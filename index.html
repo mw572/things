@@ -9,27 +9,13 @@
   <meta name="theme-color" content="#1f2937">
   <title>ADD Companion</title>
   
-  <!-- PWA Manifest inline as data URI -->
-  <link rel="manifest" href="data:application/json,{
-    &quot;name&quot;: &quot;ADD Companion&quot;,
-    &quot;short_name&quot;: &quot;ADD&quot;,
-    &quot;start_url&quot;: &quot;.&quot;,
-    &quot;display&quot;: &quot;standalone&quot;,
-    &quot;background_color&quot;: &quot;%23f9fafb&quot;,
-    &quot;theme_color&quot;: &quot;%231f2937&quot;,
-    &quot;icons&quot;: []
-  }">
+  <link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;ADD Companion&quot;,&quot;short_name&quot;:&quot;ADD&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%23f9fafb&quot;,&quot;theme_color&quot;:&quot;%231f2937&quot;}">
   
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #f9fafb;
       min-height: 100vh;
       min-height: 100dvh;
@@ -37,23 +23,16 @@
       line-height: 1.5;
     }
     
-    .container {
-      max-width: 500px;
-      margin: 0 auto;
-      padding-bottom: 2rem;
-    }
+    .container { max-width: 500px; margin: 0 auto; padding-bottom: 2rem; }
     
     /* Header */
     .header {
       position: sticky;
       top: 0;
       background: white;
-      border-bottom: 1px solid #f3f4f6;
+      border-bottom: 1px solid #e5e7eb;
       z-index: 10;
-      display: none;
     }
-    
-    .header.visible { display: block; }
     
     .header-inner {
       display: flex;
@@ -66,7 +45,6 @@
       background: none;
       border: none;
       padding: 0.5rem;
-      margin: -0.5rem;
       margin-left: -0.5rem;
       border-radius: 50%;
       cursor: pointer;
@@ -76,34 +54,73 @@
     }
     
     .back-btn:active { background: #f3f4f6; }
+    .back-btn svg { width: 1.25rem; height: 1.25rem; color: #374151; }
     
-    .header-title {
-      font-weight: 600;
-      font-size: 1rem;
-    }
+    .header-title { font-weight: 600; font-size: 1.1rem; }
     
     /* Home View */
-    .home-header {
-      padding: 1.5rem 1.25rem 0.5rem;
-    }
+    .home-header { padding: 1.5rem 1.25rem 0.75rem; }
+    .home-header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .home-header p { color: #6b7280; font-size: 0.875rem; }
     
-    .home-header h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 0.25rem;
-    }
-    
-    .home-header p {
-      color: #6b7280;
-      font-size: 0.875rem;
-    }
-    
-    /* State Cards */
-    .states-grid {
-      padding: 1rem 1.25rem;
+    /* Main Options */
+    .main-options {
+      padding: 0.5rem 1.25rem 1rem;
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
+    }
+    
+    .option-card {
+      width: 100%;
+      padding: 1.25rem;
+      border-radius: 1rem;
+      border: 2px solid;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s;
+      background: white;
+    }
+    
+    .option-card:active { transform: scale(0.98); }
+    
+    .option-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.375rem;
+    }
+    
+    .option-icon {
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .option-icon svg { width: 1.375rem; height: 1.375rem; color: white; }
+    .option-label { font-weight: 600; font-size: 1.05rem; }
+    .option-desc { font-size: 0.875rem; color: #6b7280; margin-left: 3.5rem; }
+    
+    /* Option Colors */
+    .option-checkin { background: #f0fdf4; border-color: #86efac; }
+    .option-checkin .option-icon { background: #22c55e; }
+    .option-checkin .option-label { color: #166534; }
+    
+    .option-understand { background: #eff6ff; border-color: #93c5fd; }
+    .option-understand .option-icon { background: #3b82f6; }
+    .option-understand .option-label { color: #1e40af; }
+    
+    /* State Cards */
+    .states-header { padding: 1.25rem 1.25rem 0.75rem; font-size: 1.1rem; font-weight: 600; }
+    
+    .states-grid {
+      padding: 0 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
     }
     
     .state-card {
@@ -113,7 +130,7 @@
       border: 2px solid;
       text-align: left;
       cursor: pointer;
-      transition: transform 0.1s, box-shadow 0.2s;
+      transition: transform 0.1s;
       background: white;
     }
     
@@ -123,40 +140,28 @@
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      margin-bottom: 0.5rem;
     }
     
     .state-icon {
-      width: 2.5rem;
-      height: 2.5rem;
+      width: 2.25rem;
+      height: 2.25rem;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
     
-    .state-icon svg {
-      width: 1.25rem;
-      height: 1.25rem;
-      color: white;
-    }
-    
-    .state-label {
-      font-weight: 600;
-      font-size: 1rem;
-    }
-    
-    .state-desc {
-      font-size: 0.875rem;
-      color: #6b7280;
-    }
+    .state-icon svg { width: 1.125rem; height: 1.125rem; color: white; }
+    .state-label { font-weight: 600; font-size: 0.95rem; }
+    .state-desc { font-size: 0.8rem; color: #6b7280; margin-left: 3rem; margin-top: 0.25rem; }
     
     /* State Colors */
     .state-understimulated .state-card { background: #fffbeb; border-color: #fde68a; }
     .state-understimulated .state-icon { background: #f59e0b; }
     .state-understimulated .state-label { color: #b45309; }
     
-    .state-overwhelmed .state-card { background: #f8fafc; border-color: #e2e8f0; }
+    .state-overwhelmed .state-card { background: #f8fafc; border-color: #cbd5e1; }
     .state-overwhelmed .state-icon { background: #64748b; }
     .state-overwhelmed .state-label { color: #475569; }
     
@@ -169,11 +174,7 @@
     .state-regulated .state-label { color: #047857; }
     
     /* Sections Grid */
-    .sections-header {
-      padding: 1rem 1.25rem 0.75rem;
-      font-size: 1.125rem;
-      font-weight: 600;
-    }
+    .sections-header { padding: 1.5rem 1.25rem 0.75rem; font-size: 1.1rem; font-weight: 600; }
     
     .sections-grid {
       padding: 0 1.25rem;
@@ -188,7 +189,7 @@
       gap: 0.75rem;
       padding: 1rem;
       background: white;
-      border: 1px solid #f3f4f6;
+      border: 1px solid #e5e7eb;
       border-radius: 0.75rem;
       cursor: pointer;
       text-align: left;
@@ -196,18 +197,8 @@
     }
     
     .section-btn:active { background: #f9fafb; }
-    
-    .section-btn svg {
-      width: 1.25rem;
-      height: 1.25rem;
-      color: #9ca3af;
-    }
-    
-    .section-btn span {
-      font-weight: 500;
-      color: #374151;
-      font-size: 0.9rem;
-    }
+    .section-btn svg { width: 1.25rem; height: 1.25rem; color: #9ca3af; flex-shrink: 0; }
+    .section-btn span { font-weight: 500; color: #374151; font-size: 0.9rem; }
     
     /* Quote */
     .quote-card {
@@ -218,19 +209,8 @@
       color: white;
     }
     
-    .quote-card p {
-      font-size: 0.9rem;
-      opacity: 0.9;
-      font-style: italic;
-      line-height: 1.6;
-    }
-    
-    .quote-card .author {
-      font-size: 0.75rem;
-      opacity: 0.6;
-      margin-top: 0.5rem;
-      font-style: normal;
-    }
+    .quote-card p { font-size: 0.9rem; opacity: 0.9; font-style: italic; line-height: 1.6; }
+    .quote-card .author { font-size: 0.75rem; opacity: 0.6; margin-top: 0.5rem; font-style: normal; }
     
     /* Interventions View */
     .need-card {
@@ -240,16 +220,8 @@
       border: 1px solid;
     }
     
-    .need-card .label {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: #6b7280;
-      margin-bottom: 0.25rem;
-    }
-    
-    .need-card .text {
-      font-weight: 500;
-    }
+    .need-card .label { font-size: 0.875rem; font-weight: 500; color: #6b7280; margin-bottom: 0.25rem; }
+    .need-card .text { font-weight: 500; }
     
     .interventions-list {
       padding: 0 1.25rem;
@@ -261,7 +233,7 @@
     .intervention-card {
       background: white;
       border-radius: 0.75rem;
-      border: 1px solid #f3f4f6;
+      border: 1px solid #e5e7eb;
       overflow: hidden;
       box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
@@ -287,10 +259,7 @@
       flex-shrink: 0;
     }
     
-    .intervention-title {
-      font-weight: 500;
-      flex: 1;
-    }
+    .intervention-title { font-weight: 500; flex: 1; }
     
     .intervention-detail {
       padding: 0 1rem 1rem 3.75rem;
@@ -302,13 +271,17 @@
     
     .intervention-card.expanded .intervention-detail { display: block; }
     
+    /* Chevron styling */
     .chevron {
+      width: 1.25rem;
+      height: 1.25rem;
+      color: #9ca3af;
       transition: transform 0.2s;
+      flex-shrink: 0;
     }
     
-    .intervention-card.expanded .chevron {
-      transform: rotate(180deg);
-    }
+    .intervention-card.expanded .chevron { transform: rotate(180deg); }
+    .content-item.expanded .chevron { transform: rotate(180deg); }
     
     .check-again-btn {
       margin: 1.5rem 1.25rem;
@@ -330,13 +303,13 @@
       padding: 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: 1.25rem;
     }
     
     .content-group {
       background: white;
       border-radius: 0.75rem;
-      border: 1px solid #f3f4f6;
+      border: 1px solid #e5e7eb;
       overflow: hidden;
       box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
@@ -345,7 +318,7 @@
       font-weight: 600;
       padding: 1rem;
       background: #f9fafb;
-      border-bottom: 1px solid #f3f4f6;
+      border-bottom: 1px solid #e5e7eb;
       font-size: 0.95rem;
     }
     
@@ -361,12 +334,10 @@
       align-items: center;
       justify-content: space-between;
       padding: 0.875rem 1rem;
+      gap: 0.75rem;
     }
     
-    .content-item-heading {
-      font-weight: 500;
-      font-size: 0.9rem;
-    }
+    .content-item-heading { font-weight: 500; font-size: 0.9rem; flex: 1; }
     
     .content-item-text {
       padding: 0 1rem 0.875rem;
@@ -377,12 +348,68 @@
     }
     
     .content-item.expanded .content-item-text { display: block; }
-    .content-item.expanded .chevron { transform: rotate(180deg); }
     
-    /* Utilities */
-    .hidden { display: none !important; }
+    /* Info/Prose sections */
+    .prose-section {
+      padding: 1.25rem;
+    }
     
-    /* Safe area for notched phones */
+    .prose-card {
+      background: white;
+      border-radius: 0.75rem;
+      border: 1px solid #e5e7eb;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    
+    .prose-card:last-child { margin-bottom: 0; }
+    
+    .prose-card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: #1f2937;
+    }
+    
+    .prose-card p {
+      font-size: 0.9rem;
+      color: #4b5563;
+      line-height: 1.7;
+      margin-bottom: 0.75rem;
+    }
+    
+    .prose-card p:last-child { margin-bottom: 0; }
+    
+    .prose-card strong { color: #1f2937; }
+    
+    .prose-card ul {
+      margin: 0.5rem 0;
+      padding-left: 1.25rem;
+    }
+    
+    .prose-card li {
+      font-size: 0.9rem;
+      color: #4b5563;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    
+    .highlight-box {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin: 0.75rem 0;
+    }
+    
+    .highlight-box p {
+      color: #92400e;
+      font-size: 0.875rem;
+      margin: 0;
+    }
+    
+    /* Safe area */
     @supports (padding-top: env(safe-area-inset-top)) {
       .header { padding-top: env(safe-area-inset-top); }
       body { padding-bottom: env(safe-area-inset-bottom); }
@@ -393,7 +420,6 @@
   <div class="container" id="app"></div>
 
   <script>
-    // Icons as SVG strings
     const icons = {
       arrowLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
       chevronDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>',
@@ -404,11 +430,12 @@
       clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
       heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>',
       users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-      briefcase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
-      sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>'
+      briefcase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+      sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
+      info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+      activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>'
     };
 
-    // Data
     const states = {
       understimulated: {
         id: 'understimulated',
@@ -470,185 +497,167 @@
 
     const sections = {
       tasks: {
-        id: 'tasks',
-        label: 'Tasks',
-        icon: 'clock',
+        id: 'tasks', label: 'Tasks', icon: 'clock',
         content: [
-          {
-            title: 'Starting (The Hardest Part)',
-            items: [
-              { heading: 'Shrink the commitment', text: 'Not "write the report" — "open the document and write one sentence." Your brain rebels against large commitments. Make starting trivial.' },
-              { heading: 'Implementation intentions', text: '"When I finish lunch, I will immediately open the spreadsheet." Linking new behaviour to existing triggers bypasses decision fatigue.' },
-              { heading: 'Externalise motivation', text: 'Accountability partners, public commitments, coworking. Internal motivation is unreliable; borrow structure from outside.' }
-            ]
-          },
-          {
-            title: 'Sustaining Focus',
-            items: [
-              { heading: 'Timeboxing', text: 'Work in defined blocks: 25 or 45 minutes. Open-ended sessions are focus death. Containers create urgency.' },
-              { heading: 'The "boring" workaround', text: "Can you make it novel? Gamify it? Add stakes? You're not lazy — you're understimulated." },
-              { heading: 'One tab, one task', text: "Close everything except what you're working on. Every open option is a leak in your attention." }
-            ]
-          },
-          {
-            title: 'Finishing',
-            items: [
-              { heading: 'Define "done" before starting', text: 'Not "work on presentation" — "complete slides 1-5 with speaker notes." Ambiguous endpoints make completion impossible.' },
-              { heading: 'Completion rituals', text: 'Physical act to mark finishing: close the laptop, stand up, say "done" out loud. Your brain needs clear signals.' },
-              { heading: 'The 90% trap', text: 'ADD brains often stop at "basically done." Build in a final review step. The last 10% is where things fall apart.' }
-            ]
-          }
+          { title: 'Starting (The Hardest Part)', items: [
+            { heading: 'Shrink the commitment', text: 'Not "write the report" — "open the document and write one sentence." Your brain rebels against large commitments. Make starting trivial.' },
+            { heading: 'Implementation intentions', text: '"When I finish lunch, I will immediately open the spreadsheet." Linking new behaviour to existing triggers bypasses decision fatigue.' },
+            { heading: 'Externalise motivation', text: 'Accountability partners, public commitments, coworking. Internal motivation is unreliable; borrow structure from outside.' }
+          ]},
+          { title: 'Sustaining Focus', items: [
+            { heading: 'Timeboxing', text: 'Work in defined blocks: 25 or 45 minutes. Open-ended sessions are focus death. Containers create urgency.' },
+            { heading: 'The "boring" workaround', text: "Can you make it novel? Gamify it? Add stakes? You're not lazy — you're understimulated." },
+            { heading: 'One tab, one task', text: "Close everything except what you're working on. Every open option is a leak in your attention." }
+          ]},
+          { title: 'Finishing', items: [
+            { heading: 'Define "done" before starting', text: 'Not "work on presentation" — "complete slides 1-5 with speaker notes." Ambiguous endpoints make completion impossible.' },
+            { heading: 'Completion rituals', text: 'Physical act to mark finishing: close the laptop, stand up, say "done" out loud. Your brain needs clear signals.' },
+            { heading: 'The 90% trap', text: 'ADD brains often stop at "basically done." Build in a final review step. The last 10% is where things fall apart.' }
+          ]}
         ]
       },
       emotions: {
-        id: 'emotions',
-        label: 'Emotions',
-        icon: 'heart',
+        id: 'emotions', label: 'Emotions', icon: 'heart',
         content: [
-          {
-            title: 'The ADD Emotional Pattern',
-            items: [
-              { heading: 'Fast and intense', text: "Feelings arrive quickly and hit hard. This isn't weakness — it's part of the same dysregulation that affects attention." },
-              { heading: 'Rejection sensitivity', text: "Criticism lands disproportionately. You're not overreacting — your nervous system processes it differently." },
-              { heading: 'Rumination loops', text: 'Difficulty letting things go. The same thought circling. This is attention dysregulation applied to emotions.' }
-            ]
-          },
-          {
-            title: 'Working With It',
-            items: [
-              { heading: "The feeling isn't the problem", text: 'The avoidance is. Most ADD coping (distraction, busyness) is avoiding feelings. The scatteredness often IS the avoidance.' },
-              { heading: 'Tolerate before you regulate', text: 'When a difficult feeling arises, pause. Don\'t fix or distract. Just notice: "I feel anxious." Stay with it for 30 seconds.' },
-              { heading: 'Separate feeling from story', text: '"I feel rejected" is a feeling. "They think I\'m incompetent" is a story. You can have the feeling without believing the story.' }
-            ]
-          },
-          {
-            title: 'On Shame',
-            items: [
-              { heading: "It's not earned", text: 'The shame of "I should be able to do this" is inherited, not deserved. You adapted to circumstances.' },
-              { heading: 'Address it directly', text: 'Unexamined shame runs your life. Name it. Look at it. Ask: where did this come from?' }
-            ]
-          }
+          { title: 'The ADD Emotional Pattern', items: [
+            { heading: 'Fast and intense', text: "Feelings arrive quickly and hit hard. This isn't weakness — it's part of the same dysregulation that affects attention." },
+            { heading: 'Rejection sensitivity', text: "Criticism lands disproportionately. You're not overreacting — your nervous system processes it differently." },
+            { heading: 'Rumination loops', text: 'Difficulty letting things go. The same thought circling. This is attention dysregulation applied to emotions.' }
+          ]},
+          { title: 'Working With It', items: [
+            { heading: "The feeling isn't the problem", text: 'The avoidance is. Most ADD coping (distraction, busyness) is avoiding feelings. The scatteredness often IS the avoidance.' },
+            { heading: 'Tolerate before you regulate', text: 'When a difficult feeling arises, pause. Don\'t fix or distract. Just notice: "I feel anxious." Stay with it for 30 seconds.' },
+            { heading: 'Separate feeling from story', text: '"I feel rejected" is a feeling. "They think I\'m incompetent" is a story. You can have the feeling without believing the story.' }
+          ]},
+          { title: 'On Shame', items: [
+            { heading: "It's not earned", text: 'The shame of "I should be able to do this" is inherited, not deserved. You adapted to circumstances.' },
+            { heading: 'Address it directly', text: 'Unexamined shame runs your life. Name it. Look at it. Ask: where did this come from?' }
+          ]}
         ]
       },
       relationships: {
-        id: 'relationships',
-        label: 'Relationships',
-        icon: 'users',
+        id: 'relationships', label: 'Relationships', icon: 'users',
         content: [
-          {
-            title: 'Common Patterns',
-            items: [
-              { heading: 'Interrupting', text: 'Impulse control failure. Try: physical anchor — hold an object, press fingers together when the urge arises.' },
-              { heading: 'Forgetting commitments', text: 'Time blindness + out of sight = out of mind. Use shared calendars, immediate capture, repeat back what was agreed.' },
-              { heading: 'Emotional reactivity', text: 'Feels like overreaction to others. Try: "Let me think about that and come back to you." Build in time delays.' },
-              { heading: 'Inconsistent presence', text: 'Hyperfocus elsewhere. Schedule protected time for relationships. Devices physically away.' }
-            ]
-          },
-          {
-            title: 'How to Explain It',
-            items: [
-              { heading: 'A script that works', text: '"My brain works differently in ways that affect [specific behaviour]. It\'s not that I don\'t care. Here\'s what I\'m doing to manage it: [strategy]. Here\'s what would help from you: [request]."' },
-              { heading: "Don't over-apologise", text: "Don't use ADD as an excuse. Do be specific and solutions-oriented. Take responsibility without taking blame." }
-            ]
-          }
+          { title: 'Common Patterns', items: [
+            { heading: 'Interrupting', text: 'Impulse control failure. Try: physical anchor — hold an object, press fingers together when the urge arises.' },
+            { heading: 'Forgetting commitments', text: 'Time blindness + out of sight = out of mind. Use shared calendars, immediate capture, repeat back what was agreed.' },
+            { heading: 'Emotional reactivity', text: 'Feels like overreaction to others. Try: "Let me think about that and come back to you." Build in time delays.' },
+            { heading: 'Inconsistent presence', text: 'Hyperfocus elsewhere. Schedule protected time for relationships. Devices physically away.' }
+          ]},
+          { title: 'How to Explain It', items: [
+            { heading: 'A script that works', text: '"My brain works differently in ways that affect [specific behaviour]. It\'s not that I don\'t care. Here\'s what I\'m doing to manage it: [strategy]. Here\'s what would help from you: [request]."' },
+            { heading: "Don't over-apologise", text: "Don't use ADD as an excuse. Do be specific and solutions-oriented. Take responsibility without taking blame." }
+          ]}
         ]
       },
       work: {
-        id: 'work',
-        label: 'Work',
-        icon: 'briefcase',
+        id: 'work', label: 'Work', icon: 'briefcase',
         content: [
-          {
-            title: 'Meeting Your Limitations',
-            items: [
-              { heading: 'Time estimation is broken', text: 'Build in buffers. Never promise tight turnarounds. Add 50% to every estimate as default.' },
-              { heading: 'Sustained admin is impossible', text: "Batch it, outsource it, or automate it. Don't pretend you'll do it consistently." },
-              { heading: 'Open-plan destroys you', text: 'Noise-cancelling headphones, remote work when possible, find private space.' },
-              { heading: 'Email becomes a graveyard', text: 'Time-blocked processing (twice daily), not reactive checking.' }
-            ]
-          },
-          {
-            title: 'Playing to Strengths',
-            items: [
-              { heading: 'Crisis response', text: "High stimulation = engagement. You're good in emergencies." },
-              { heading: 'Novel problem-solving', text: 'You see connections others miss. Non-linear thinking is an asset.' },
-              { heading: 'Hyperfocus bursts', text: 'When aligned with interest, you can outwork anyone. Unsustainable but powerful.' },
-              { heading: 'Stop trying to be consistent', text: "You're not going to become a steady plodder. Design your role around what you're actually good at." }
-            ]
-          },
-          {
-            title: 'Energy Management',
-            items: [
-              { heading: 'Your capacity is variable', text: "Not constant. Track when you're sharp, when you crash. Build your schedule around this." },
-              { heading: 'High-energy windows', text: 'Deep work, complex decisions, creative work. Protect these times aggressively.' },
-              { heading: 'Low-energy windows', text: "Admin, email, routine tasks. Don't waste good hours on these." }
-            ]
-          }
+          { title: 'Meeting Your Limitations', items: [
+            { heading: 'Time estimation is broken', text: 'Build in buffers. Never promise tight turnarounds. Add 50% to every estimate as default.' },
+            { heading: 'Sustained admin is impossible', text: "Batch it, outsource it, or automate it. Don't pretend you'll do it consistently." },
+            { heading: 'Open-plan destroys you', text: 'Noise-cancelling headphones, remote work when possible, find private space.' },
+            { heading: 'Email becomes a graveyard', text: 'Time-blocked processing (twice daily), not reactive checking.' }
+          ]},
+          { title: 'Playing to Strengths', items: [
+            { heading: 'Crisis response', text: "High stimulation = engagement. You're good in emergencies." },
+            { heading: 'Novel problem-solving', text: 'You see connections others miss. Non-linear thinking is an asset.' },
+            { heading: 'Hyperfocus bursts', text: 'When aligned with interest, you can outwork anyone. Unsustainable but powerful.' },
+            { heading: 'Stop trying to be consistent', text: "You're not going to become a steady plodder. Design your role around what you're actually good at." }
+          ]},
+          { title: 'Energy Management', items: [
+            { heading: 'Your capacity is variable', text: "Not constant. Track when you're sharp, when you crash. Build your schedule around this." },
+            { heading: 'High-energy windows', text: 'Deep work, complex decisions, creative work. Protect these times aggressively.' },
+            { heading: 'Low-energy windows', text: "Admin, email, routine tasks. Don't waste good hours on these." }
+          ]}
         ]
       },
       routines: {
-        id: 'routines',
-        label: 'Routines',
-        icon: 'sun',
+        id: 'routines', label: 'Routines', icon: 'sun',
         content: [
-          {
-            title: 'Morning Non-Negotiables',
-            items: [
-              { heading: 'No phone first 30-60 mins', text: "Protect your attentional state before it's hijacked. This is the highest-leverage habit." },
-              { heading: 'Physical activation', text: 'Movement wakes up the prefrontal cortex. Even 10 minutes.' },
-              { heading: 'Review the day', text: 'What are the 1-3 things that actually matter today? Not a list. Priorities.' },
-              { heading: 'Eat protein', text: 'Stabilises blood sugar, supports dopamine production. Not optional.' }
-            ]
-          },
-          {
-            title: 'Evening Wind-Down',
-            items: [
-              { heading: 'Hard stop on work', text: 'Defined time, not "when I\'m done." You\'ll never feel done.' },
-              { heading: 'Brain dump', text: 'Write down anything still spinning. Get it out of your head and onto paper.' },
-              { heading: 'Reduce stimulation', text: 'Screens down, lights low. Your nervous system needs the signal.' },
-              { heading: 'Same sleep time', text: 'Irregular sleep worsens everything. Protect this ruthlessly.' }
-            ]
-          },
-          {
-            title: 'Weekly Rhythm',
-            items: [
-              { heading: 'Weekly review', text: "What worked? What didn't? Adjust systems. 30 minutes, same time each week." },
-              { heading: 'Plan the week', text: 'Not a detailed schedule. Key priorities identified. Buffer space left.' },
-              { heading: 'One "off" period', text: 'Time with no obligations, no productivity pressure. This is not optional.' }
-            ]
-          }
+          { title: 'Morning Non-Negotiables', items: [
+            { heading: 'No phone first 30-60 mins', text: "Protect your attentional state before it's hijacked. This is the highest-leverage habit." },
+            { heading: 'Physical activation', text: 'Movement wakes up the prefrontal cortex. Even 10 minutes.' },
+            { heading: 'Review the day', text: 'What are the 1-3 things that actually matter today? Not a list. Priorities.' },
+            { heading: 'Eat protein', text: 'Stabilises blood sugar, supports dopamine production. Not optional.' }
+          ]},
+          { title: 'Evening Wind-Down', items: [
+            { heading: 'Hard stop on work', text: 'Defined time, not "when I\'m done." You\'ll never feel done.' },
+            { heading: 'Brain dump', text: 'Write down anything still spinning. Get it out of your head and onto paper.' },
+            { heading: 'Reduce stimulation', text: 'Screens down, lights low. Your nervous system needs the signal.' },
+            { heading: 'Same sleep time', text: 'Irregular sleep worsens everything. Protect this ruthlessly.' }
+          ]},
+          { title: 'Weekly Rhythm', items: [
+            { heading: 'Weekly review', text: "What worked? What didn't? Adjust systems. 30 minutes, same time each week." },
+            { heading: 'Plan the week', text: 'Not a detailed schedule. Key priorities identified. Buffer space left.' },
+            { heading: 'One "off" period', text: 'Time with no obligations, no productivity pressure. This is not optional.' }
+          ]}
         ]
       }
     };
 
-    // App State
     let currentView = 'home';
     let selectedState = null;
     let selectedSection = null;
 
-    // Render functions
     function render() {
       const app = document.getElementById('app');
-      
-      if (currentView === 'home') {
-        app.innerHTML = renderHome();
-      } else if (currentView === 'interventions') {
-        app.innerHTML = renderInterventions();
-      } else if (currentView === 'section') {
-        app.innerHTML = renderSection();
-      }
-      
+      if (currentView === 'home') app.innerHTML = renderHome();
+      else if (currentView === 'checkin') app.innerHTML = renderCheckin();
+      else if (currentView === 'interventions') app.innerHTML = renderInterventions();
+      else if (currentView === 'section') app.innerHTML = renderSection();
+      else if (currentView === 'understand') app.innerHTML = renderUnderstand();
       attachEventListeners();
+      window.scrollTo(0, 0);
     }
 
     function renderHome() {
       return `
-        <div class="header"></div>
         <div class="home-header">
-          <h1>How are you right now?</h1>
-          <p>Recognise your state, then work with it.</p>
+          <h1>ADD Companion</h1>
+          <p>Based on Gabor Maté's Scattered Minds</p>
         </div>
-        <div class="states-grid">
+        <div class="main-options">
+          <div class="option-card option-checkin" data-action="checkin">
+            <div class="option-card-header">
+              <div class="option-icon">${icons.activity}</div>
+              <span class="option-label">I need help now</span>
+            </div>
+            <p class="option-desc">Check in with how you're feeling and get practical support</p>
+          </div>
+          <div class="option-card option-understand" data-action="understand">
+            <div class="option-card-header">
+              <div class="option-icon">${icons.info}</div>
+              <span class="option-label">Understanding ADD</span>
+            </div>
+            <p class="option-desc">What it is, where it comes from, and why this approach works</p>
+          </div>
+        </div>
+        <h2 class="sections-header">Go deeper</h2>
+        <div class="sections-grid">
+          ${Object.values(sections).map(s => `
+            <button class="section-btn" data-section="${s.id}">
+              ${icons[s.icon]}
+              <span>${s.label}</span>
+            </button>
+          `).join('')}
+        </div>
+        <div class="quote-card">
+          <p>"The greatest gift you can give yourself is to understand yourself without judgment."</p>
+          <p class="author">— Gabor Maté</p>
+        </div>
+      `;
+    }
+
+    function renderCheckin() {
+      return `
+        <div class="header">
+          <div class="header-inner">
+            <button class="back-btn" data-action="home">${icons.arrowLeft}</button>
+            <h1 class="header-title">How are you right now?</h1>
+          </div>
+        </div>
+        <div class="states-grid" style="padding-top: 1.25rem;">
           ${Object.values(states).map(state => `
             <div class="state-${state.id}" data-state="${state.id}">
               <div class="state-card">
@@ -661,64 +670,49 @@
             </div>
           `).join('')}
         </div>
-        <h2 class="sections-header">Go deeper</h2>
-        <div class="sections-grid">
-          ${Object.values(sections).map(section => `
-            <button class="section-btn" data-section="${section.id}">
-              ${icons[section.icon]}
-              <span>${section.label}</span>
-            </button>
-          `).join('')}
-        </div>
-        <div class="quote-card">
-          <p>"The greatest gift you can give yourself is to understand yourself without judgment."</p>
-          <p class="author">— Gabor Maté</p>
-        </div>
       `;
     }
 
     function renderInterventions() {
       const state = states[selectedState];
-      const colorClasses = {
+      const colors = {
         understimulated: { bg: '#fffbeb', border: '#fde68a', text: '#b45309', accent: '#f59e0b' },
-        overwhelmed: { bg: '#f8fafc', border: '#e2e8f0', text: '#475569', accent: '#64748b' },
+        overwhelmed: { bg: '#f8fafc', border: '#cbd5e1', text: '#475569', accent: '#64748b' },
         hyperactivated: { bg: '#fff1f2', border: '#fecdd3', text: '#be123c', accent: '#f43f5e' },
         regulated: { bg: '#ecfdf5', border: '#a7f3d0', text: '#047857', accent: '#10b981' }
-      };
-      const colors = colorClasses[selectedState];
+      }[selectedState];
       
       return `
-        <div class="header visible">
+        <div class="header">
           <div class="header-inner">
-            <button class="back-btn" data-action="home">${icons.arrowLeft}</button>
+            <button class="back-btn" data-action="checkin">${icons.arrowLeft}</button>
             <h1 class="header-title">${state.label}</h1>
           </div>
         </div>
-        <div class="need-card" style="background: ${colors.bg}; border-color: ${colors.border};">
+        <div class="need-card" style="background:${colors.bg};border-color:${colors.border};">
           <p class="label">What you need:</p>
-          <p class="text" style="color: ${colors.text};">${state.need}</p>
+          <p class="text" style="color:${colors.text};">${state.need}</p>
         </div>
         <div class="interventions-list">
-          ${state.interventions.map((intervention, i) => `
-            <div class="intervention-card ${i === 0 ? 'expanded' : ''}" data-intervention="${i}">
+          ${state.interventions.map((int, i) => `
+            <div class="intervention-card ${i===0?'expanded':''}" data-intervention="${i}">
               <div class="intervention-header">
-                <div class="intervention-number" style="background: ${colors.accent};">${i + 1}</div>
-                <span class="intervention-title">${intervention.title}</span>
+                <div class="intervention-number" style="background:${colors.accent};">${i+1}</div>
+                <span class="intervention-title">${int.title}</span>
                 <span class="chevron">${icons.chevronDown}</span>
               </div>
-              <div class="intervention-detail">${intervention.detail}</div>
+              <div class="intervention-detail">${int.detail}</div>
             </div>
           `).join('')}
         </div>
-        <button class="check-again-btn" data-action="home">Check in again</button>
+        <button class="check-again-btn" data-action="checkin">Check in again</button>
       `;
     }
 
     function renderSection() {
       const section = sections[selectedSection];
-      
       return `
-        <div class="header visible">
+        <div class="header">
           <div class="header-inner">
             <button class="back-btn" data-action="home">${icons.arrowLeft}</button>
             <h1 class="header-title">${section.label}</h1>
@@ -743,62 +737,127 @@
       `;
     }
 
+    function renderUnderstand() {
+      return `
+        <div class="header">
+          <div class="header-inner">
+            <button class="back-btn" data-action="home">${icons.arrowLeft}</button>
+            <h1 class="header-title">Understanding ADD</h1>
+          </div>
+        </div>
+        <div class="prose-section">
+          <div class="prose-card">
+            <h3>What ADD Actually Is</h3>
+            <p>ADD is <strong>not</strong> a character flaw, laziness, or lack of intelligence. It's a <strong>developmental adaptation</strong> — your brain organised itself around early environmental conditions (stress, attunement gaps, chaos) in ways that made sense at the time.</p>
+            <p>The core issue isn't attention. It's <strong>self-regulation</strong>. Your nervous system struggles to:</p>
+            <ul>
+              <li>Maintain optimal arousal (you're either understimulated or overwhelmed)</li>
+              <li>Filter stimuli (everything feels equally urgent)</li>
+              <li>Tolerate uncomfortable internal states (boredom, anxiety, emptiness)</li>
+            </ul>
+            <div class="highlight-box">
+              <p><strong>Why this matters:</strong> If you think ADD is a willpower problem, you'll try to force yourself through it and fail. If you understand it as a regulation problem, you can design around it.</p>
+            </div>
+          </div>
+
+          <div class="prose-card">
+            <h3>Where It Comes From</h3>
+            <p>Maté's view: ADD develops in the context of early relationships. It's not purely genetic — it emerges when a child's environment doesn't provide the consistent, attuned presence needed for the brain to develop robust self-regulation.</p>
+            <p>This isn't about blame. Parents were doing their best with their own circumstances. But understanding the origin helps you see that <strong>you adapted to survive</strong>, and those adaptations are still running.</p>
+          </div>
+
+          <div class="prose-card">
+            <h3>The Four Core Struggles</h3>
+            <p><strong>1. Attention Dysregulation</strong><br>
+            Not a deficit — a dysregulation. You can hyperfocus for hours on the right thing; you can't direct attention voluntarily to the "wrong" thing. Your reward system needs higher stimulation to engage.</p>
+            <p><strong>2. Impulse Control</strong><br>
+            The gap between stimulus and response is too short. You act before the executive brain has time to weigh in. The prefrontal cortex is underactive relative to the limbic system.</p>
+            <p><strong>3. Restlessness</strong><br>
+            Physical (can't sit still) or mental (racing thoughts). Your nervous system is seeking stimulation to reach baseline. Stillness feels like deprivation.</p>
+            <p><strong>4. Emotional Sensitivity</strong><br>
+            Often overlooked. Intense emotional responses, rejection sensitivity, difficulty letting things go. The same dysregulation that affects attention affects emotional processing.</p>
+          </div>
+
+          <div class="prose-card">
+            <h3>What ADD Is Good For</h3>
+            <p>Your brain isn't broken — it's different. ADD often comes with genuine strengths:</p>
+            <ul>
+              <li><strong>Crisis response:</strong> High stimulation = engagement. You're good when things are urgent.</li>
+              <li><strong>Novel problem-solving:</strong> You see connections others miss. Non-linear thinking is an asset.</li>
+              <li><strong>Hyperfocus:</strong> When aligned with interest, you can outwork anyone.</li>
+              <li><strong>Energy and enthusiasm:</strong> When you're engaged, you bring intensity others can't match.</li>
+            </ul>
+            <p>The goal isn't to eliminate these traits — it's to <strong>channel them</strong> and manage the downsides.</p>
+          </div>
+
+          <div class="prose-card">
+            <h3>What About Medication?</h3>
+            <p>Medication can help. It adjusts dopamine and norepinephrine levels, making it easier to engage with low-stimulation tasks and improving impulse control.</p>
+            <p><strong>What medication does:</strong></p>
+            <ul>
+              <li>Raises baseline arousal so you need less external stimulation</li>
+              <li>Improves working memory and focus</li>
+              <li>Reduces impulsivity</li>
+            </ul>
+            <p><strong>What medication doesn't do:</strong></p>
+            <ul>
+              <li>Teach you skills you never developed</li>
+              <li>Change ingrained habits and coping mechanisms</li>
+              <li>Address the emotional patterns (shame, avoidance, sensitivity)</li>
+              <li>Design your environment and systems for you</li>
+            </ul>
+            <div class="highlight-box">
+              <p>Medication can make it <em>easier</em> to do the work — but the work still has to be done. That's what this approach is about.</p>
+            </div>
+          </div>
+
+          <div class="prose-card">
+            <h3>Why This Approach</h3>
+            <p>This isn't about forcing yourself to be "normal." It's about understanding your nervous system and working <strong>with</strong> it rather than against it.</p>
+            <p>The framework here is practical:</p>
+            <ul>
+              <li><strong>Recognise your state</strong> — know whether you're understimulated, overwhelmed, or hyperactivated</li>
+              <li><strong>Intervene appropriately</strong> — different states need different responses</li>
+              <li><strong>Design your environment</strong> — stop relying on willpower; build systems</li>
+              <li><strong>Address the emotional layer</strong> — the shame, the avoidance, the sensitivity</li>
+            </ul>
+            <p>The goal isn't to become neurotypical. The goal is to become <strong>functional, fulfilled, and at peace with who you actually are.</strong></p>
+          </div>
+        </div>
+      `;
+    }
+
     function attachEventListeners() {
-      // State cards
-      document.querySelectorAll('[data-state]').forEach(el => {
-        el.addEventListener('click', () => {
-          selectedState = el.dataset.state;
-          currentView = 'interventions';
-          render();
-        });
+      document.querySelectorAll('[data-action="checkin"]').forEach(el => {
+        el.addEventListener('click', () => { currentView = 'checkin'; render(); });
       });
-      
-      // Section buttons
-      document.querySelectorAll('[data-section]').forEach(el => {
-        el.addEventListener('click', () => {
-          selectedSection = el.dataset.section;
-          currentView = 'section';
-          render();
-        });
+      document.querySelectorAll('[data-action="understand"]').forEach(el => {
+        el.addEventListener('click', () => { currentView = 'understand'; render(); });
       });
-      
-      // Back / Home buttons
       document.querySelectorAll('[data-action="home"]').forEach(el => {
-        el.addEventListener('click', () => {
-          currentView = 'home';
-          selectedState = null;
-          selectedSection = null;
-          render();
-        });
+        el.addEventListener('click', () => { currentView = 'home'; selectedState = null; selectedSection = null; render(); });
       });
-      
-      // Intervention cards
+      document.querySelectorAll('[data-state]').forEach(el => {
+        el.addEventListener('click', () => { selectedState = el.dataset.state; currentView = 'interventions'; render(); });
+      });
+      document.querySelectorAll('[data-section]').forEach(el => {
+        el.addEventListener('click', () => { selectedSection = el.dataset.section; currentView = 'section'; render(); });
+      });
       document.querySelectorAll('[data-intervention]').forEach(el => {
-        el.querySelector('.intervention-header').addEventListener('click', () => {
-          el.classList.toggle('expanded');
-        });
+        el.querySelector('.intervention-header').addEventListener('click', () => { el.classList.toggle('expanded'); });
       });
-      
-      // Content items
       document.querySelectorAll('.content-item').forEach(el => {
-        el.addEventListener('click', () => {
-          el.classList.toggle('expanded');
-        });
+        el.addEventListener('click', () => { el.classList.toggle('expanded'); });
       });
     }
 
-    // Service Worker for offline support
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('data:text/javascript,' + encodeURIComponent(`
         self.addEventListener('install', e => self.skipWaiting());
         self.addEventListener('activate', e => e.waitUntil(clients.claim()));
-        self.addEventListener('fetch', e => {
-          e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
-        });
       `)).catch(() => {});
     }
 
-    // Initial render
     render();
   </script>
 </body>
