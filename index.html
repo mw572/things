@@ -8,8 +8,18 @@
   <meta name="apple-mobile-web-app-title" content="ADD Companion">
   <meta name="theme-color" content="#1f2937">
   <title>ADD Companion</title>
-  
+  <script src="https://t.contentsquare.net/uxa/953c12ed56a06.js"></script>
   <link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;ADD Companion&quot;,&quot;short_name&quot;:&quot;ADD&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%23f9fafb&quot;,&quot;theme_color&quot;:&quot;%231f2937&quot;}">
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-G2FS7Z73L9"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-G2FS7Z73L9');
+  </script>
   
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -418,7 +428,15 @@
 </head>
 <body>
   <div class="container" id="app"></div>
+  <div id="stats"
+     style="max-width:500px;margin:0 auto;
+            text-align:center;font-size:0.75rem;
+            color:#9ca3af;padding:0.75rem 0 1.5rem;">
+  <span id="total-visits">–</span> total uses ·
+  <span id="live-count">0</span> people here now
+</div>
 
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script>
     const icons = {
       arrowLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
@@ -858,7 +876,115 @@
       `)).catch(() => {});
     }
 
-    render();
+     // ---------------- Supabase setup ----------------
+  const SUPABASE_URL = 'https://nchsabvhbenfntsnivlu.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jaHNhYnZoYmVuZm50c25pdmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NjYyNDEsImV4cCI6MjA4MDI0MjI0MX0.1kWsELW7Z3roKq6lcVjhYNGDxccT7b2kXB7tWeDF6V8';
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const SESSION_ID_KEY = 'add_companion_session_id';
+
+  function getSessionId() {
+    let id = localStorage.getItem(SESSION_ID_KEY);
+    if (!id) {
+      if (crypto && crypto.randomUUID) {
+        id = crypto.randomUUID();
+      } else {
+        id = 'sess-' + Math.random().toString(36).slice(2);
+      }
+      localStorage.setItem(SESSION_ID_KEY, id);
+    }
+    return id;
+  }
+
+  // 1) Track total visits
+  async function trackVisit() {
+    const sessionId = getSessionId();
+    try {
+      await supabase
+        .from('page_visits')
+        .insert({ session_id: sessionId });
+    } catch (e) {
+      // metrics should never break the app
+      console.warn('trackVisit failed', e);
+    }
+  }
+
+  async function updateTotalVisits() {
+    try {
+      const { error, count } = await supabase
+        .from('page_visits')
+        .select('id', { count: 'exact', head: true });
+
+      if (!error) {
+        const el = document.getElementById('total-visits');
+        if (el) el.textContent = (count || 0).toLocaleString();
+      }
+    } catch (e) {
+      console.warn('updateTotalVisits failed', e);
+    }
+  }
+
+  // 2) Presence / live users
+  async function heartbeat() {
+    const sessionId = getSessionId();
+    try {
+      await supabase
+        .from('presence')
+        .upsert({
+          session_id: sessionId,
+          last_seen: new Date().toISOString()
+        });
+    } catch (e) {
+      console.warn('heartbeat failed', e);
+    }
+  }
+
+  async function updateOnlineCount() {
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+    try {
+      const { error, count } = await supabase
+        .from('presence')
+        .select('session_id', { count: 'exact', head: true })
+        .gt('last_seen', oneMinuteAgo);
+
+      if (!error) {
+        const el = document.getElementById('live-count');
+        if (el) el.textContent = count || 0;
+      }
+    } catch (e) {
+      console.warn('updateOnlineCount failed', e);
+    }
+  }
+
+  function subscribePresenceChanges() {
+    supabase
+      .channel('presence_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'presence' },
+        () => {
+          updateOnlineCount();
+        }
+      )
+      .subscribe();
+  }
+
+  function initMetrics() {
+    // fire once on load
+    trackVisit();
+    updateTotalVisits();
+    heartbeat();
+    updateOnlineCount();
+    subscribePresenceChanges();
+
+    // keep presence updated so user stays "online"
+    setInterval(heartbeat, 30 * 1000);
+  }
+
+  // Your existing entrypoint
+  render();
+  initMetrics();
   </script>
 </body>
 </html>
