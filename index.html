@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="ADD Companion">
-  <meta name="theme-color" content="#1f2937">
-  <title>ADD Companion</title>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Clarity">
+  <meta name="theme-color" content="#0d1117">
+  <title>Clarity</title>
   <script src="https://t.contentsquare.net/uxa/953c12ed56a06.js"></script>
-  <link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;ADD Companion&quot;,&quot;short_name&quot;:&quot;ADD&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%23f9fafb&quot;,&quot;theme_color&quot;:&quot;%231f2937&quot;}">
+  <link rel="manifest" href="data:application/json,%7B%22name%22%3A%22Clarity%22%2C%22short_name%22%3A%22Clarity%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230d1117%22%2C%22theme_color%22%3A%22%230d1117%22%7D">
 
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-G2FS7Z73L9"></script>
@@ -23,410 +23,72 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+    html, body {
+      overflow: hidden;
+      height: 100%;
+      height: 100dvh;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f9fafb;
-      min-height: 100vh;
-      min-height: 100dvh;
-      color: #1f2937;
+      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       line-height: 1.5;
-      transition: background 0.4s ease, color 0.4s ease;
-    }
-
-    body.timer-active {
-      background: #0d1117;
-      color: #e6edf3;
-    }
-
-    .container { max-width: 500px; margin: 0 auto; padding-bottom: 2rem; }
-
-    /* Header */
-    .header {
-      position: sticky;
-      top: 0;
-      background: white;
-      border-bottom: 1px solid #e5e7eb;
-      z-index: 10;
-    }
-
-    .header-inner {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 1rem 1.25rem;
-    }
-
-    .back-btn {
-      background: none;
-      border: none;
-      padding: 0.5rem;
-      margin-left: -0.5rem;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .back-btn:active { background: #f3f4f6; }
-    .back-btn svg { width: 1.25rem; height: 1.25rem; color: #374151; }
-
-    .header-title { font-weight: 600; font-size: 1.1rem; }
-
-    /* Home View */
-    .home-header { padding: 1.5rem 1.25rem 0.75rem; }
-    .home-header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
-    .home-header p { color: #6b7280; font-size: 0.875rem; }
-
-    /* Main Options */
-    .main-options {
-      padding: 0.5rem 1.25rem 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .option-card {
+      transition: background 0.5s ease, color 0.5s ease;
+      position: fixed;
       width: 100%;
-      padding: 1.25rem;
-      border-radius: 1rem;
-      border: 2px solid;
-      text-align: left;
-      cursor: pointer;
-      transition: transform 0.1s, box-shadow 0.2s;
-      background: white;
-    }
-
-    .option-card:active { transform: scale(0.98); }
-
-    .option-card-header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.375rem;
-    }
-
-    .option-icon {
-      width: 2.75rem;
-      height: 2.75rem;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .option-icon svg { width: 1.375rem; height: 1.375rem; color: white; }
-    .option-label { font-weight: 600; font-size: 1.05rem; }
-    .option-desc { font-size: 0.875rem; color: #6b7280; margin-left: 3.5rem; }
-
-    /* Option Colors */
-    .option-checkin { background: #f0fdf4; border-color: #86efac; }
-    .option-checkin .option-icon { background: #22c55e; }
-    .option-checkin .option-label { color: #166534; }
-
-    .option-understand { background: #eff6ff; border-color: #93c5fd; }
-    .option-understand .option-icon { background: #3b82f6; }
-    .option-understand .option-label { color: #1e40af; }
-
-    .option-timer { background: #161b22; border-color: #58a6ff; }
-    .option-timer .option-icon { background: #58a6ff; }
-    .option-timer .option-label { color: #58a6ff; }
-    .option-timer .option-desc { color: #8b949e; }
-
-    /* State Cards */
-    .states-header { padding: 1.25rem 1.25rem 0.75rem; font-size: 1.1rem; font-weight: 600; }
-
-    .states-grid {
-      padding: 0 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.625rem;
-    }
-
-    .state-card {
-      width: 100%;
-      padding: 1rem;
-      border-radius: 1rem;
-      border: 2px solid;
-      text-align: left;
-      cursor: pointer;
-      transition: transform 0.1s;
-      background: white;
-    }
-
-    .state-card:active { transform: scale(0.98); }
-
-    .state-card-header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .state-icon {
-      width: 2.25rem;
-      height: 2.25rem;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .state-icon svg { width: 1.125rem; height: 1.125rem; color: white; }
-    .state-label { font-weight: 600; font-size: 0.95rem; }
-    .state-desc { font-size: 0.8rem; color: #6b7280; margin-left: 3rem; margin-top: 0.25rem; }
-
-    /* State Colors */
-    .state-understimulated .state-card { background: #fffbeb; border-color: #fde68a; }
-    .state-understimulated .state-icon { background: #f59e0b; }
-    .state-understimulated .state-label { color: #b45309; }
-
-    .state-overwhelmed .state-card { background: #f8fafc; border-color: #cbd5e1; }
-    .state-overwhelmed .state-icon { background: #64748b; }
-    .state-overwhelmed .state-label { color: #475569; }
-
-    .state-hyperactivated .state-card { background: #fff1f2; border-color: #fecdd3; }
-    .state-hyperactivated .state-icon { background: #f43f5e; }
-    .state-hyperactivated .state-label { color: #be123c; }
-
-    .state-regulated .state-card { background: #ecfdf5; border-color: #a7f3d0; }
-    .state-regulated .state-icon { background: #10b981; }
-    .state-regulated .state-label { color: #047857; }
-
-    /* Sections Grid */
-    .sections-header { padding: 1.5rem 1.25rem 0.75rem; font-size: 1.1rem; font-weight: 600; }
-
-    .sections-grid {
-      padding: 0 1.25rem;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-    }
-
-    .section-btn {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 1rem;
-      background: white;
-      border: 1px solid #e5e7eb;
-      border-radius: 0.75rem;
-      cursor: pointer;
-      text-align: left;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-
-    .section-btn:active { background: #f9fafb; }
-    .section-btn svg { width: 1.25rem; height: 1.25rem; color: #9ca3af; flex-shrink: 0; }
-    .section-btn span { font-weight: 500; color: #374151; font-size: 0.9rem; }
-
-    /* Quote */
-    .quote-card {
-      margin: 1.5rem 1.25rem;
-      padding: 1.25rem;
-      background: linear-gradient(135deg, #1f2937, #111827);
-      border-radius: 1rem;
-      color: white;
-    }
-
-    .quote-card p { font-size: 0.9rem; opacity: 0.9; font-style: italic; line-height: 1.6; }
-    .quote-card .author { font-size: 0.75rem; opacity: 0.6; margin-top: 0.5rem; font-style: normal; }
-
-    /* Interventions View */
-    .need-card {
-      margin: 1.25rem;
-      padding: 1rem;
-      border-radius: 1rem;
-      border: 1px solid;
-    }
-
-    .need-card .label { font-size: 0.875rem; font-weight: 500; color: #6b7280; margin-bottom: 0.25rem; }
-    .need-card .text { font-weight: 500; }
-
-    .interventions-list {
-      padding: 0 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .intervention-card {
-      background: white;
-      border-radius: 0.75rem;
-      border: 1px solid #e5e7eb;
-      overflow: hidden;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-
-    .intervention-header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 1rem;
-      cursor: pointer;
-    }
-
-    .intervention-number {
-      width: 2rem;
-      height: 2rem;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 0.875rem;
-      font-weight: 500;
-      flex-shrink: 0;
-    }
-
-    .intervention-title { font-weight: 500; flex: 1; }
-
-    .intervention-detail {
-      padding: 0 1rem 1rem 3.75rem;
-      font-size: 0.875rem;
-      color: #6b7280;
-      line-height: 1.6;
-      display: none;
-    }
-
-    .intervention-card.expanded .intervention-detail { display: block; }
-
-    /* Chevron styling */
-    .chevron {
-      width: 1.25rem;
-      height: 1.25rem;
-      color: #9ca3af;
-      transition: transform 0.2s;
-      flex-shrink: 0;
-    }
-
-    .intervention-card.expanded .chevron { transform: rotate(180deg); }
-    .content-item.expanded .chevron { transform: rotate(180deg); }
-
-    .check-again-btn {
-      margin: 1.5rem 1.25rem;
-      width: calc(100% - 2.5rem);
-      padding: 0.875rem;
-      background: #f3f4f6;
-      border: none;
-      border-radius: 0.75rem;
-      font-weight: 500;
-      color: #374151;
-      cursor: pointer;
-      font-size: 1rem;
-    }
-
-    .check-again-btn:active { background: #e5e7eb; }
-
-    /* Section View */
-    .section-content {
-      padding: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    .content-group {
-      background: white;
-      border-radius: 0.75rem;
-      border: 1px solid #e5e7eb;
-      overflow: hidden;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-
-    .content-group-title {
-      font-weight: 600;
-      padding: 1rem;
-      background: #f9fafb;
-      border-bottom: 1px solid #e5e7eb;
-      font-size: 0.95rem;
-    }
-
-    .content-item {
-      border-bottom: 1px solid #f3f4f6;
-      cursor: pointer;
-    }
-
-    .content-item:last-child { border-bottom: none; }
-
-    .content-item-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.875rem 1rem;
-      gap: 0.75rem;
-    }
-
-    .content-item-heading { font-weight: 500; font-size: 0.9rem; flex: 1; }
-
-    .content-item-text {
-      padding: 0 1rem 0.875rem;
-      font-size: 0.875rem;
-      color: #6b7280;
-      line-height: 1.6;
-      display: none;
-    }
-
-    .content-item.expanded .content-item-text { display: block; }
-
-    /* Info/Prose sections */
-    .prose-section { padding: 1.25rem; }
-
-    .prose-card {
-      background: white;
-      border-radius: 0.75rem;
-      border: 1px solid #e5e7eb;
-      padding: 1.25rem;
-      margin-bottom: 1rem;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-
-    .prose-card:last-child { margin-bottom: 0; }
-
-    .prose-card h3 {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 0.75rem;
-      color: #1f2937;
-    }
-
-    .prose-card p {
-      font-size: 0.9rem;
-      color: #4b5563;
-      line-height: 1.7;
-      margin-bottom: 0.75rem;
-    }
-
-    .prose-card p:last-child { margin-bottom: 0; }
-    .prose-card strong { color: #1f2937; }
-
-    .prose-card ul { margin: 0.5rem 0; padding-left: 1.25rem; }
-
-    .prose-card li {
-      font-size: 0.9rem;
-      color: #4b5563;
-      line-height: 1.6;
-      margin-bottom: 0.375rem;
-    }
-
-    .highlight-box {
-      background: #fef3c7;
-      border: 1px solid #fcd34d;
-      border-radius: 0.5rem;
-      padding: 1rem;
-      margin: 0.75rem 0;
-    }
-
-    .highlight-box p { color: #92400e; font-size: 0.875rem; margin: 0; }
-
-    /* Safe area */
-    @supports (padding-top: env(safe-area-inset-top)) {
-      .header { padding-top: env(safe-area-inset-top); }
-      body { padding-bottom: env(safe-area-inset-bottom); }
+      height: 100%;
+      height: 100dvh;
     }
 
     /* ═══════════════════════════════════════════════════════════════════
-       FOCUS TIMER STYLES
+       THEME VARIABLES
+       ═══════════════════════════════════════════════════════════════════ */
+
+    body.night {
+      --bg: #0d1117;
+      --text: #e6edf3;
+      --text-muted: #7d8590;
+      --glass-bg: rgba(255,255,255,0.06);
+      --glass-border: rgba(255,255,255,0.08);
+      --glass-bg-hover: rgba(255,255,255,0.1);
+      --particle-r: 88;
+      --particle-g: 166;
+      --particle-b: 255;
+      --blob-opacity: 0.12;
+      --surface: #161b22;
+      --surface2: #1c2230;
+      --border: #21262d;
+      --ring-bg: #21262d;
+      --overlay-bg: rgba(0,0,0,0.7);
+      --input-bg: #0d1117;
+      --toggle-icon: "🌙";
+    }
+
+    body.day {
+      --bg: #e8ecf0;
+      --text: #1f2937;
+      --text-muted: #6b7280;
+      --glass-bg: rgba(255,255,255,0.55);
+      --glass-border: rgba(255,255,255,0.65);
+      --glass-bg-hover: rgba(255,255,255,0.7);
+      --particle-r: 100;
+      --particle-g: 120;
+      --particle-b: 150;
+      --blob-opacity: 0.08;
+      --surface: rgba(255,255,255,0.7);
+      --surface2: rgba(255,255,255,0.5);
+      --border: rgba(0,0,0,0.08);
+      --ring-bg: rgba(0,0,0,0.1);
+      --overlay-bg: rgba(0,0,0,0.4);
+      --input-bg: rgba(255,255,255,0.8);
+      --toggle-icon: "☀️";
+    }
+
+    /* Timer always forces night palette via inline overrides */
+
+    /* ═══════════════════════════════════════════════════════════════════
+       CANVAS & BLUR LAYER
        ═══════════════════════════════════════════════════════════════════ */
 
     #bgCanvas {
@@ -435,10 +97,591 @@
       width: 100%; height: 100%;
       z-index: 0;
       pointer-events: none;
+    }
+
+    #blurOverlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      transition: opacity 0.4s ease;
+      opacity: 1;
+    }
+
+    #blurOverlay.clear {
+      opacity: 0;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       APP SHELL
+       ═══════════════════════════════════════════════════════════════════ */
+
+    #app {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .view-scroll {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .view-center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       GLASSMORPHISM
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      transition: background 0.2s ease, transform 0.15s ease;
+    }
+
+    .glass:active {
+      transform: scale(0.98);
+    }
+
+    .glass-hover:hover {
+      background: var(--glass-bg-hover);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       HEADER BAR
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .view-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+      flex-shrink: 0;
+    }
+
+    .back-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      flex-shrink: 0;
+    }
+
+    .back-btn:hover { color: var(--text); }
+    .back-btn svg { width: 16px; height: 16px; }
+
+    .view-title {
+      font-weight: 500;
+      font-size: 1rem;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       DAY/NIGHT TOGGLE
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .theme-toggle {
+      position: fixed;
+      bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.3s ease;
+    }
+
+    .theme-toggle:active { transform: translateX(-50%) scale(0.9); }
+
+    /* Hide toggle in timer view */
+    body.timer-active .theme-toggle { display: none; }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       HOME VIEW
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .home-title {
+      font-size: 2.5rem;
+      font-weight: 200;
+      letter-spacing: 0.04em;
+      text-align: center;
+      margin-bottom: 2.5rem;
+      color: var(--text);
+    }
+
+    .home-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 0 1.5rem;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .home-card {
+      padding: 1.125rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .home-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      border-radius: 2px;
+    }
+
+    .home-card.card-checkin::before { background: #56d364; }
+    .home-card.card-focus::before { background: #58a6ff; }
+    .home-card.card-learn::before { background: #bc8cff; }
+
+    .home-card-icon {
+      font-size: 1.25rem;
+      width: 2rem;
+      text-align: center;
+      flex-shrink: 0;
+      opacity: 0.9;
+    }
+
+    .home-card-label {
+      font-weight: 500;
+      font-size: 1rem;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .home-card-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      background: rgba(88,166,255,0.15);
+      border: 1px solid rgba(88,166,255,0.3);
+      border-radius: 20px;
+      font-size: 0.75rem;
+      color: #58a6ff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .badge-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #58a6ff;
+      animation: dotPulse 1.5s ease-in-out infinite;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       CHECK IN VIEW
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .state-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+      padding: 0.5rem 1.25rem;
+    }
+
+    .state-card {
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .state-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      border-radius: 2px;
+    }
+
+    .state-card.state-flat::before { background: #f59e0b; }
+    .state-card.state-foggy::before { background: #64748b; }
+    .state-card.state-wired::before { background: #f43f5e; }
+    .state-card.state-centred::before { background: #10b981; }
+
+    .state-icon-text {
+      font-size: 1.25rem;
+      width: 2rem;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .state-info {
+      flex: 1;
+    }
+
+    .state-label {
+      font-weight: 500;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .state-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       INTERVENTIONS VIEW
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .need-card {
+      margin: 0 1.25rem 1rem;
+      padding: 1rem 1.25rem;
+    }
+
+    .need-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .need-text {
+      font-weight: 500;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .interventions-list {
+      padding: 0 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .intervention-card {
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .intervention-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.875rem 1rem;
+    }
+
+    .intervention-number {
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 500;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.1);
+      color: var(--text-muted);
+    }
+
+    .intervention-title {
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .chevron {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .intervention-card.expanded .chevron { transform: rotate(180deg); }
+
+    .intervention-detail {
+      padding: 0 1rem 1rem 3.5rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.6;
       display: none;
     }
 
-    body.timer-active #bgCanvas { display: block; }
+    .intervention-card.expanded .intervention-detail { display: block; }
+
+    .check-again-btn {
+      margin: 1.5rem 1.25rem;
+      width: calc(100% - 2.5rem);
+      padding: 0.875rem;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .check-again-btn:active { background: var(--glass-bg-hover); }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       LEARN VIEW
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .learn-tabs {
+      display: flex;
+      gap: 4px;
+      margin: 0 1.25rem 1rem;
+      padding: 4px;
+      border-radius: 12px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .learn-tab {
+      flex: 1;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .learn-tab.active {
+      background: var(--glass-bg-hover);
+      color: var(--text);
+    }
+
+    .topics-list {
+      padding: 0 1.25rem;
+    }
+
+    .topic-card {
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .topic-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.125rem;
+      width: 100%;
+      cursor: pointer;
+      border: none;
+      background: none;
+      text-align: left;
+    }
+
+    .topic-icon {
+      font-size: 1rem;
+      width: 1.5rem;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .topic-icon svg { width: 18px; height: 18px; color: var(--text-muted); }
+
+    .topic-label {
+      font-weight: 500;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    /* Understanding tab prose */
+    .prose-section {
+      padding: 0 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .prose-card {
+      padding: 1.25rem;
+    }
+
+    .prose-card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+
+    .prose-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+      margin-bottom: 0.5rem;
+    }
+
+    .prose-card p:last-child { margin-bottom: 0; }
+
+    .prose-card strong { color: var(--text); }
+
+    .prose-card ul { margin: 0.5rem 0; padding-left: 1.25rem; }
+
+    .prose-card li {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 0.25rem;
+    }
+
+    .highlight-box {
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.25);
+      border-radius: 8px;
+      padding: 0.875rem;
+      margin: 0.75rem 0;
+    }
+
+    .highlight-box p { color: #fbbf24; font-size: 0.85rem; margin: 0; }
+
+    body.day .highlight-box {
+      background: rgba(180, 83, 9, 0.08);
+      border-color: rgba(180, 83, 9, 0.2);
+    }
+    body.day .highlight-box p { color: #92400e; }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       SECTION VIEW (expandable content)
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .section-content {
+      padding: 0 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .content-group {
+      overflow: hidden;
+    }
+
+    .content-group-title {
+      font-weight: 600;
+      padding: 0.875rem 1.125rem;
+      font-size: 0.85rem;
+      letter-spacing: 0.03em;
+      color: var(--text);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .content-item {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer;
+    }
+
+    body.day .content-item {
+      border-bottom-color: rgba(0,0,0,0.04);
+    }
+
+    .content-item:last-child { border-bottom: none; }
+
+    .content-item-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.125rem;
+      gap: 0.75rem;
+    }
+
+    .content-item-heading {
+      font-weight: 500;
+      font-size: 0.875rem;
+      flex: 1;
+      color: var(--text);
+    }
+
+    .content-item .chevron {
+      width: 14px;
+      height: 14px;
+    }
+
+    .content-item.expanded .chevron { transform: rotate(180deg); }
+
+    .content-item-text {
+      padding: 0 1.125rem 0.875rem;
+      font-size: 0.825rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      display: none;
+    }
+
+    .content-item.expanded .content-item-text { display: block; }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       FOCUS TIMER
+       ═══════════════════════════════════════════════════════════════════ */
 
     .timer-view {
       position: relative;
@@ -447,32 +690,25 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
-      min-height: 100dvh;
+      height: 100%;
+      height: 100dvh;
       user-select: none;
-      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      --surface: #161b22;
-      --surface2: #1c2230;
-      --border: #21262d;
-      --text: #e6edf3;
-      --muted: #7d8590;
-      --ring-bg: #21262d;
-      --ring-size: 260px;
+      overflow: hidden;
       --accent: #58a6ff;
+      --ring-size: 260px;
     }
 
-    /* Timer back button */
     .timer-back {
       position: fixed;
-      top: 16px;
+      top: calc(16px + env(safe-area-inset-top, 0px));
       left: 16px;
       z-index: 20;
       width: 40px;
       height: 40px;
       border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--muted);
+      border: 1px solid #21262d;
+      background: #161b22;
+      color: #7d8590;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -480,15 +716,14 @@
       transition: all 0.2s;
     }
 
-    .timer-back:hover { color: var(--text); border-color: var(--muted); }
+    .timer-back:hover { color: #e6edf3; border-color: #7d8590; }
     .timer-back svg { width: 16px; height: 16px; }
 
-    /* Mode tabs */
     .modes {
       display: flex;
       gap: 4px;
-      background: var(--surface);
-      border: 1px solid var(--border);
+      background: #161b22;
+      border: 1px solid #21262d;
       border-radius: 12px;
       padding: 4px;
       margin-bottom: 48px;
@@ -499,7 +734,7 @@
       border-radius: 8px;
       border: none;
       background: transparent;
-      color: var(--muted);
+      color: #7d8590;
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
@@ -507,15 +742,14 @@
       letter-spacing: 0.02em;
     }
 
-    .mode-btn:hover { color: var(--text); }
+    .mode-btn:hover { color: #e6edf3; }
 
     .mode-btn.active {
-      background: var(--surface2);
-      color: var(--text);
+      background: #1c2230;
+      color: #e6edf3;
       box-shadow: 0 1px 3px rgba(0,0,0,0.4);
     }
 
-    /* Timer ring */
     .timer-container {
       position: relative;
       width: var(--ring-size);
@@ -532,7 +766,7 @@
 
     .ring-bg-circle {
       fill: none;
-      stroke: var(--ring-bg);
+      stroke: #21262d;
       stroke-width: 3;
     }
 
@@ -575,7 +809,7 @@
       font-size: 64px;
       font-weight: 200;
       letter-spacing: -2px;
-      color: var(--text);
+      color: #e6edf3;
       line-height: 1;
       font-variant-numeric: tabular-nums;
       transition: opacity 0.3s;
@@ -586,10 +820,9 @@
       font-weight: 500;
       letter-spacing: 0.15em;
       text-transform: uppercase;
-      color: var(--muted);
+      color: #7d8590;
     }
 
-    /* Controls */
     .controls {
       display: flex;
       align-items: center;
@@ -601,9 +834,9 @@
       width: 44px;
       height: 44px;
       border-radius: 50%;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--muted);
+      border: 1px solid #21262d;
+      background: #161b22;
+      color: #7d8590;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -613,8 +846,8 @@
 
     .btn-icon:hover {
       border-color: var(--accent);
-      color: var(--text);
-      background: var(--surface2);
+      color: #e6edf3;
+      background: #1c2230;
     }
 
     .btn-icon svg { width: 16px; height: 16px; }
@@ -654,7 +887,6 @@
       z-index: 1;
     }
 
-    /* Session dots */
     .sessions {
       display: flex;
       gap: 8px;
@@ -665,7 +897,7 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: var(--border);
+      background: #21262d;
       transition: all 0.3s ease;
     }
 
@@ -681,10 +913,9 @@
       50% { opacity: 0.8; transform: scale(1.3); }
     }
 
-    /* Timer settings bar */
     .timer-settings-bar {
       position: fixed;
-      bottom: 24px;
+      bottom: calc(24px + env(safe-area-inset-bottom, 0px));
       display: flex;
       gap: 12px;
       align-items: center;
@@ -695,9 +926,9 @@
       width: 36px;
       height: 36px;
       border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--muted);
+      border: 1px solid #21262d;
+      background: #161b22;
+      color: #7d8590;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -706,11 +937,7 @@
       font-size: 13px;
     }
 
-    .settings-btn:hover {
-      color: var(--text);
-      border-color: var(--muted);
-    }
-
+    .settings-btn:hover { color: #e6edf3; border-color: #7d8590; }
     .settings-btn svg { width: 14px; height: 14px; }
 
     /* Settings modal */
@@ -725,17 +952,15 @@
       pointer-events: none;
       transition: opacity 0.2s;
       backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
       z-index: 100;
     }
 
-    .modal-overlay.open {
-      opacity: 1;
-      pointer-events: all;
-    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
 
     .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
+      background: #161b22;
+      border: 1px solid #21262d;
       border-radius: 16px;
       padding: 28px;
       width: 320px;
@@ -750,7 +975,7 @@
       font-weight: 600;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--muted);
+      color: #7d8590;
       margin-bottom: 20px;
     }
 
@@ -761,17 +986,14 @@
       margin-bottom: 16px;
     }
 
-    .setting-row label {
-      font-size: 14px;
-      color: var(--text);
-    }
+    .setting-row label { font-size: 14px; color: #e6edf3; }
 
     .setting-row input[type="number"] {
       width: 64px;
       background: #0d1117;
-      border: 1px solid var(--border);
+      border: 1px solid #21262d;
       border-radius: 8px;
-      color: var(--text);
+      color: #e6edf3;
       font-size: 14px;
       padding: 6px 10px;
       text-align: center;
@@ -779,34 +1001,30 @@
       transition: border-color 0.2s;
     }
 
-    .setting-row input[type="number"]:focus { border-color: var(--accent); }
+    .setting-row input[type="number"]:focus { border-color: #58a6ff; }
 
-    .modal-footer {
-      display: flex;
-      gap: 8px;
-      margin-top: 24px;
-    }
+    .modal-footer { display: flex; gap: 8px; margin-top: 24px; }
 
     .modal-btn {
       flex: 1;
       padding: 10px;
       border-radius: 8px;
-      border: 1px solid var(--border);
+      border: 1px solid #21262d;
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s;
     }
 
-    .modal-btn.secondary { background: transparent; color: var(--muted); }
-    .modal-btn.secondary:hover { color: var(--text); }
-    .modal-btn.primary { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+    .modal-btn.secondary { background: transparent; color: #7d8590; }
+    .modal-btn.secondary:hover { color: #e6edf3; }
+    .modal-btn.primary { background: #58a6ff; color: #0d1117; border-color: #58a6ff; }
     .modal-btn.primary:hover { opacity: 0.85; }
 
     /* Toast */
     .timer-toast {
       position: fixed;
-      top: 24px;
+      top: calc(24px + env(safe-area-inset-top, 0px));
       left: 50%;
       transform: translateX(-50%) translateY(-8px);
       background: #1c2230;
@@ -843,65 +1061,154 @@
 
     .timer-container.complete { animation: completePulse 0.6s ease forwards; }
 
-    /* Timer running indicator on home screen */
-    .timer-running-indicator {
-      display: inline-flex;
+    /* ═══════════════════════════════════════════════════════════════════
+       COMPLETION OVERLAY
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .completion-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.375rem 0.75rem;
-      background: #161b22;
-      border: 1px solid #58a6ff;
-      border-radius: 2rem;
-      font-size: 0.8rem;
-      color: #58a6ff;
-      font-variant-numeric: tabular-nums;
-      margin-top: 0.375rem;
+      justify-content: center;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      cursor: pointer;
     }
 
-    .timer-running-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #58a6ff;
-      animation: dotPulse 1.5s ease-in-out infinite;
+    .completion-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .completion-text {
+      font-size: 1.5rem;
+      font-weight: 300;
+      color: #e6edf3;
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.02em;
+    }
+
+    .completion-detail {
+      font-size: 0.9rem;
+      color: #7d8590;
+      margin-bottom: 2rem;
+    }
+
+    .completion-dismiss {
+      font-size: 0.8rem;
+      color: #58a6ff;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      animation: subtleBreathe 2s ease-in-out infinite;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       STATS FOOTER
+       ═══════════════════════════════════════════════════════════════════ */
+
+    #stats {
+      position: fixed;
+      bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      text-align: center;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      opacity: 0.5;
+      white-space: nowrap;
+    }
+
+    body.timer-active #stats { display: none; }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       LANDSCAPE FIX
+       ═══════════════════════════════════════════════════════════════════ */
+
+    @media (orientation: landscape) and (max-height: 500px) {
+      .timer-view {
+        flex-direction: row;
+        gap: 2rem;
+        padding: 0 2rem;
+      }
+      .timer-view .modes { margin-bottom: 0; }
+      .timer-view .timer-container {
+        --ring-size: 180px;
+        margin-bottom: 0;
+      }
+      .timer-view .controls { margin-bottom: 0; }
+      .timer-view .sessions { margin-bottom: 0; }
+      .home-title { font-size: 1.8rem; margin-bottom: 1.5rem; }
     }
   </style>
 </head>
-<body>
+<body class="night">
   <canvas id="bgCanvas"></canvas>
+  <div id="blurOverlay"></div>
 
-  <div class="container" id="app"></div>
+  <div id="app"></div>
 
-  <div id="stats"
-     style="max-width:500px;margin:0 auto;
-            text-align:center;font-size:0.75rem;
-            color:#9ca3af;padding:0.75rem 0 1.5rem;">
+  <button class="theme-toggle" id="themeToggle"></button>
+
+  <div id="stats">
     <span id="total-visits">&ndash;</span> total uses &middot;
     <span id="live-count">0</span> people here now
   </div>
+
+  <!-- Completion overlay (persistent, outside app for z-index) -->
+  <div class="completion-overlay" id="completionOverlay">
+    <div class="completion-text" id="completionText">Session complete</div>
+    <div class="completion-detail" id="completionDetail">Nice work.</div>
+    <div class="completion-dismiss">Tap to continue</div>
+  </div>
+
+  <!-- Settings modal (persistent, outside app) -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+      <h3>Settings</h3>
+      <div class="setting-row"><label>Focus (min)</label><input type="number" id="setFocus" min="1" max="90"></div>
+      <div class="setting-row"><label>Short break</label><input type="number" id="setShort" min="1" max="30"></div>
+      <div class="setting-row"><label>Long break</label><input type="number" id="setLong" min="1" max="60"></div>
+      <div class="setting-row"><label>Sessions</label><input type="number" id="setSessions" min="1" max="12"></div>
+      <div class="modal-footer">
+        <button class="modal-btn secondary" id="settingsCancel">Cancel</button>
+        <button class="modal-btn primary" id="settingsSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast (persistent) -->
+  <div class="timer-toast" id="timerToast"></div>
 
   <script src="https://unpkg.com/@supabase/supabase-js@2" defer></script>
 
   <script>
     // ═══════════════════════════════════════════════════════════════════
-    //  ICONS
+    //  ICONS (SVG)
     // ═══════════════════════════════════════════════════════════════════
 
     const icons = {
       arrowLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
       chevronDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>',
-      brain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>',
-      zap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
-      cloudOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 2l20 20M5 5a7 7 0 0 0 2.8 11.2M8.8 8.8a4 4 0 0 0 .9 7.2h6.6M19.1 19.1A7 7 0 0 0 18 5a5 5 0 0 0-9-1"/></svg>',
-      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
       clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
       heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>',
       users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
       briefcase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
       sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
-      info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
-      activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
-      target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>'
+      settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>',
+      volumeOn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>',
+      volumeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>',
+      skipFwd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>',
+      skipBack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>',
+      play: '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>',
+      pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
     };
 
     // ═══════════════════════════════════════════════════════════════════
@@ -911,10 +1218,12 @@
     const states = {
       understimulated: {
         id: 'understimulated',
-        label: 'Understimulated',
-        description: "Bored, restless, seeking, can't settle",
-        icon: 'cloudOff',
+        label: 'Flat',
+        emoji: '☁️',
+        description: 'Bored, restless, can\'t settle',
+        cssClass: 'state-flat',
         need: 'Stimulation \u2014 movement, novelty, engagement',
+        accentColor: '#f59e0b',
         interventions: [
           { title: 'Add stimulation', detail: 'Music, background noise, coffee shop sounds. Your brain needs MORE input to focus, not less.' },
           { title: 'Shrink the task', detail: 'Not "do the thing" \u2014 "open the document and write one sentence." Make starting trivial.' },
@@ -925,10 +1234,12 @@
       },
       overwhelmed: {
         id: 'overwhelmed',
-        label: 'Overwhelmed',
-        description: "Paralysed, shutdown, foggy, can't start",
-        icon: 'brain',
+        label: 'Foggy',
+        emoji: '🌫️',
+        description: 'Can\'t start, shutdown, paralysed',
+        cssClass: 'state-foggy',
         need: 'Discharge \u2014 physical release, then containment',
+        accentColor: '#64748b',
         interventions: [
           { title: 'Physical discharge first', detail: "Cold water on face, intense movement, shake it out. Your body needs to release before your mind can work." },
           { title: 'Reduce inputs', detail: "Close tabs, silence notifications, find quiet. You're overloaded \u2014 remove stimulation." },
@@ -939,10 +1250,12 @@
       },
       hyperactivated: {
         id: 'hyperactivated',
-        label: 'Hyperactivated',
-        description: "Racing, anxious, can't stop, mind spinning",
-        icon: 'zap',
+        label: 'Wired',
+        emoji: '⚡',
+        description: 'Racing, anxious, can\'t slow down',
+        cssClass: 'state-wired',
         need: 'Grounding \u2014 slow breath, body awareness, boundaries',
+        accentColor: '#f43f5e',
         interventions: [
           { title: 'Extended exhale breathing', detail: 'Breathe in for 4, out for 8. The long exhale activates your parasympathetic system.' },
           { title: 'Physical grounding', detail: 'Feet on floor. Name 5 things you can see. Feel your hands. Come back to your body.' },
@@ -953,10 +1266,12 @@
       },
       regulated: {
         id: 'regulated',
-        label: 'Regulated',
-        description: 'Present, capable, engaged but not frantic',
-        icon: 'check',
+        label: 'Centred',
+        emoji: '✓',
+        description: 'Present, capable, engaged',
+        cssClass: 'state-centred',
         need: "Maintenance \u2014 don't blow it with overcommitment",
+        accentColor: '#10b981',
         interventions: [
           { title: 'Use this window wisely', detail: 'This is your deep work time. Complex decisions, creative work, hard conversations \u2014 do them now.' },
           { title: "Don't overcommit", detail: "Feeling capable \u2260 being capable of everything. Protect this state by not overloading it." },
@@ -1068,6 +1383,32 @@
       }
     };
 
+    const understandContent = [
+      {
+        title: 'What ADD Actually Is',
+        html: `<p>ADD (Attention Deficit Disorder) is <strong>not a behaviour problem</strong>. It's a developmental difference in how the brain's self-regulation systems mature.</p>
+        <p>The prefrontal cortex \u2014 responsible for impulse control, planning, emotional regulation, and sustained attention \u2014 develops differently. Not broken. Different.</p>
+        <div class="highlight-box"><p>Gabor Mat\u00e9 argues ADD is not genetic destiny but a response to early environment. The brain adapts to stress, inconsistency, or emotional absence by developing differently.</p></div>`
+      },
+      {
+        title: 'The Three Core Deficits',
+        html: `<p><strong>1. Attention regulation</strong> \u2014 Not a deficit of attention, but a deficit of <em>directing</em> attention. You can hyperfocus for hours on the right thing, but can't sustain 10 minutes on the wrong one.</p>
+        <p><strong>2. Emotional regulation</strong> \u2014 Feelings arrive faster, hit harder, and are harder to modulate. This isn't weakness \u2014 it's the same dysregulation that affects attention.</p>
+        <p><strong>3. Impulse regulation</strong> \u2014 The gap between impulse and action is shorter. This affects speech (interrupting), decisions (impulsivity), and habits (seeking novelty).</p>`
+      },
+      {
+        title: 'Why This Approach',
+        html: `<p>Most ADD advice is <strong>behavioural</strong>: "use a planner", "set reminders", "try harder." This misses the point.</p>
+        <p>Mat\u00e9's approach starts with <strong>understanding</strong> \u2014 why your brain works this way, what it adapted to, what needs went unmet. Not to blame, but to see clearly.</p>
+        <p>From understanding comes <strong>compassion</strong>. From compassion comes the safety to change. Not through force, but through meeting your own needs.</p>
+        <ul>
+          <li>The strategies here are <strong>state-dependent</strong> \u2014 different interventions for different states</li>
+          <li>They work <strong>with</strong> your brain, not against it</li>
+          <li>They prioritise <strong>self-knowledge</strong> over compliance</li>
+        </ul>`
+      }
+    ];
+
     // ═══════════════════════════════════════════════════════════════════
     //  FOCUS TIMER STATE (persistent across views)
     // ═══════════════════════════════════════════════════════════════════
@@ -1086,25 +1427,56 @@
 
     const ACCENT = { focus: '#58a6ff', short: '#56d364', long: '#bc8cff' };
 
-    // Wake Lock - prevents screen from locking while timer runs
+    // ═══════════════════════════════════════════════════════════════════
+    //  WAKE LOCK (with NoSleep fallback for iOS Chrome)
+    // ═══════════════════════════════════════════════════════════════════
+
     let wakeLock = null;
 
+    // NoSleep fallback: tiny silent video loop
+    const noSleepVideo = document.createElement('video');
+    noSleepVideo.setAttribute('playsinline', '');
+    noSleepVideo.setAttribute('loop', '');
+    noSleepVideo.setAttribute('muted', '');
+    noSleepVideo.muted = true;
+    noSleepVideo.style.position = 'fixed';
+    noSleepVideo.style.top = '-1px';
+    noSleepVideo.style.left = '-1px';
+    noSleepVideo.style.width = '1px';
+    noSleepVideo.style.height = '1px';
+    noSleepVideo.style.opacity = '0.01';
+    // Minimal base64-encoded MP4 (silent, 1x1 pixel, ~600 bytes)
+    noSleepVideo.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAs1tZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE0OCByMjYwMSBhMGNkN2QzIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNSAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTEgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMAAAAAAPZYiEAD//8m+P5OXfBeLGOfKE3xkODvFZuBflq/AAAAHJQZO/Ai4AAAU0mUDgnwAAARAAAAMAAAMAABkvifhCgAABFMBBBRgABR6AAQo/ElAACjsAAAADAAADAAADAAAawAADABqEAAAAAwAAAwAAAwAAAwAAAwAaVFAAAAwAABAAAAHAAAAMAAAMAAoAAAAMAABAAAAHAAAAMAAAMAATAAAAMAAAQAAABwAAADAAADABcAAAADAAAEAAABAAAAAwAAAwAAAwAAAemp';
+    document.body.appendChild(noSleepVideo);
+
+    function enableNoSleep() { noSleepVideo.play().catch(()=>{}); }
+    function disableNoSleep() { noSleepVideo.pause(); }
+
     async function requestWakeLock() {
-      if (!('wakeLock' in navigator)) return;
-      try {
-        wakeLock = await navigator.wakeLock.request('screen');
-        wakeLock.addEventListener('release', () => { wakeLock = null; });
-      } catch (e) {}
+      // Try native Wake Lock API first
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => { wakeLock = null; });
+        } catch (e) {}
+      }
+      // Always also enable NoSleep fallback (belt and braces)
+      enableNoSleep();
     }
 
     async function releaseWakeLock() {
       if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+      disableNoSleep();
     }
 
-    // Re-acquire wake lock when returning to the tab (Safari releases it on tab switch)
+    // Re-acquire wake lock when returning to the tab
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && timerState.running) requestWakeLock();
     });
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  TIMER FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════
 
     function timerFmt(secs) {
       return `${Math.floor(secs/60).toString().padStart(2,'0')}:${(secs%60).toString().padStart(2,'0')}`;
@@ -1114,7 +1486,6 @@
       if (timerState.timeLeft <= 0) { timerComplete(); return; }
       timerState.timeLeft--;
       if (currentView === 'timer') updateTimerDOM();
-      // Update document title even when not on timer view
       if (timerState.running) {
         const d = timerFmt(timerState.timeLeft);
         const label = timerState.mode === 'focus' ? 'Focus' : timerState.mode === 'short' ? 'Short Break' : 'Long Break';
@@ -1125,7 +1496,6 @@
     function timerPlay() {
       timerState.running = true;
       timerState.interval = setInterval(timerTick, 1000);
-      anim.setRunning(true);
       requestWakeLock();
       if (currentView === 'timer') updateTimerDOM();
     }
@@ -1134,9 +1504,8 @@
       timerState.running = false;
       clearInterval(timerState.interval);
       timerState.interval = null;
-      anim.setRunning(false);
       releaseWakeLock();
-      document.title = 'ADD Companion';
+      document.title = 'Clarity';
       if (currentView === 'timer') updateTimerDOM();
     }
 
@@ -1158,28 +1527,76 @@
       }
     }
 
+    // Completion with looping chime
+    let chimeInterval = null;
+    let pendingCompletion = null;
+
     function timerComplete() {
       timerPause();
       if (currentView === 'timer') {
         const tc = document.getElementById('timerContainer');
         if (tc) { tc.classList.add('complete'); setTimeout(() => tc.classList.remove('complete'), 700); }
       }
-      if (timerState.soundEnabled) playChime();
+
+      // Determine next mode info for overlay
+      let nextLabel, nextDetail;
       if (timerState.mode === 'focus') {
-        timerState.completedSessions++;
-        if (timerState.completedSessions >= timerState.config.sessions) {
-          timerState.completedSessions = 0;
-          showTimerToast('Nice work. Long break earned.');
-          timerSwitchMode('long');
+        const nextSession = timerState.completedSessions + 1;
+        if (nextSession >= timerState.config.sessions) {
+          nextLabel = 'Session complete';
+          nextDetail = 'Nice work. Long break earned.';
+          pendingCompletion = 'long';
         } else {
-          showTimerToast('Break time.');
-          timerSwitchMode('short');
+          nextLabel = 'Session complete';
+          nextDetail = 'Break time.';
+          pendingCompletion = 'short';
         }
       } else {
-        showTimerToast('Back to it.');
-        timerSwitchMode('focus');
+        nextLabel = 'Break over';
+        nextDetail = 'Back to it.';
+        pendingCompletion = 'focus';
+      }
+
+      // Show overlay and start looping chime
+      showCompletionOverlay(nextLabel, nextDetail);
+      if (timerState.soundEnabled) {
+        playChime();
+        chimeInterval = setInterval(() => {
+          if (timerState.soundEnabled) playChime();
+        }, 3500);
       }
     }
+
+    function showCompletionOverlay(title, detail) {
+      const overlay = document.getElementById('completionOverlay');
+      const textEl = document.getElementById('completionText');
+      const detailEl = document.getElementById('completionDetail');
+      textEl.textContent = title;
+      detailEl.textContent = detail;
+      overlay.classList.add('visible');
+    }
+
+    function dismissCompletion() {
+      const overlay = document.getElementById('completionOverlay');
+      overlay.classList.remove('visible');
+
+      // Stop chime loop
+      if (chimeInterval) { clearInterval(chimeInterval); chimeInterval = null; }
+
+      // Advance to next mode
+      if (pendingCompletion) {
+        if (pendingCompletion === 'long' || pendingCompletion === 'short') {
+          timerState.completedSessions++;
+          if (timerState.completedSessions >= timerState.config.sessions) {
+            timerState.completedSessions = 0;
+          }
+        }
+        timerSwitchMode(pendingCompletion);
+        pendingCompletion = null;
+      }
+    }
+
+    document.getElementById('completionOverlay').addEventListener('click', dismissCompletion);
 
     function timerSkip() {
       if (timerState.mode === 'focus') {
@@ -1229,7 +1646,6 @@
       iconPlay.style.display = timerState.running ? 'none' : 'block';
       iconPause.style.display = timerState.running ? 'block' : 'none';
 
-      // Session dots
       sessionsEl.innerHTML = '';
       for (let i = 0; i < timerState.config.sessions; i++) {
         const dot = document.createElement('div');
@@ -1239,7 +1655,6 @@
         sessionsEl.appendChild(dot);
       }
 
-      // Update accent CSS variable
       document.querySelector('.timer-view').style.setProperty('--accent', ACCENT[timerState.mode]);
     }
 
@@ -1270,7 +1685,7 @@
     // Toast
     let toastTimer;
     function showTimerToast(msg) {
-      let toast = document.getElementById('timerToast');
+      const toast = document.getElementById('timerToast');
       if (!toast) return;
       toast.textContent = msg;
       toast.classList.add('show');
@@ -1278,8 +1693,48 @@
       toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
     }
 
+    // Settings modal
+    function openSettings() {
+      document.getElementById('setFocus').value = timerState.config.focus;
+      document.getElementById('setShort').value = timerState.config.short;
+      document.getElementById('setLong').value = timerState.config.long;
+      document.getElementById('setSessions').value = timerState.config.sessions;
+      document.getElementById('settingsModal').classList.add('open');
+    }
+
+    function closeSettings() {
+      document.getElementById('settingsModal').classList.remove('open');
+    }
+
+    function saveSettings() {
+      timerState.config.focus = Math.max(1, +document.getElementById('setFocus').value || 25);
+      timerState.config.short = Math.max(1, +document.getElementById('setShort').value || 5);
+      timerState.config.long = Math.max(1, +document.getElementById('setLong').value || 15);
+      timerState.config.sessions = Math.max(1, +document.getElementById('setSessions').value || 4);
+      localStorage.setItem('clarity-timer-config', JSON.stringify(timerState.config));
+      timerSwitchMode(timerState.mode);
+      closeSettings();
+      showTimerToast('Settings saved');
+    }
+
+    document.getElementById('settingsCancel').addEventListener('click', closeSettings);
+    document.getElementById('settingsSave').addEventListener('click', saveSettings);
+    document.getElementById('settingsModal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('settingsModal')) closeSettings();
+    });
+
+    // Load saved config
+    const savedConfig = localStorage.getItem('clarity-timer-config');
+    if (savedConfig) {
+      try {
+        Object.assign(timerState.config, JSON.parse(savedConfig));
+        timerState.totalTime = timerState.config.focus * 60;
+        timerState.timeLeft = timerState.totalTime;
+      } catch(e) {}
+    }
+
     // ═══════════════════════════════════════════════════════════════════
-    //  BACKGROUND ANIMATION (always in memory, only draws when visible)
+    //  BACKGROUND ANIMATION (always running)
     // ═══════════════════════════════════════════════════════════════════
 
     const canvas = document.getElementById('bgCanvas');
@@ -1309,11 +1764,11 @@
     }
 
     const anim = {
-      opacity: 0, targetOpacity: 0,
+      opacity: 1,
       mode: 'focus',
       accent: hexToRgb('#58a6ff'), targetAccent: hexToRgb('#58a6ff'),
       particles: [], blobs: [],
-      visible: false,
+      timerMode: false,
 
       init() {
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
@@ -1326,30 +1781,53 @@
         this.blobs = Array.from({ length: 6 }, makeBlob);
       },
       setMode(m, hex) { this.mode = m; this.targetAccent = hexToRgb(hex); },
-      setRunning(r) { this.targetOpacity = r ? 1 : 0; },
+      setTheme(theme) {
+        // Update particle colours to match theme
+        if (theme === 'day') {
+          this.targetAccent = hexToRgb('#8899aa');
+        } else if (!this.timerMode) {
+          this.targetAccent = hexToRgb('#58a6ff');
+        }
+      },
       lc(a, b, t) { return a + (b - a) * t; },
 
-      draw(ts) {
-        if (!this.visible) return;
-        const W = canvas.width, H = canvas.height;
-        const opSpeed = this.targetOpacity > this.opacity ? 0.012 : 0.018;
-        this.opacity += (this.targetOpacity - this.opacity) * opSpeed;
-        canvasCtx.clearRect(0, 0, W, H);
-        if (this.opacity < 0.004) return;
+      getParticleColor() {
+        // Read from CSS variables for theme-aware colors (when not in timer)
+        if (this.timerMode) return this.accent;
+        const style = getComputedStyle(document.body);
+        return {
+          r: parseInt(style.getPropertyValue('--particle-r')) || this.accent.r,
+          g: parseInt(style.getPropertyValue('--particle-g')) || this.accent.g,
+          b: parseInt(style.getPropertyValue('--particle-b')) || this.accent.b,
+        };
+      },
 
+      draw(ts) {
+        const W = canvas.width, H = canvas.height;
+        canvasCtx.clearRect(0, 0, W, H);
+
+        // Smoothly interpolate accent
         this.accent.r = this.lc(this.accent.r, this.targetAccent.r, 0.025);
         this.accent.g = this.lc(this.accent.g, this.targetAccent.g, 0.025);
         this.accent.b = this.lc(this.accent.b, this.targetAccent.b, 0.025);
-        const {r, g, b} = this.accent;
+
+        const color = this.getParticleColor();
+        const {r, g, b} = color;
         const op = this.opacity;
-        const speedMult = this.mode === 'long' ? 0.55 : this.mode === 'short' ? 1.5 : 1.0;
-        const connDist = this.mode === 'long' ? 170 : this.mode === 'short' ? 95 : 130;
+
+        const speedMult = this.timerMode
+          ? (this.mode === 'long' ? 0.55 : this.mode === 'short' ? 1.5 : 1.0)
+          : 0.7;
+        const connDist = this.timerMode
+          ? (this.mode === 'long' ? 170 : this.mode === 'short' ? 95 : 130)
+          : 110;
+        const blobOpacity = this.timerMode ? 0.12 : parseFloat(getComputedStyle(document.body).getPropertyValue('--blob-opacity')) || 0.08;
 
         for (const blob of this.blobs) {
           const bx = blob.baseX + Math.sin(ts * blob.freqX + blob.phaseX) * blob.ampX;
           const by = blob.baseY + Math.cos(ts * blob.freqY + blob.phaseY) * blob.ampY;
           const grad = canvasCtx.createRadialGradient(bx, by, 0, bx, by, blob.r);
-          grad.addColorStop(0, `rgba(${r|0},${g|0},${b|0},${0.12 * op})`);
+          grad.addColorStop(0, `rgba(${r|0},${g|0},${b|0},${blobOpacity * op})`);
           grad.addColorStop(1, `rgba(${r|0},${g|0},${b|0},0)`);
           canvasCtx.fillStyle = grad;
           canvasCtx.beginPath(); canvasCtx.arc(bx, by, blob.r, 0, Math.PI * 2); canvasCtx.fill();
@@ -1394,328 +1872,273 @@
     window.addEventListener('resize', () => anim.resize());
 
     // ═══════════════════════════════════════════════════════════════════
+    //  THEME TOGGLE
+    // ═══════════════════════════════════════════════════════════════════
+
+    let currentTheme = localStorage.getItem('clarity-theme') || 'night';
+
+    function applyTheme(theme) {
+      currentTheme = theme;
+      document.body.classList.remove('day', 'night');
+      document.body.classList.add(theme);
+      document.getElementById('themeToggle').textContent = theme === 'night' ? '🌙' : '☀️';
+      localStorage.setItem('clarity-theme', theme);
+      anim.setTheme(theme);
+
+      // Update meta theme-color
+      const metaTheme = document.querySelector('meta[name="theme-color"]');
+      if (metaTheme) metaTheme.content = theme === 'night' ? '#0d1117' : '#e8ecf0';
+    }
+
+    applyTheme(currentTheme);
+
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      applyTheme(currentTheme === 'night' ? 'day' : 'night');
+    });
+
+    // ═══════════════════════════════════════════════════════════════════
     //  APP ROUTER
     // ═══════════════════════════════════════════════════════════════════
 
     let currentView = 'home';
     let selectedState = null;
     let selectedSection = null;
+    let learnTab = 'topics';
 
     function render() {
       const app = document.getElementById('app');
       const stats = document.getElementById('stats');
+      const blurOverlay = document.getElementById('blurOverlay');
       const isTimer = currentView === 'timer';
 
-      // Toggle body class for dark/light theme
+      // Toggle body class for timer
       document.body.classList.toggle('timer-active', isTimer);
-      anim.visible = isTimer;
+      anim.timerMode = isTimer;
 
-      // Hide stats footer when in timer
-      stats.style.display = isTimer ? 'none' : 'block';
+      // Blur overlay: clear (no blur) for timer + home, blurred for content views
+      if (isTimer || currentView === 'home') {
+        blurOverlay.classList.add('clear');
+      } else {
+        blurOverlay.classList.remove('clear');
+      }
 
-      // Hide container max-width constraint for timer (full screen)
-      app.style.maxWidth = isTimer ? 'none' : '500px';
-      app.style.padding = isTimer ? '0' : '';
+      // Stats visibility
+      stats.style.display = isTimer ? 'none' : '';
+
+      // When in timer, force night palette visuals
+      // (timer elements use hardcoded dark colours anyway)
 
       if (currentView === 'home') app.innerHTML = renderHome();
       else if (currentView === 'checkin') app.innerHTML = renderCheckin();
       else if (currentView === 'interventions') app.innerHTML = renderInterventions();
+      else if (currentView === 'learn') app.innerHTML = renderLearn();
       else if (currentView === 'section') app.innerHTML = renderSection();
-      else if (currentView === 'understand') app.innerHTML = renderUnderstand();
       else if (currentView === 'timer') app.innerHTML = renderTimer();
 
       attachEventListeners();
-      if (!isTimer) window.scrollTo(0, 0);
     }
 
+    function navigate(view) {
+      currentView = view;
+      render();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  VIEW RENDERERS
+    // ═══════════════════════════════════════════════════════════════════
+
     function renderHome() {
-      const timerRunning = timerState.running;
-      const timerIndicator = timerRunning
-        ? `<div class="timer-running-indicator"><span class="timer-running-dot"></span>${timerFmt(timerState.timeLeft)} ${timerState.mode}</div>`
+      const badge = timerState.running
+        ? `<span class="home-card-badge"><span class="badge-dot"></span>${timerFmt(timerState.timeLeft)}</span>`
         : '';
 
       return `
-        <div class="home-header">
-          <h1>ADD Companion</h1>
-          <p>Based on Gabor Mat\u00e9's Scattered Minds</p>
-        </div>
-        <div class="main-options">
-          <div class="option-card option-checkin" data-action="checkin">
-            <div class="option-card-header">
-              <div class="option-icon">${icons.activity}</div>
-              <span class="option-label">I need help now</span>
+        <div class="view view-center">
+          <div class="home-title">Clarity</div>
+          <div class="home-cards">
+            <div class="glass glass-hover home-card card-checkin" data-action="checkin">
+              <span class="home-card-icon">◉</span>
+              <span class="home-card-label">Check In</span>
             </div>
-            <p class="option-desc">Check in with how you're feeling and get practical support</p>
-          </div>
-          <div class="option-card option-timer" data-action="timer">
-            <div class="option-card-header">
-              <div class="option-icon">${icons.target}</div>
-              <span class="option-label">Focus Timer</span>
+            <div class="glass glass-hover home-card card-focus" data-action="timer">
+              <span class="home-card-icon">◎</span>
+              <span class="home-card-label">Focus</span>
+              ${badge}
             </div>
-            <p class="option-desc">Pomodoro timer to protect your focus windows</p>
-            ${timerIndicator}
-          </div>
-          <div class="option-card option-understand" data-action="understand">
-            <div class="option-card-header">
-              <div class="option-icon">${icons.info}</div>
-              <span class="option-label">Understanding ADD</span>
+            <div class="glass glass-hover home-card card-learn" data-action="learn">
+              <span class="home-card-icon">◐</span>
+              <span class="home-card-label">Learn</span>
             </div>
-            <p class="option-desc">What it is, where it comes from, and why this approach works</p>
           </div>
-        </div>
-        <h2 class="sections-header">Go deeper</h2>
-        <div class="sections-grid">
-          ${Object.values(sections).map(s => `
-            <button class="section-btn" data-section="${s.id}">
-              ${icons[s.icon]}
-              <span>${s.label}</span>
-            </button>
-          `).join('')}
-        </div>
-        <div class="quote-card">
-          <p>"The greatest gift you can give yourself is to understand yourself without judgment."</p>
-          <p class="author">\u2014 Gabor Mat\u00e9</p>
         </div>
       `;
     }
 
     function renderCheckin() {
       return `
-        <div class="header">
-          <div class="header-inner">
+        <div class="view">
+          <div class="view-header">
             <button class="back-btn" data-action="home">${icons.arrowLeft}</button>
-            <h1 class="header-title">How are you right now?</h1>
+            <span class="view-title">Check In</span>
           </div>
-        </div>
-        <div class="states-grid" style="padding-top: 1.25rem;">
-          ${Object.values(states).map(state => `
-            <div class="state-${state.id}" data-state="${state.id}">
-              <div class="state-card">
-                <div class="state-card-header">
-                  <div class="state-icon">${icons[state.icon]}</div>
-                  <span class="state-label">${state.label}</span>
+          <div class="view-scroll">
+            <div class="state-cards">
+              ${Object.values(states).map(state => `
+                <div class="glass glass-hover state-card ${state.cssClass}" data-state="${state.id}">
+                  <span class="state-icon-text">${state.emoji}</span>
+                  <div class="state-info">
+                    <div class="state-label">${state.label}</div>
+                    <div class="state-desc">${state.description}</div>
+                  </div>
                 </div>
-                <p class="state-desc">${state.description}</p>
-              </div>
+              `).join('')}
             </div>
-          `).join('')}
+          </div>
         </div>
       `;
     }
 
     function renderInterventions() {
       const state = states[selectedState];
-      const colors = {
-        understimulated: { bg: '#fffbeb', border: '#fde68a', text: '#b45309', accent: '#f59e0b' },
-        overwhelmed: { bg: '#f8fafc', border: '#cbd5e1', text: '#475569', accent: '#64748b' },
-        hyperactivated: { bg: '#fff1f2', border: '#fecdd3', text: '#be123c', accent: '#f43f5e' },
-        regulated: { bg: '#ecfdf5', border: '#a7f3d0', text: '#047857', accent: '#10b981' }
-      }[selectedState];
+      if (!state) return renderCheckin();
 
       return `
-        <div class="header">
-          <div class="header-inner">
+        <div class="view">
+          <div class="view-header">
             <button class="back-btn" data-action="checkin">${icons.arrowLeft}</button>
-            <h1 class="header-title">${state.label}</h1>
+            <span class="view-title">${state.label}</span>
+          </div>
+          <div class="view-scroll">
+            <div class="glass need-card">
+              <div class="need-label">What you need</div>
+              <div class="need-text">${state.need}</div>
+            </div>
+            <div class="interventions-list">
+              ${state.interventions.map((inv, i) => `
+                <div class="glass intervention-card" data-idx="${i}">
+                  <div class="intervention-header">
+                    <div class="intervention-number">${i + 1}</div>
+                    <div class="intervention-title">${inv.title}</div>
+                    <span class="chevron">${icons.chevronDown}</span>
+                  </div>
+                  <div class="intervention-detail">${inv.detail}</div>
+                </div>
+              `).join('')}
+            </div>
+            <button class="check-again-btn" data-action="checkin">Check in again</button>
           </div>
         </div>
-        <div class="need-card" style="background:${colors.bg};border-color:${colors.border};">
-          <p class="label">What you need:</p>
-          <p class="text" style="color:${colors.text};">${state.need}</p>
-        </div>
-        <div class="interventions-list">
-          ${state.interventions.map((int, i) => `
-            <div class="intervention-card ${i===0?'expanded':''}" data-intervention="${i}">
-              <div class="intervention-header">
-                <div class="intervention-number" style="background:${colors.accent};">${i+1}</div>
-                <span class="intervention-title">${int.title}</span>
-                <span class="chevron">${icons.chevronDown}</span>
+      `;
+    }
+
+    function renderLearn() {
+      const topicsContent = `
+        <div class="topics-list">
+          ${Object.values(sections).map(s => `
+            <div class="glass glass-hover topic-card" data-section="${s.id}">
+              <div class="topic-btn">
+                <span class="topic-icon">${icons[s.icon]}</span>
+                <span class="topic-label">${s.label}</span>
               </div>
-              <div class="intervention-detail">${int.detail}</div>
             </div>
           `).join('')}
         </div>
-        <button class="check-again-btn" data-action="checkin">Check in again</button>
+      `;
+
+      const understandingContent = `
+        <div class="prose-section">
+          ${understandContent.map(item => `
+            <div class="glass prose-card">
+              <h3>${item.title}</h3>
+              ${item.html}
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      return `
+        <div class="view">
+          <div class="view-header">
+            <button class="back-btn" data-action="home">${icons.arrowLeft}</button>
+            <span class="view-title">Learn</span>
+          </div>
+          <div class="learn-tabs">
+            <button class="learn-tab ${learnTab === 'topics' ? 'active' : ''}" data-tab="topics">Topics</button>
+            <button class="learn-tab ${learnTab === 'understanding' ? 'active' : ''}" data-tab="understanding">Understanding</button>
+          </div>
+          <div class="view-scroll">
+            ${learnTab === 'topics' ? topicsContent : understandingContent}
+          </div>
+        </div>
       `;
     }
 
     function renderSection() {
       const section = sections[selectedSection];
+      if (!section) return renderLearn();
+
       return `
-        <div class="header">
-          <div class="header-inner">
-            <button class="back-btn" data-action="home">${icons.arrowLeft}</button>
-            <h1 class="header-title">${section.label}</h1>
+        <div class="view">
+          <div class="view-header">
+            <button class="back-btn" data-action="learn">${icons.arrowLeft}</button>
+            <span class="view-title">${section.label}</span>
           </div>
-        </div>
-        <div class="section-content">
-          ${section.content.map(group => `
-            <div class="content-group">
-              <h3 class="content-group-title">${group.title}</h3>
-              ${group.items.map((item, i) => `
-                <div class="content-item" data-item="${i}">
-                  <div class="content-item-header">
-                    <span class="content-item-heading">${item.heading}</span>
-                    <span class="chevron">${icons.chevronDown}</span>
-                  </div>
-                  <div class="content-item-text">${item.text}</div>
+          <div class="view-scroll">
+            <div class="section-content">
+              ${section.content.map(group => `
+                <div class="glass content-group">
+                  <div class="content-group-title">${group.title}</div>
+                  ${group.items.map(item => `
+                    <div class="content-item">
+                      <div class="content-item-header">
+                        <span class="content-item-heading">${item.heading}</span>
+                        <span class="chevron">${icons.chevronDown}</span>
+                      </div>
+                      <div class="content-item-text">${item.text}</div>
+                    </div>
+                  `).join('')}
                 </div>
               `).join('')}
             </div>
-          `).join('')}
-        </div>
-      `;
-    }
-
-    function renderUnderstand() {
-      return `
-        <div class="header">
-          <div class="header-inner">
-            <button class="back-btn" data-action="home">${icons.arrowLeft}</button>
-            <h1 class="header-title">Understanding ADD</h1>
-          </div>
-        </div>
-        <div class="prose-section">
-          <div class="prose-card">
-            <h3>What ADD Actually Is</h3>
-            <p>ADD is <strong>not</strong> a character flaw, laziness, or lack of intelligence. It's a <strong>developmental adaptation</strong> \u2014 your brain organised itself around early environmental conditions (stress, attunement gaps, chaos) in ways that made sense at the time.</p>
-            <p>The core issue isn't attention. It's <strong>self-regulation</strong>. Your nervous system struggles to:</p>
-            <ul>
-              <li>Maintain optimal arousal (you're either understimulated or overwhelmed)</li>
-              <li>Filter stimuli (everything feels equally urgent)</li>
-              <li>Tolerate uncomfortable internal states (boredom, anxiety, emptiness)</li>
-            </ul>
-            <div class="highlight-box">
-              <p><strong>Why this matters:</strong> If you think ADD is a willpower problem, you'll try to force yourself through it and fail. If you understand it as a regulation problem, you can design around it.</p>
-            </div>
-          </div>
-          <div class="prose-card">
-            <h3>Where It Comes From</h3>
-            <p>Mat\u00e9's view: ADD develops in the context of early relationships. It's not purely genetic \u2014 it emerges when a child's environment doesn't provide the consistent, attuned presence needed for the brain to develop robust self-regulation.</p>
-            <p>This isn't about blame. Parents were doing their best with their own circumstances. But understanding the origin helps you see that <strong>you adapted to survive</strong>, and those adaptations are still running.</p>
-          </div>
-          <div class="prose-card">
-            <h3>The Four Core Struggles</h3>
-            <p><strong>1. Attention Dysregulation</strong><br>Not a deficit \u2014 a dysregulation. You can hyperfocus for hours on the right thing; you can't direct attention voluntarily to the "wrong" thing. Your reward system needs higher stimulation to engage.</p>
-            <p><strong>2. Impulse Control</strong><br>The gap between stimulus and response is too short. You act before the executive brain has time to weigh in. The prefrontal cortex is underactive relative to the limbic system.</p>
-            <p><strong>3. Restlessness</strong><br>Physical (can't sit still) or mental (racing thoughts). Your nervous system is seeking stimulation to reach baseline. Stillness feels like deprivation.</p>
-            <p><strong>4. Emotional Sensitivity</strong><br>Often overlooked. Intense emotional responses, rejection sensitivity, difficulty letting things go. The same dysregulation that affects attention affects emotional processing.</p>
-          </div>
-          <div class="prose-card">
-            <h3>What ADD Is Good For</h3>
-            <p>Your brain isn't broken \u2014 it's different. ADD often comes with genuine strengths:</p>
-            <ul>
-              <li><strong>Crisis response:</strong> High stimulation = engagement. You're good when things are urgent.</li>
-              <li><strong>Novel problem-solving:</strong> You see connections others miss. Non-linear thinking is an asset.</li>
-              <li><strong>Hyperfocus:</strong> When aligned with interest, you can outwork anyone.</li>
-              <li><strong>Energy and enthusiasm:</strong> When you're engaged, you bring intensity others can't match.</li>
-            </ul>
-            <p>The goal isn't to eliminate these traits \u2014 it's to <strong>channel them</strong> and manage the downsides.</p>
-          </div>
-          <div class="prose-card">
-            <h3>What About Medication?</h3>
-            <p>Medication can help. It adjusts dopamine and norepinephrine levels, making it easier to engage with low-stimulation tasks and improving impulse control.</p>
-            <p><strong>What medication does:</strong></p>
-            <ul>
-              <li>Raises baseline arousal so you need less external stimulation</li>
-              <li>Improves working memory and focus</li>
-              <li>Reduces impulsivity</li>
-            </ul>
-            <p><strong>What medication doesn't do:</strong></p>
-            <ul>
-              <li>Teach you skills you never developed</li>
-              <li>Change ingrained habits and coping mechanisms</li>
-              <li>Address the emotional patterns (shame, avoidance, sensitivity)</li>
-              <li>Design your environment and systems for you</li>
-            </ul>
-            <div class="highlight-box">
-              <p>Medication can make it <em>easier</em> to do the work \u2014 but the work still has to be done. That's what this approach is about.</p>
-            </div>
-          </div>
-          <div class="prose-card">
-            <h3>Why This Approach</h3>
-            <p>This isn't about forcing yourself to be "normal." It's about understanding your nervous system and working <strong>with</strong> it rather than against it.</p>
-            <p>The framework here is practical:</p>
-            <ul>
-              <li><strong>Recognise your state</strong> \u2014 know whether you're understimulated, overwhelmed, or hyperactivated</li>
-              <li><strong>Intervene appropriately</strong> \u2014 different states need different responses</li>
-              <li><strong>Design your environment</strong> \u2014 stop relying on willpower; build systems</li>
-              <li><strong>Address the emotional layer</strong> \u2014 the shame, the avoidance, the sensitivity</li>
-            </ul>
-            <p>The goal isn't to become neurotypical. The goal is to become <strong>functional, fulfilled, and at peace with who you actually are.</strong></p>
           </div>
         </div>
       `;
     }
 
     function renderTimer() {
-      const modeLabel = timerState.mode === 'focus' ? 'focus' : timerState.mode === 'short' ? 'short break' : 'long break';
-
       return `
-        <div class="timer-view" style="--accent: ${ACCENT[timerState.mode]};">
-          <button class="timer-back" data-action="home">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          </button>
-
+        <div class="timer-view">
+          <button class="timer-back" data-action="home">${icons.arrowLeft}</button>
           <div class="modes">
             <button class="mode-btn ${timerState.mode==='focus'?'active':''}" data-mode="focus">Focus</button>
-            <button class="mode-btn ${timerState.mode==='short'?'active':''}" data-mode="short">Short Break</button>
-            <button class="mode-btn ${timerState.mode==='long'?'active':''}" data-mode="long">Long Break</button>
+            <button class="mode-btn ${timerState.mode==='short'?'active':''}" data-mode="short">Short</button>
+            <button class="mode-btn ${timerState.mode==='long'?'active':''}" data-mode="long">Long</button>
           </div>
-
           <div class="timer-container" id="timerContainer">
             <div class="ring-glow ${timerState.running?'':'paused'}" id="ringGlow"></div>
             <svg class="ring-svg" viewBox="0 0 100 100">
-              <circle class="ring-bg-circle" cx="50" cy="50" r="44"></circle>
-              <circle class="ring-progress" id="ringProgress" cx="50" cy="50" r="44"></circle>
+              <circle class="ring-bg-circle" cx="50" cy="50" r="44"/>
+              <circle class="ring-progress" id="ringProgress" cx="50" cy="50" r="44"/>
             </svg>
             <div class="timer-display">
               <div class="timer-time ${timerState.running?'running':''}" id="timerTime">${timerFmt(timerState.timeLeft)}</div>
-              <div class="timer-label" id="timerLabel">${modeLabel}</div>
+              <div class="timer-label" id="timerLabel">${timerState.mode === 'focus' ? 'focus' : timerState.mode === 'short' ? 'short break' : 'long break'}</div>
             </div>
           </div>
-
           <div class="controls">
-            <button class="btn-icon" id="btnPrev" title="Restart / previous">
-              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 3a1 1 0 0 1 1 1v2.586l6.293-6.293a1 1 0 0 1 1.414 1.414L5.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L4 9.414V12a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1z"/></svg>
+            <button class="btn-icon" id="btnPrev">${icons.skipBack}</button>
+            <button class="btn-primary" id="btnToggle">
+              <span id="iconPlay" style="display:${timerState.running?'none':'block'}">${icons.play}</span>
+              <span id="iconPause" style="display:${timerState.running?'block':'none'}">${icons.pause}</span>
             </button>
-            <button class="btn-primary" id="btnPlayPause">
-              <svg id="iconPlay" viewBox="0 0 24 24" fill="currentColor" style="display:${timerState.running?'none':'block'};"><path d="M8 5v14l11-7z"/></svg>
-              <svg id="iconPause" viewBox="0 0 24 24" fill="currentColor" style="display:${timerState.running?'block':'none'};"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-            </button>
-            <button class="btn-icon" id="btnSkip" title="Skip to next">
-              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M13 3a1 1 0 0 0-1 1v2.586L5.707 0.293a1 1 0 0 0-1.414 1.414L10.586 8 4.293 14.293a1 1 0 0 0 1.414 1.414L12 9.414V12a1 1 0 1 0 2 0V4a1 1 0 0 0-1-1z"/></svg>
-            </button>
+            <button class="btn-icon" id="btnSkip">${icons.skipFwd}</button>
           </div>
-
           <div class="sessions" id="sessions"></div>
-        </div>
-
-        <div class="timer-settings-bar">
-          <button class="settings-btn" id="btnSettings" title="Settings">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/></svg>
-          </button>
-          <button class="settings-btn" id="btnSound" title="Toggle sound">
-            <svg id="soundOn" viewBox="0 0 16 16" fill="currentColor" style="display:${timerState.soundEnabled?'block':'none'}"><path d="M11.536 14.01A8.473 8.473 0 0 0 14.026 8a8.473 8.473 0 0 0-2.49-6.01l-.708.707A7.476 7.476 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303l.708.707z"/><path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.483 5.483 0 0 1 11.025 8a5.483 5.483 0 0 1-1.61 3.89l.706.706z"/><path d="M8.707 11.182A4.486 4.486 0 0 0 10.025 8a4.486 4.486 0 0 0-1.318-3.182L8 5.525A3.489 3.489 0 0 1 9.025 8 3.49 3.49 0 0 1 8 10.475l.707.707zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06z"/></svg>
-            <svg id="soundOff" viewBox="0 0 16 16" fill="currentColor" style="display:${timerState.soundEnabled?'none':'block'}"><path d="M6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06zm7.137 2.096a.5.5 0 0 1 0 .708L12.207 8l1.647 1.646a.5.5 0 0 1-.708.708L11.5 8.707l-1.646 1.647a.5.5 0 0 1-.708-.708L10.793 8 9.146 6.354a.5.5 0 1 1 .708-.708L11.5 7.293l1.646-1.647a.5.5 0 0 1 .708 0z"/></svg>
-          </button>
-        </div>
-
-        <div class="modal-overlay" id="settingsModal">
-          <div class="modal">
-            <h3>Timer Settings</h3>
-            <div class="setting-row"><label>Focus (min)</label><input type="number" id="setFocus" min="1" max="90" value="${timerState.config.focus}"></div>
-            <div class="setting-row"><label>Short Break (min)</label><input type="number" id="setShort" min="1" max="30" value="${timerState.config.short}"></div>
-            <div class="setting-row"><label>Long Break (min)</label><input type="number" id="setLong" min="1" max="60" value="${timerState.config.long}"></div>
-            <div class="setting-row"><label>Sessions until long break</label><input type="number" id="setSessions" min="2" max="8" value="${timerState.config.sessions}"></div>
-            <div class="modal-footer">
-              <button class="modal-btn secondary" id="btnCancelSettings">Cancel</button>
-              <button class="modal-btn primary" id="btnSaveSettings">Save</button>
-            </div>
+          <div class="timer-settings-bar">
+            <button class="settings-btn" id="btnSound">${timerState.soundEnabled ? icons.volumeOn : icons.volumeOff}</button>
+            <button class="settings-btn" id="btnSettings">${icons.settings}</button>
           </div>
         </div>
-
-        <div class="timer-toast" id="timerToast"></div>
       `;
     }
 
@@ -1724,156 +2147,119 @@
     // ═══════════════════════════════════════════════════════════════════
 
     function attachEventListeners() {
-      // Navigation
-      document.querySelectorAll('[data-action="checkin"]').forEach(el => {
-        el.addEventListener('click', () => { currentView = 'checkin'; render(); });
+      // Navigation actions
+      document.querySelectorAll('[data-action]').forEach(el => {
+        el.addEventListener('click', () => {
+          const action = el.dataset.action;
+          navigate(action);
+        });
       });
-      document.querySelectorAll('[data-action="understand"]').forEach(el => {
-        el.addEventListener('click', () => { currentView = 'understand'; render(); });
-      });
-      document.querySelectorAll('[data-action="timer"]').forEach(el => {
-        el.addEventListener('click', () => { currentView = 'timer'; render(); updateTimerDOM(); });
-      });
-      document.querySelectorAll('[data-action="home"]').forEach(el => {
-        el.addEventListener('click', () => { currentView = 'home'; selectedState = null; selectedSection = null; render(); });
-      });
+
+      // State selection (check-in)
       document.querySelectorAll('[data-state]').forEach(el => {
-        el.addEventListener('click', () => { selectedState = el.dataset.state; currentView = 'interventions'; render(); });
+        el.addEventListener('click', () => {
+          selectedState = el.dataset.state;
+          navigate('interventions');
+        });
       });
+
+      // Section selection (learn topics)
       document.querySelectorAll('[data-section]').forEach(el => {
-        el.addEventListener('click', () => { selectedSection = el.dataset.section; currentView = 'section'; render(); });
-      });
-      document.querySelectorAll('[data-intervention]').forEach(el => {
-        el.querySelector('.intervention-header').addEventListener('click', () => { el.classList.toggle('expanded'); });
-      });
-      document.querySelectorAll('.content-item').forEach(el => {
-        el.addEventListener('click', () => { el.classList.toggle('expanded'); });
+        el.addEventListener('click', () => {
+          selectedSection = el.dataset.section;
+          navigate('section');
+        });
       });
 
-      // Timer controls (only when timer view is active)
+      // Learn tabs
+      document.querySelectorAll('[data-tab]').forEach(el => {
+        el.addEventListener('click', () => {
+          learnTab = el.dataset.tab;
+          render();
+        });
+      });
+
+      // Intervention card expand/collapse
+      document.querySelectorAll('.intervention-card').forEach(card => {
+        card.querySelector('.intervention-header').addEventListener('click', () => {
+          card.classList.toggle('expanded');
+        });
+      });
+
+      // Content item expand/collapse
+      document.querySelectorAll('.content-item').forEach(item => {
+        item.querySelector('.content-item-header').addEventListener('click', () => {
+          item.classList.toggle('expanded');
+        });
+      });
+
+      // Timer controls
       if (currentView === 'timer') {
-        document.getElementById('btnPlayPause').addEventListener('click', timerToggle);
-        document.getElementById('btnSkip').addEventListener('click', timerSkip);
-        document.getElementById('btnPrev').addEventListener('click', timerPrev);
-
-        document.querySelectorAll('.mode-btn').forEach(b => {
-          b.addEventListener('click', () => timerSwitchMode(b.dataset.mode));
-        });
-
-        document.getElementById('btnSettings').addEventListener('click', () => {
-          document.getElementById('settingsModal').classList.add('open');
-        });
-        document.getElementById('btnCancelSettings').addEventListener('click', () => {
-          document.getElementById('settingsModal').classList.remove('open');
-        });
-        document.getElementById('btnSaveSettings').addEventListener('click', () => {
-          timerState.config.focus = parseInt(document.getElementById('setFocus').value) || 25;
-          timerState.config.short = parseInt(document.getElementById('setShort').value) || 5;
-          timerState.config.long = parseInt(document.getElementById('setLong').value) || 15;
-          timerState.config.sessions = parseInt(document.getElementById('setSessions').value) || 4;
-          document.getElementById('settingsModal').classList.remove('open');
-          timerSwitchMode(timerState.mode);
-          showTimerToast('Settings saved.');
-        });
-        document.getElementById('settingsModal').addEventListener('click', e => {
-          if (e.target.id === 'settingsModal') document.getElementById('settingsModal').classList.remove('open');
-        });
-        document.getElementById('btnSound').addEventListener('click', () => {
+        document.getElementById('btnToggle')?.addEventListener('click', timerToggle);
+        document.getElementById('btnSkip')?.addEventListener('click', timerSkip);
+        document.getElementById('btnPrev')?.addEventListener('click', timerPrev);
+        document.getElementById('btnSettings')?.addEventListener('click', openSettings);
+        document.getElementById('btnSound')?.addEventListener('click', () => {
           timerState.soundEnabled = !timerState.soundEnabled;
-          document.getElementById('soundOn').style.display = timerState.soundEnabled ? 'block' : 'none';
-          document.getElementById('soundOff').style.display = timerState.soundEnabled ? 'none' : 'block';
+          document.getElementById('btnSound').innerHTML = timerState.soundEnabled ? icons.volumeOn : icons.volumeOff;
         });
+
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+          btn.addEventListener('click', () => timerSwitchMode(btn.dataset.mode));
+        });
+
+        updateTimerDOM();
       }
     }
 
-    // Keyboard shortcuts (global, only apply in timer view)
-    document.addEventListener('keydown', e => {
-      if (currentView !== 'timer') return;
-      const modal = document.getElementById('settingsModal');
-      if (modal && modal.classList.contains('open')) return;
-      if (e.code === 'Space') { e.preventDefault(); timerToggle(); }
-      if (e.code === 'ArrowRight') timerSkip();
-      if (e.code === 'ArrowLeft') timerPrev();
-      if (e.code === 'Escape') { currentView = 'home'; render(); }
-    });
+    // Update home badge when timer is running (via interval)
+    setInterval(() => {
+      if (timerState.running && currentView === 'home') {
+        const badge = document.querySelector('.home-card-badge');
+        if (badge) badge.innerHTML = `<span class="badge-dot"></span>${timerFmt(timerState.timeLeft)}`;
+      }
+    }, 1000);
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  SERVICE WORKER
-    // ═══════════════════════════════════════════════════════════════════
-
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('data:text/javascript,' + encodeURIComponent(`
-        self.addEventListener('install', e => self.skipWaiting());
-        self.addEventListener('activate', e => e.waitUntil(clients.claim()));
-      `)).catch(() => {});
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  INIT
-    // ═══════════════════════════════════════════════════════════════════
-
+    // Initial render
     render();
 
     // ═══════════════════════════════════════════════════════════════════
-    //  SUPABASE METRICS (fail-safe)
+    //  SUPABASE STATS (lazy load)
     // ═══════════════════════════════════════════════════════════════════
 
-    const SUPABASE_URL = 'https://nchsabvhbenfntsnivlu.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jaHNhYnZoYmVuZm50c25pdmx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NjYyNDEsImV4cCI6MjA4MDI0MjI0MX0.1kWsELW7Z3roKq6lcVjhYNGDxccT7b2kXB7tWeDF6V8';
-
-    let supabase = null;
-    const SESSION_ID_KEY = 'add_companion_session_id';
-
-    function getSessionId() {
-      let id = localStorage.getItem(SESSION_ID_KEY);
-      if (!id) {
-        id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'sess-' + Math.random().toString(36).slice(2);
-        localStorage.setItem(SESSION_ID_KEY, id);
+    function initStats() {
+      if (typeof window.supabase === 'undefined') {
+        setTimeout(initStats, 500);
+        return;
       }
-      return id;
+
+      const sb = window.supabase.createClient(
+        'https://jafngizvbtfbhrqtyidp.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphZm5naXp2YnRmYmhycXR5aWRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NTIwMTcsImV4cCI6MjA2NDEyODAxN30.fJnyMXtNLFIFlMs28ypCL63JRRIHGV5iVRam7F0Y2c8'
+      );
+
+      const sessionId = crypto.randomUUID();
+
+      (async () => {
+        try {
+          await sb.from('page_visits').insert({ session_id: sessionId, page: 'clarity' });
+          const { count } = await sb.from('page_visits').select('*', { count: 'exact', head: true });
+          const el = document.getElementById('total-visits');
+          if (el && count) el.textContent = count.toLocaleString();
+        } catch(e) {}
+      })();
+
+      const channel = sb.channel('presence-clarity', { config: { presence: { key: sessionId } } });
+      channel.on('presence', { event: 'sync' }, () => {
+        const el = document.getElementById('live-count');
+        if (el) el.textContent = Object.keys(channel.presenceState()).length;
+      });
+      channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') await channel.track({ online_at: new Date().toISOString() });
+      });
     }
 
-    async function trackVisit() {
-      if (!supabase) return;
-      try { await supabase.from('page_visits').insert({ session_id: getSessionId() }); } catch (e) {}
-    }
-
-    async function updateTotalVisits() {
-      if (!supabase) return;
-      try {
-        const { error, count } = await supabase.from('page_visits').select('id', { count: 'exact', head: true });
-        if (!error) { const el = document.getElementById('total-visits'); if (el) el.textContent = (count || 0).toLocaleString(); }
-      } catch (e) {}
-    }
-
-    async function heartbeat() {
-      if (!supabase) return;
-      try { await supabase.from('presence').upsert({ session_id: getSessionId(), last_seen: new Date().toISOString() }); } catch (e) {}
-    }
-
-    async function updateOnlineCount() {
-      if (!supabase) return;
-      try {
-        const { error, count } = await supabase.from('presence').select('session_id', { count: 'exact', head: true }).gt('last_seen', new Date(Date.now() - 60000).toISOString());
-        if (!error) { const el = document.getElementById('live-count'); if (el) el.textContent = count || 0; }
-      } catch (e) {}
-    }
-
-    function subscribePresenceChanges() {
-      if (!supabase) return;
-      try {
-        supabase.channel('presence_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'presence' }, () => updateOnlineCount()).subscribe();
-      } catch (e) {}
-    }
-
-    (function initSupabaseSafely() {
-      try {
-        if (!(window.supabase && typeof window.supabase.createClient === 'function')) return;
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        trackVisit(); updateTotalVisits(); heartbeat(); updateOnlineCount(); subscribePresenceChanges();
-        setInterval(heartbeat, 30000);
-      } catch (e) {}
-    })();
+    setTimeout(initStats, 1000);
   </script>
 </body>
 </html>
