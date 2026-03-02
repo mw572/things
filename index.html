@@ -1298,8 +1298,8 @@
   <button class="theme-toggle" id="themeToggle"></button>
 
   <div id="stats">
-    <span id="total-visits">&ndash;</span> total uses &middot;
-    <span id="live-count">0</span> people here now
+    <span id="total-visits">&ndash;</span> visits &middot;
+    <span id="live-count">0</span> focusing now
   </div>
 
   <!-- Completion overlay (persistent, outside app for z-index) -->
@@ -2447,34 +2447,48 @@
     function initStats() {
       const sessionId = crypto.randomUUID();
 
-      // Record visit
+      // Record visit — also returns updated total
       fetch(STATS_URL, {
         method: 'POST',
         body: JSON.stringify({ action: 'visit', id: sessionId, token: STATS_TOKEN }),
-      }).catch(() => {});
-
-      // Fetch total count
-      fetch(`${STATS_URL}?action=count&token=${STATS_TOKEN}`)
+      })
         .then(r => r.json())
         .then(data => {
           const el = document.getElementById('total-visits');
-          if (el && data.count != null) el.textContent = Number(data.count).toLocaleString();
+          if (el && data.total) el.textContent = Number(data.total).toLocaleString();
         })
-        .catch(() => {});
+        .catch(() => {
+          // Fallback: fetch count separately if visit POST didn't return it
+          fetch(`${STATS_URL}?action=count&token=${STATS_TOKEN}`)
+            .then(r => r.json())
+            .then(data => {
+              const el = document.getElementById('total-visits');
+              if (el && data.count != null) el.textContent = Number(data.count).toLocaleString();
+            })
+            .catch(() => {});
+        });
 
-      // Fetch active users (approximate)
-      function fetchActive() {
-        fetch(`${STATS_URL}?action=active&token=${STATS_TOKEN}`)
+      // Heartbeat — reports presence + focusing status, receives live counts
+      function heartbeat() {
+        fetch(STATS_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'heartbeat',
+            id: sessionId,
+            token: STATS_TOKEN,
+            focusing: timerState.running,
+          }),
+        })
           .then(r => r.json())
           .then(data => {
             const el = document.getElementById('live-count');
-            if (el) el.textContent = data.active || 0;
+            if (el) el.textContent = data.focusing || 0;
           })
           .catch(() => {});
       }
 
-      fetchActive();
-      setInterval(fetchActive, 60000); // Poll every 60s
+      heartbeat();
+      setInterval(heartbeat, 60000); // Every 60s
     }
 
     setTimeout(initStats, 1000);
