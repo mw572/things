@@ -1086,6 +1086,26 @@
 
     const ACCENT = { focus: '#58a6ff', short: '#56d364', long: '#bc8cff' };
 
+    // Wake Lock - prevents screen from locking while timer runs
+    let wakeLock = null;
+
+    async function requestWakeLock() {
+      if (!('wakeLock' in navigator)) return;
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      } catch (e) {}
+    }
+
+    async function releaseWakeLock() {
+      if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+    }
+
+    // Re-acquire wake lock when returning to the tab (Safari releases it on tab switch)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && timerState.running) requestWakeLock();
+    });
+
     function timerFmt(secs) {
       return `${Math.floor(secs/60).toString().padStart(2,'0')}:${(secs%60).toString().padStart(2,'0')}`;
     }
@@ -1106,6 +1126,7 @@
       timerState.running = true;
       timerState.interval = setInterval(timerTick, 1000);
       anim.setRunning(true);
+      requestWakeLock();
       if (currentView === 'timer') updateTimerDOM();
     }
 
@@ -1114,6 +1135,7 @@
       clearInterval(timerState.interval);
       timerState.interval = null;
       anim.setRunning(false);
+      releaseWakeLock();
       document.title = 'ADD Companion';
       if (currentView === 'timer') updateTimerDOM();
     }
