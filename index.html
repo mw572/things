@@ -719,11 +719,18 @@
       --ring-size: 260px;
     }
 
-    .timer-back {
+    .timer-top-bar {
       position: fixed;
       top: calc(16px + env(safe-area-inset-top, 0px));
       left: 16px;
+      right: 16px;
       z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .timer-top-btn {
       width: 40px;
       height: 40px;
       border-radius: 10px;
@@ -737,8 +744,8 @@
       transition: all 0.2s;
     }
 
-    .timer-back:hover { color: #e6edf3; border-color: #7d8590; }
-    .timer-back svg { width: 16px; height: 16px; }
+    .timer-top-btn:hover { color: #e6edf3; border-color: #7d8590; }
+    .timer-top-btn svg { width: 16px; height: 16px; }
 
     .modes {
       display: flex;
@@ -747,7 +754,14 @@
       border: 1px solid #21262d;
       border-radius: 12px;
       padding: 4px;
-      margin-bottom: 48px;
+      margin-bottom: 32px;
+    }
+
+    .timer-ring-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
     }
 
     .mode-btn {
@@ -775,7 +789,6 @@
       position: relative;
       width: var(--ring-size);
       height: var(--ring-size);
-      margin-bottom: 48px;
     }
 
     .ring-svg {
@@ -823,8 +836,27 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 4px;
     }
+
+    .btn-play {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1.5px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 4px;
+    }
+
+    .btn-play:hover { background: rgba(88, 166, 255, 0.1); }
+    .btn-play:active { transform: scale(0.93); }
+    .btn-play svg { width: 18px; height: 18px; }
 
     .timer-time {
       font-size: 64px;
@@ -844,16 +876,9 @@
       color: #7d8590;
     }
 
-    .controls {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      margin-bottom: 56px;
-    }
-
     .btn-icon {
-      width: 44px;
-      height: 44px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       border: 1px solid #21262d;
       background: #161b22;
@@ -863,6 +888,7 @@
       justify-content: center;
       cursor: pointer;
       transition: all 0.2s ease;
+      flex-shrink: 0;
     }
 
     .btn-icon:hover {
@@ -873,45 +899,10 @@
 
     .btn-icon svg { width: 16px; height: 16px; }
 
-    .btn-primary {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      border: 2px solid var(--accent);
-      background: transparent;
-      color: var(--accent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .btn-primary::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: var(--accent);
-      opacity: 0;
-      transition: opacity 0.25s;
-    }
-
-    .btn-primary:hover::before { opacity: 0.12; }
-    .btn-primary:active::before { opacity: 0.25; }
-
-    .btn-primary svg {
-      width: 24px;
-      height: 24px;
-      position: relative;
-      z-index: 1;
-    }
-
     .sessions {
       display: flex;
       gap: 8px;
-      margin-bottom: 40px;
+      margin-bottom: 20px;
     }
 
     .session-dot {
@@ -934,37 +925,49 @@
       50% { opacity: 0.8; transform: scale(1.3); }
     }
 
-    .timer-settings-bar {
-      position: fixed;
-      bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    /* Sound toggle in settings */
+    .setting-toggle {
       display: flex;
-      gap: 12px;
       align-items: center;
-      z-index: 10;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #21262d;
     }
 
-    .settings-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      border: 1px solid #21262d;
-      background: #161b22;
-      color: #7d8590;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .setting-toggle label { font-size: 14px; color: #e6edf3; }
+
+    .toggle-switch {
+      width: 40px;
+      height: 22px;
+      border-radius: 11px;
+      background: #21262d;
+      border: none;
       cursor: pointer;
-      transition: all 0.2s;
-      font-size: 13px;
+      position: relative;
+      transition: background 0.2s;
     }
 
-    .settings-btn:hover { color: #e6edf3; border-color: #7d8590; }
-    .settings-btn svg { width: 14px; height: 14px; }
+    .toggle-switch.on { background: #58a6ff; }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #e6edf3;
+      transition: transform 0.2s;
+    }
+
+    .toggle-switch.on::after { transform: translateX(18px); }
 
     /* Task capture */
     .task-area {
       position: fixed;
-      bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+      bottom: calc(24px + env(safe-area-inset-bottom, 0px));
       left: 50%;
       transform: translateX(-50%);
       width: calc(100% - 48px);
@@ -1258,11 +1261,8 @@
         padding: 0 2rem;
       }
       .timer-view .modes { margin-bottom: 0; }
-      .timer-view .timer-container {
-        --ring-size: 180px;
-        margin-bottom: 0;
-      }
-      .timer-view .controls { margin-bottom: 0; }
+      .timer-view .timer-container { --ring-size: 180px; }
+      .timer-ring-row { margin-bottom: 0; }
       .timer-view .sessions { margin-bottom: 0; }
       .home-title { font-size: 1.8rem; margin-bottom: 1.5rem; }
       .task-area { display: none; }
@@ -1412,6 +1412,7 @@
   <div class="modal-overlay" id="settingsModal">
     <div class="modal">
       <h3>Settings</h3>
+      <div class="setting-toggle"><label>Sound</label><button class="toggle-switch" id="btnSoundToggle"></button></div>
       <div class="setting-row"><label>Focus (min)</label><input type="number" id="setFocus" min="1" max="90"></div>
       <div class="setting-row"><label>Short break</label><input type="number" id="setShort" min="1" max="30"></div>
       <div class="setting-row"><label>Long break</label><input type="number" id="setLong" min="1" max="60"></div>
@@ -1804,10 +1805,7 @@
         timerState.totalTime = timerState.config[m] * 60;
         timerState.timeLeft = timerState.totalTime;
       }
-      if (currentView === 'timer') {
-        document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
-        updateTimerDOM();
-      }
+      if (currentView === 'timer') render();
     }
 
     // Completion with looping chime
@@ -1982,6 +1980,8 @@
       document.getElementById('setShort').value = timerState.config.short;
       document.getElementById('setLong').value = timerState.config.long;
       document.getElementById('setSessions').value = timerState.config.sessions;
+      const soundBtn = document.getElementById('btnSoundToggle');
+      soundBtn.classList.toggle('on', timerState.soundEnabled);
       document.getElementById('settingsModal').classList.add('open');
     }
 
@@ -2002,6 +2002,10 @@
 
     document.getElementById('settingsCancel').addEventListener('click', closeSettings);
     document.getElementById('settingsSave').addEventListener('click', saveSettings);
+    document.getElementById('btnSoundToggle').addEventListener('click', () => {
+      timerState.soundEnabled = !timerState.soundEnabled;
+      document.getElementById('btnSoundToggle').classList.toggle('on', timerState.soundEnabled);
+    });
     document.getElementById('settingsModal').addEventListener('click', (e) => {
       if (e.target === document.getElementById('settingsModal')) closeSettings();
     });
@@ -2471,37 +2475,36 @@
     function renderTimer() {
       return `
         <div class="timer-view">
-          <button class="timer-back" data-action="home">${icons.arrowLeft}</button>
+          <div class="timer-top-bar">
+            <button class="timer-top-btn" data-action="home">${icons.arrowLeft}</button>
+            <button class="timer-top-btn" id="btnSettings">${icons.settings}</button>
+          </div>
           <div class="modes">
             <button class="mode-btn ${timerState.mode==='focus'?'active':''}" data-mode="focus">Focus</button>
             <button class="mode-btn ${timerState.mode==='short'?'active':''}" data-mode="short">Short</button>
             <button class="mode-btn ${timerState.mode==='long'?'active':''}" data-mode="long">Long</button>
           </div>
-          <div class="timer-container" id="timerContainer">
-            <div class="ring-glow ${timerState.running?'':'paused'}" id="ringGlow"></div>
-            <svg class="ring-svg" viewBox="0 0 100 100">
-              <circle class="ring-bg-circle" cx="50" cy="50" r="44"/>
-              <circle class="ring-progress" id="ringProgress" cx="50" cy="50" r="44"/>
-            </svg>
-            <div class="timer-display">
-              <div class="timer-time ${timerState.running?'running':''}" id="timerTime">${timerFmt(timerState.timeLeft)}</div>
-              <div class="timer-label" id="timerLabel">${timerState.mode === 'focus' ? 'focus' : timerState.mode === 'short' ? 'short break' : 'long break'}</div>
-            </div>
-          </div>
-          <div class="controls">
+          <div class="timer-ring-row">
             <button class="btn-icon" id="btnPrev">${icons.skipBack}</button>
-            <button class="btn-primary" id="btnToggle">
-              <span id="iconPlay" style="display:${timerState.running?'none':'block'}">${icons.play}</span>
-              <span id="iconPause" style="display:${timerState.running?'block':'none'}">${icons.pause}</span>
-            </button>
+            <div class="timer-container" id="timerContainer">
+              <div class="ring-glow ${timerState.running?'':'paused'}" id="ringGlow"></div>
+              <svg class="ring-svg" viewBox="0 0 100 100">
+                <circle class="ring-bg-circle" cx="50" cy="50" r="44"/>
+                <circle class="ring-progress" id="ringProgress" cx="50" cy="50" r="44"/>
+              </svg>
+              <div class="timer-display">
+                <div class="timer-time ${timerState.running?'running':''}" id="timerTime">${timerFmt(timerState.timeLeft)}</div>
+                <div class="timer-label" id="timerLabel">${timerState.mode === 'focus' ? 'focus' : timerState.mode === 'short' ? 'short break' : 'long break'}</div>
+                <button class="btn-play" id="btnToggle">
+                  <span id="iconPlay" style="display:${timerState.running?'none':'block'}">${icons.play}</span>
+                  <span id="iconPause" style="display:${timerState.running?'block':'none'}">${icons.pause}</span>
+                </button>
+              </div>
+            </div>
             <button class="btn-icon" id="btnSkip">${icons.skipFwd}</button>
           </div>
           <div class="sessions" id="sessions"></div>
           ${renderTaskArea()}
-          <div class="timer-settings-bar">
-            <button class="settings-btn" id="btnSound">${timerState.soundEnabled ? icons.volumeOn : icons.volumeOff}</button>
-            <button class="settings-btn" id="btnSettings">${icons.settings}</button>
-          </div>
         </div>
       `;
     }
@@ -2563,10 +2566,6 @@
         document.getElementById('btnSkip')?.addEventListener('click', timerSkip);
         document.getElementById('btnPrev')?.addEventListener('click', timerPrev);
         document.getElementById('btnSettings')?.addEventListener('click', openSettings);
-        document.getElementById('btnSound')?.addEventListener('click', () => {
-          timerState.soundEnabled = !timerState.soundEnabled;
-          document.getElementById('btnSound').innerHTML = timerState.soundEnabled ? icons.volumeOn : icons.volumeOff;
-        });
 
         document.querySelectorAll('.mode-btn').forEach(btn => {
           btn.addEventListener('click', () => timerSwitchMode(btn.dataset.mode));
