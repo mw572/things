@@ -961,6 +961,104 @@
     .settings-btn:hover { color: #e6edf3; border-color: #7d8590; }
     .settings-btn svg { width: 14px; height: 14px; }
 
+    /* Task capture */
+    .task-area {
+      position: fixed;
+      bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 48px);
+      max-width: 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 5;
+    }
+
+    .task-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(125, 133, 144, 0.15);
+      color: rgba(125, 133, 144, 0.5);
+      font-size: 13px;
+      padding: 8px 0;
+      outline: none;
+      font-family: inherit;
+      letter-spacing: 0.02em;
+      transition: all 0.2s;
+    }
+
+    .task-input::placeholder { color: rgba(125, 133, 144, 0.25); }
+    .task-input:focus { border-bottom-color: rgba(125, 133, 144, 0.3); color: #c9d1d9; }
+
+    .task-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      max-height: 100px;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+
+    .task-list::-webkit-scrollbar { display: none; }
+
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 0;
+      font-size: 12px;
+      color: rgba(125, 133, 144, 0.45);
+      transition: color 0.2s;
+    }
+
+    .task-item:hover { color: #7d8590; }
+
+    .task-text {
+      flex: 1;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+
+    .task-area:not(.break-mode) .task-text { cursor: pointer; }
+    .task-text.done { text-decoration: line-through; opacity: 0.4; }
+
+    .task-delete {
+      background: none;
+      border: none;
+      color: rgba(125, 133, 144, 0.25);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 2px;
+      line-height: 1;
+      transition: color 0.2s;
+    }
+
+    .task-delete:hover { color: #f85149; }
+
+    .task-check {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border: 1px solid rgba(125, 133, 144, 0.25);
+      border-radius: 3px;
+      background: transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .task-check:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .break-mode .task-list { max-height: 160px; }
+    .break-mode .task-item { color: rgba(125, 133, 144, 0.65); }
+
     /* Settings modal */
     .modal-overlay {
       position: fixed;
@@ -1167,6 +1265,7 @@
       .timer-view .controls { margin-bottom: 0; }
       .timer-view .sessions { margin-bottom: 0; }
       .home-title { font-size: 1.8rem; margin-bottom: 1.5rem; }
+      .task-area { display: none; }
     }
 
     /* ═══════════════════════════════════════════════════════════════════
@@ -1697,6 +1796,7 @@
     }
 
     function timerSwitchMode(m, reset = true) {
+      if (m === 'focus') taskStore.purgeDone();
       timerState.mode = m;
       anim.setMode(m, ACCENT[m]);
       if (reset) {
@@ -1914,6 +2014,62 @@
         timerState.totalTime = timerState.config.focus * 60;
         timerState.timeLeft = timerState.totalTime;
       } catch(e) {}
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  TASK CAPTURE
+    // ═══════════════════════════════════════════════════════════════════
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    const taskStore = {
+      items: JSON.parse(localStorage.getItem('clarity-tasks') || '[]'),
+      save() { localStorage.setItem('clarity-tasks', JSON.stringify(this.items)); },
+      add(text) { this.items.push({ id: Date.now(), text, done: false }); this.save(); },
+      remove(id) { this.items = this.items.filter(t => t.id !== id); this.save(); },
+      toggle(id) { const t = this.items.find(i => i.id === id); if (t) t.done = !t.done; this.save(); },
+      purgeDone() { this.items = this.items.filter(t => !t.done); this.save(); },
+    };
+
+    function renderTaskArea() {
+      const isFocus = timerState.mode === 'focus';
+      const tasks = taskStore.items;
+
+      if (isFocus) {
+        const listHtml = tasks.length ? `<ul class="task-list">${tasks.map(t =>
+          `<li class="task-item"><span class="task-text" data-task-edit="${t.id}">${esc(t.text)}</span><button class="task-delete" data-task-del="${t.id}">&times;</button></li>`
+        ).join('')}</ul>` : '';
+        return `<div class="task-area">${listHtml}<input class="task-input" id="taskInput" type="text" placeholder="jot a thought..." autocomplete="off"></div>`;
+      } else {
+        if (!tasks.length) return '';
+        return `<div class="task-area break-mode"><ul class="task-list">${tasks.map(t =>
+          `<li class="task-item"><input type="checkbox" class="task-check" data-task-toggle="${t.id}"${t.done ? ' checked' : ''}><span class="task-text${t.done ? ' done' : ''}">${esc(t.text)}</span></li>`
+        ).join('')}</ul></div>`;
+      }
+    }
+
+    function updateTaskList() {
+      const area = document.querySelector('.task-area');
+      if (!area) return;
+      const isFocus = timerState.mode === 'focus';
+      const tasks = taskStore.items;
+      let ul = area.querySelector('.task-list');
+
+      if (isFocus) {
+        const html = tasks.map(t =>
+          `<li class="task-item"><span class="task-text" data-task-edit="${t.id}">${esc(t.text)}</span><button class="task-delete" data-task-del="${t.id}">&times;</button></li>`
+        ).join('');
+        if (tasks.length) {
+          if (!ul) { ul = document.createElement('ul'); ul.className = 'task-list'; area.insertBefore(ul, area.firstChild); }
+          ul.innerHTML = html;
+        } else if (ul) { ul.remove(); }
+      } else {
+        if (!tasks.length) { area.remove(); return; }
+        const html = tasks.map(t =>
+          `<li class="task-item"><input type="checkbox" class="task-check" data-task-toggle="${t.id}"${t.done ? ' checked' : ''}><span class="task-text${t.done ? ' done' : ''}">${esc(t.text)}</span></li>`
+        ).join('');
+        if (ul) ul.innerHTML = html;
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -2341,6 +2497,7 @@
             <button class="btn-icon" id="btnSkip">${icons.skipFwd}</button>
           </div>
           <div class="sessions" id="sessions"></div>
+          ${renderTaskArea()}
           <div class="timer-settings-bar">
             <button class="settings-btn" id="btnSound">${timerState.soundEnabled ? icons.volumeOn : icons.volumeOff}</button>
             <button class="settings-btn" id="btnSettings">${icons.settings}</button>
@@ -2414,6 +2571,34 @@
         document.querySelectorAll('.mode-btn').forEach(btn => {
           btn.addEventListener('click', () => timerSwitchMode(btn.dataset.mode));
         });
+
+        // Task capture
+        const taskArea = document.querySelector('.task-area');
+        if (taskArea) {
+          const taskInput = document.getElementById('taskInput');
+          if (taskInput) {
+            taskInput.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' && taskInput.value.trim()) {
+                taskStore.add(taskInput.value.trim());
+                taskInput.value = '';
+                updateTaskList();
+              }
+            });
+          }
+          taskArea.addEventListener('click', (e) => {
+            const del = e.target.closest('[data-task-del]');
+            if (del) { taskStore.remove(+del.dataset.taskDel); updateTaskList(); return; }
+            const edit = e.target.closest('[data-task-edit]');
+            if (edit && taskInput) {
+              const t = taskStore.items.find(i => i.id === +edit.dataset.taskEdit);
+              if (t) { taskInput.value = t.text; taskInput.focus(); taskStore.remove(t.id); updateTaskList(); }
+            }
+          });
+          taskArea.addEventListener('change', (e) => {
+            const cb = e.target.closest('[data-task-toggle]');
+            if (cb) { taskStore.toggle(+cb.dataset.taskToggle); updateTaskList(); }
+          });
+        }
 
         updateTimerDOM();
       }
