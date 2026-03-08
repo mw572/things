@@ -1324,6 +1324,329 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════════
+       FOCUS TAB SWITCHER (Pomodoro vs Countdown)
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .focus-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #21262d;
+      width: 100%;
+      max-width: 260px;
+    }
+
+    .focus-tab {
+      flex: 1;
+      padding: 10px 0;
+      font-size: 13px;
+      font-weight: 500;
+      color: #7d8590;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .focus-tab.active {
+      color: #e6edf3;
+    }
+
+    .focus-tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 20%;
+      right: 20%;
+      height: 2px;
+      background: var(--accent, #58a6ff);
+      border-radius: 1px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       COUNTDOWN TIMER UI
+       ═══════════════════════════════════════════════════════════════════ */
+
+    .countdown-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 24px;
+      width: 100%;
+    }
+
+    .countdown-preset-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .countdown-preset {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid #21262d;
+      background: #161b22;
+      color: #7d8590;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .countdown-preset:hover { color: #e6edf3; border-color: #7d8590; }
+    .countdown-preset.active { color: #e6edf3; border-color: #f0883e; background: rgba(240,136,62,0.1); }
+
+    .countdown-input-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .countdown-digit-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .countdown-digit-label {
+      font-size: 10px;
+      color: #7d8590;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .countdown-digit {
+      width: 64px;
+      height: 72px;
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 12px;
+      color: #e6edf3;
+      font-size: 32px;
+      font-weight: 300;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+      -moz-appearance: textfield;
+    }
+
+    .countdown-digit::-webkit-outer-spin-button,
+    .countdown-digit::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .countdown-digit:focus { border-color: #f0883e; }
+
+    .countdown-sep {
+      font-size: 28px;
+      color: #7d8590;
+      font-weight: 300;
+      padding: 0 2px;
+      margin-top: 14px;
+    }
+
+    .countdown-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .countdown-btn {
+      padding: 12px 32px;
+      border-radius: 12px;
+      border: 1px solid #21262d;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .countdown-btn.start {
+      background: #f0883e;
+      color: #0d1117;
+      border-color: #f0883e;
+    }
+
+    .countdown-btn.start:hover { opacity: 0.85; }
+
+    .countdown-btn.stop {
+      background: transparent;
+      color: #f0883e;
+      border-color: #f0883e;
+    }
+
+    .countdown-btn.stop:hover { background: rgba(240,136,62,0.1); }
+
+    .countdown-btn.reset {
+      background: transparent;
+      color: #7d8590;
+    }
+
+    .countdown-btn.reset:hover { color: #e6edf3; }
+
+    /* Running countdown display */
+    .countdown-running {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .countdown-big-time {
+      font-size: 56px;
+      font-weight: 200;
+      color: #e6edf3;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 2px;
+    }
+
+    .countdown-big-time.running {
+      animation: subtleBreathe 4s ease-in-out infinite;
+    }
+
+    .countdown-target {
+      font-size: 13px;
+      color: #7d8590;
+    }
+
+    .countdown-progress-ring {
+      position: relative;
+      width: var(--ring-size, 260px);
+      height: var(--ring-size, 260px);
+    }
+
+    .countdown-progress-ring svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .countdown-progress-ring .ring-bg-circle {
+      fill: none;
+      stroke: #21262d;
+      stroke-width: 3;
+    }
+
+    .countdown-progress-ring .ring-progress {
+      fill: none;
+      stroke: #f0883e;
+      stroke-width: 3;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear;
+    }
+
+    .countdown-display {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .countdown-label {
+      font-size: 12px;
+      color: #7d8590;
+      text-transform: lowercase;
+    }
+
+    /* Countdown sub-mode switcher (Countdown | Alarm) */
+    .cd-modes {
+      display: flex;
+      gap: 4px;
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 10px;
+      padding: 3px;
+    }
+
+    .cd-mode-btn {
+      padding: 6px 18px;
+      border-radius: 7px;
+      border: none;
+      font-size: 12px;
+      font-weight: 500;
+      color: #7d8590;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .cd-mode-btn.active {
+      background: #f0883e;
+      color: #0d1117;
+    }
+
+    /* Alarm time input */
+    .alarm-input-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .alarm-time-input {
+      width: 72px;
+      height: 72px;
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 12px;
+      color: #e6edf3;
+      font-size: 32px;
+      font-weight: 300;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+      -moz-appearance: textfield;
+    }
+
+    .alarm-time-input::-webkit-outer-spin-button,
+    .alarm-time-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .alarm-time-input:focus { border-color: #f0883e; }
+
+    .alarm-period-toggle {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-left: 8px;
+    }
+
+    .alarm-period-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid #21262d;
+      background: #161b22;
+      color: #7d8590;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .alarm-period-btn.active {
+      background: rgba(240,136,62,0.15);
+      color: #f0883e;
+      border-color: #f0883e;
+    }
+
+    .alarm-target-preview {
+      font-size: 13px;
+      color: #7d8590;
+      margin-top: 4px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
        PERSISTENT TIMER BAR (shown on non-timer views when timer is active)
        ═══════════════════════════════════════════════════════════════════ */
 
@@ -1711,6 +2034,317 @@
     const ACCENT = { focus: '#58a6ff', short: '#56d364', long: '#bc8cff' };
 
     // ═══════════════════════════════════════════════════════════════════
+    //  COUNTDOWN TIMER STATE (independent of pomodoro)
+    // ═══════════════════════════════════════════════════════════════════
+
+    let focusTab = 'pomodoro'; // 'pomodoro' | 'countdown'
+
+    const countdownState = {
+      totalSeconds: 0,
+      timeLeft: 0,
+      running: false,
+      interval: null,
+      targetTime: null, // Date.now() + timeLeft*1000 — for accuracy
+    };
+
+    // Restore countdown from localStorage (survives reload)
+    (function restoreCountdown() {
+      const saved = localStorage.getItem('clarity-countdown');
+      if (!saved) return;
+      try {
+        const s = JSON.parse(saved);
+        if (s.targetTime && s.targetTime > Date.now()) {
+          countdownState.totalSeconds = s.totalSeconds || 0;
+          countdownState.targetTime = s.targetTime;
+          countdownState.timeLeft = Math.ceil((s.targetTime - Date.now()) / 1000);
+          countdownState.running = true;
+          focusTab = 'countdown';
+          countdownState.interval = setInterval(countdownTick, 500);
+        } else if (s.timeLeft > 0 && !s.running) {
+          // Paused countdown
+          countdownState.totalSeconds = s.totalSeconds || 0;
+          countdownState.timeLeft = s.timeLeft;
+          countdownState.running = false;
+          focusTab = 'countdown';
+        } else {
+          localStorage.removeItem('clarity-countdown');
+        }
+      } catch(e) { localStorage.removeItem('clarity-countdown'); }
+    })();
+
+    function countdownFmt(secs) {
+      if (secs <= 0) return '00:00';
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      if (h > 0) return `${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+      return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+    }
+
+    function countdownTick() {
+      if (!countdownState.running) return;
+      const remaining = Math.ceil((countdownState.targetTime - Date.now()) / 1000);
+      countdownState.timeLeft = Math.max(0, remaining);
+
+      if (countdownState.timeLeft <= 0) {
+        countdownComplete();
+        return;
+      }
+
+      // Update tab title + favicon
+      const d = countdownFmt(countdownState.timeLeft);
+      document.title = `${d} · Timer`;
+      updateFavicon(countdownState.timeLeft);
+
+      // Update DOM if on timer view
+      if (currentView === 'timer' && focusTab === 'countdown') updateCountdownDOM();
+    }
+
+    function countdownStart() {
+      const h = parseInt(document.getElementById('cdHours')?.value || '0') || 0;
+      const m = parseInt(document.getElementById('cdMinutes')?.value || '0') || 0;
+      const s = parseInt(document.getElementById('cdSeconds')?.value || '0') || 0;
+      const total = h * 3600 + m * 60 + s;
+      if (total <= 0) return;
+
+      countdownState.totalSeconds = total;
+      countdownState.timeLeft = total;
+      countdownState.targetTime = Date.now() + total * 1000;
+      countdownState.running = true;
+      countdownState.interval = setInterval(countdownTick, 500);
+
+      localStorage.setItem('clarity-countdown', JSON.stringify({
+        totalSeconds: total,
+        targetTime: countdownState.targetTime,
+        running: true,
+      }));
+
+      if (currentView === 'timer') render();
+    }
+
+    function countdownResume() {
+      if (countdownState.timeLeft <= 0) return;
+      countdownState.targetTime = Date.now() + countdownState.timeLeft * 1000;
+      countdownState.running = true;
+      countdownState.interval = setInterval(countdownTick, 500);
+
+      localStorage.setItem('clarity-countdown', JSON.stringify({
+        totalSeconds: countdownState.totalSeconds,
+        targetTime: countdownState.targetTime,
+        running: true,
+      }));
+
+      if (currentView === 'timer') render();
+    }
+
+    function countdownPause() {
+      countdownState.running = false;
+      clearInterval(countdownState.interval);
+      countdownState.interval = null;
+
+      localStorage.setItem('clarity-countdown', JSON.stringify({
+        totalSeconds: countdownState.totalSeconds,
+        timeLeft: countdownState.timeLeft,
+        running: false,
+      }));
+
+      document.title = 'Clarity';
+      resetFavicon();
+      if (currentView === 'timer') render();
+    }
+
+    function countdownReset() {
+      countdownState.running = false;
+      clearInterval(countdownState.interval);
+      countdownState.interval = null;
+      countdownState.timeLeft = 0;
+      countdownState.totalSeconds = 0;
+      countdownState.targetTime = null;
+      localStorage.removeItem('clarity-countdown');
+      document.title = 'Clarity';
+      resetFavicon();
+      if (currentView === 'timer') render();
+    }
+
+    function countdownComplete() {
+      countdownState.running = false;
+      clearInterval(countdownState.interval);
+      countdownState.interval = null;
+      countdownState.timeLeft = 0;
+      localStorage.removeItem('clarity-countdown');
+
+      // Sound alert
+      if (timerState.soundEnabled) {
+        try {
+          if (!timerState.audioCtx) timerState.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          playChime();
+          setTimeout(playChime, 1500);
+          setTimeout(playChime, 3000);
+        } catch(e) {}
+      }
+
+      // Flash the title
+      let flash = 0;
+      const flashInterval = setInterval(() => {
+        document.title = flash % 2 === 0 ? 'Timer done!' : 'Clarity';
+        flash++;
+        if (flash > 10) { clearInterval(flashInterval); document.title = 'Clarity'; resetFavicon(); }
+      }, 1000);
+
+      showTimerToast('Countdown complete!');
+      if (currentView === 'timer') render();
+    }
+
+    let cdMode = 'countdown'; // 'countdown' | 'alarm'
+
+    function alarmStart() {
+      const hInput = document.getElementById('alarmHours');
+      const mInput = document.getElementById('alarmMinutes');
+      if (!hInput || !mInput) return;
+
+      let h = parseInt(hInput.value) || 12;
+      const m = parseInt(mInput.value) || 0;
+
+      // 12-hour to 24-hour conversion
+      const isPM = document.querySelector('.alarm-period-btn[data-period="pm"]')?.classList.contains('active');
+      if (h === 12) h = isPM ? 12 : 0;
+      else if (isPM) h += 12;
+
+      const now = new Date();
+      const target = new Date(now);
+      target.setHours(h, m, 0, 0);
+
+      // If target is in the past, push to tomorrow
+      if (target <= now) target.setDate(target.getDate() + 1);
+
+      const diffMs = target - now;
+      const total = Math.ceil(diffMs / 1000);
+
+      countdownState.totalSeconds = total;
+      countdownState.timeLeft = total;
+      countdownState.targetTime = target.getTime();
+      countdownState.running = true;
+      countdownState.interval = setInterval(countdownTick, 500);
+
+      localStorage.setItem('clarity-countdown', JSON.stringify({
+        totalSeconds: total,
+        targetTime: countdownState.targetTime,
+        running: true,
+      }));
+
+      if (currentView === 'timer') render();
+    }
+
+    function countdownSetPreset(totalSecs) {
+      if (countdownState.running) return;
+      const h = Math.floor(totalSecs / 3600);
+      const m = Math.floor((totalSecs % 3600) / 60);
+      const s = totalSecs % 60;
+      const hEl = document.getElementById('cdHours');
+      const mEl = document.getElementById('cdMinutes');
+      const sEl = document.getElementById('cdSeconds');
+      if (hEl) hEl.value = h;
+      if (mEl) mEl.value = m;
+      if (sEl) sEl.value = s;
+    }
+
+    function updateCountdownDOM() {
+      const timeEl = document.getElementById('countdownBigTime');
+      const progressEl = document.getElementById('cdRingProgress');
+      if (timeEl) {
+        timeEl.textContent = countdownFmt(countdownState.timeLeft);
+        timeEl.classList.toggle('running', countdownState.running);
+      }
+      if (progressEl && countdownState.totalSeconds > 0) {
+        const circumference = 2 * Math.PI * 44;
+        progressEl.style.strokeDasharray = circumference;
+        progressEl.style.strokeDashoffset = circumference * (1 - countdownState.timeLeft / countdownState.totalSeconds);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  DYNAMIC FAVICON (canvas-rendered time digits)
+    // ═══════════════════════════════════════════════════════════════════
+
+    let faviconCanvas = null;
+    let faviconLink = null;
+    const defaultFaviconHref = null; // no default favicon
+
+    function getFaviconCanvas() {
+      if (!faviconCanvas) {
+        faviconCanvas = document.createElement('canvas');
+        faviconCanvas.width = 32;
+        faviconCanvas.height = 32;
+      }
+      return faviconCanvas;
+    }
+
+    function getFaviconLink() {
+      if (!faviconLink) {
+        faviconLink = document.querySelector('link[rel="icon"]');
+        if (!faviconLink) {
+          faviconLink = document.createElement('link');
+          faviconLink.rel = 'icon';
+          faviconLink.type = 'image/png';
+          document.head.appendChild(faviconLink);
+        }
+      }
+      return faviconLink;
+    }
+
+    function updateFavicon(secs) {
+      const canvas = getFaviconCanvas();
+      const ctx = canvas.getContext('2d');
+      const w = 32, h = 32;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Background
+      ctx.fillStyle = '#161b22';
+      ctx.beginPath();
+      ctx.roundRect(0, 0, w, h, 4);
+      ctx.fill();
+
+      const hours = Math.floor(secs / 3600);
+      const mins = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      if (hours > 0) {
+        // Two rows: hours top, mins bottom — big and bold
+        ctx.font = 'bold 16px -apple-system, sans-serif';
+        ctx.fillStyle = '#f0883e';
+        ctx.fillText(hours.toString().padStart(2,'0'), w/2, 11);
+        ctx.fillStyle = '#e6edf3';
+        ctx.fillText(mins.toString().padStart(2,'0'), w/2, 25);
+      } else if (mins > 0) {
+        // Two rows: mins top, secs bottom
+        ctx.font = 'bold 16px -apple-system, sans-serif';
+        ctx.fillStyle = '#f0883e';
+        ctx.fillText(mins.toString().padStart(2,'0'), w/2, 11);
+        ctx.fillStyle = '#e6edf3';
+        ctx.fillText(s.toString().padStart(2,'0'), w/2, 25);
+      } else {
+        // Seconds only — single big number
+        ctx.font = 'bold 22px -apple-system, sans-serif';
+        ctx.fillStyle = '#f0883e';
+        ctx.fillText(s.toString(), w/2, h/2 + 1);
+      }
+
+      getFaviconLink().href = canvas.toDataURL('image/png');
+    }
+
+    function resetFavicon() {
+      const link = document.querySelector('link[rel="icon"]');
+      if (link) link.remove();
+      faviconLink = null;
+    }
+
+    // Favicon is updated from timerTick for pomodoro (see modified timerTick below)
+
+    // ═══════════════════════════════════════════════════════════════════
     //  WAKE LOCK (with NoSleep fallback for iOS Chrome)
     // ═══════════════════════════════════════════════════════════════════
 
@@ -1773,6 +2407,7 @@
         const d = timerFmt(timerState.timeLeft);
         const label = timerState.mode === 'focus' ? 'Focus' : timerState.mode === 'short' ? 'Short Break' : 'Long Break';
         document.title = `${d} \u00b7 ${label}`;
+        updateFavicon(timerState.timeLeft);
       }
     }
 
@@ -1789,6 +2424,7 @@
       timerState.interval = null;
       releaseWakeLock();
       document.title = 'Clarity';
+      resetFavicon();
       if (currentView === 'timer') updateTimerDOM();
     }
 
@@ -2286,9 +2922,13 @@
     }
 
     function navigate(view) {
-      // Auto-pause timer when leaving timer view
+      // Auto-pause pomodoro when leaving timer view (countdown keeps running)
       if (currentView === 'timer' && view !== 'timer' && timerState.running) {
         timerPause();
+      }
+      // When navigating to timer with active countdown, show countdown tab
+      if (view === 'timer' && (countdownState.running || countdownState.timeLeft > 0)) {
+        focusTab = 'countdown';
       }
       currentView = view;
       render();
@@ -2299,12 +2939,30 @@
     // ═══════════════════════════════════════════════════════════════════
 
     function shouldShowTimerBar() {
-      return currentView !== 'timer' && !timerState.running &&
+      if (currentView === 'timer') return false;
+      // Paused pomodoro
+      const pomoPaused = !timerState.running &&
         (timerState.timeLeft < timerState.totalTime || timerState.completedSessions > 0);
+      // Running or paused countdown
+      const cdActive = countdownState.running || countdownState.timeLeft > 0;
+      return pomoPaused || cdActive;
     }
 
     function renderTimerBar() {
       if (!shouldShowTimerBar()) return '';
+
+      // Countdown takes priority when running
+      if (countdownState.running || countdownState.timeLeft > 0) {
+        const accent = '#f0883e';
+        const label = countdownState.running ? 'Timer' : 'Timer (paused)';
+        const cta = countdownState.running ? 'Tap to view' : 'Tap to resume';
+        return `<div class="timer-bar" id="timerBar" style="--timer-bar-accent:${accent}" data-action="timer">
+          <span class="timer-bar-mode">${label}</span>
+          <span class="timer-bar-time">${countdownFmt(countdownState.timeLeft)}</span>
+          <span class="timer-bar-cta">${cta}</span>
+        </div>`;
+      }
+
       const modeLabel = timerState.mode === 'focus' ? 'Focus' : timerState.mode === 'short' ? 'Short Break' : 'Long Break';
       const accent = ACCENT[timerState.mode];
       return `<div class="timer-bar" id="timerBar" style="--timer-bar-accent:${accent}" data-action="timer">
@@ -2315,9 +2973,12 @@
     }
 
     function renderHome() {
-      const badge = timerState.running
-        ? `<span class="home-card-badge"><span class="badge-dot"></span>${timerFmt(timerState.timeLeft)}</span>`
-        : '';
+      let badge = '';
+      if (countdownState.running) {
+        badge = `<span class="home-card-badge" style="--badge-color:#f0883e"><span class="badge-dot" style="background:#f0883e"></span>${countdownFmt(countdownState.timeLeft)}</span>`;
+      } else if (timerState.running) {
+        badge = `<span class="home-card-badge"><span class="badge-dot"></span>${timerFmt(timerState.timeLeft)}</span>`;
+      }
 
       return `
         <div class="view view-center">
@@ -2472,13 +3133,102 @@
       `;
     }
 
-    function renderTimer() {
-      return `
-        <div class="timer-view">
-          <div class="timer-top-bar">
-            <button class="timer-top-btn" data-action="home">${icons.arrowLeft}</button>
-            <button class="timer-top-btn" id="btnSettings">${icons.settings}</button>
+    function renderCountdownContent() {
+      const isRunning = countdownState.running;
+      const hasTime = countdownState.timeLeft > 0;
+
+      if (isRunning || (hasTime && !isRunning)) {
+        // Running or paused — show big countdown display
+        const circumference = 2 * Math.PI * 44;
+        const progress = countdownState.totalSeconds > 0
+          ? 1 - countdownState.timeLeft / countdownState.totalSeconds : 0;
+        const targetStr = countdownState.targetTime
+          ? new Date(countdownState.targetTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+          : '';
+
+        return `
+          <div class="countdown-running">
+            <div class="countdown-progress-ring">
+              <svg viewBox="0 0 100 100">
+                <circle class="ring-bg-circle" cx="50" cy="50" r="44"/>
+                <circle class="ring-progress" id="cdRingProgress" cx="50" cy="50" r="44"
+                  style="stroke-dasharray:${circumference};stroke-dashoffset:${circumference * progress}"/>
+              </svg>
+              <div class="countdown-display">
+                <div class="countdown-big-time ${isRunning?'running':''}" id="countdownBigTime">${countdownFmt(countdownState.timeLeft)}</div>
+                <div class="countdown-label">${isRunning ? 'counting down' : 'paused'}</div>
+                ${targetStr && isRunning ? `<div class="countdown-target">until ${targetStr}</div>` : ''}
+              </div>
+            </div>
+            <div class="countdown-actions">
+              ${isRunning
+                ? `<button class="countdown-btn stop" id="cdPause">Pause</button>`
+                : `<button class="countdown-btn start" id="cdResume">Resume</button>`}
+              <button class="countdown-btn reset" id="cdReset">Reset</button>
+            </div>
+          </div>`;
+      }
+
+      // Setup view — sub-mode switcher + inputs
+      const now = new Date();
+      const defaultH = now.getHours() % 12 || 12;
+      const defaultPeriod = now.getHours() >= 12 ? 'pm' : 'am';
+
+      const countdownSetup = `
+          <div class="countdown-preset-row">
+            <button class="countdown-preset" data-cd-preset="300">5m</button>
+            <button class="countdown-preset" data-cd-preset="600">10m</button>
+            <button class="countdown-preset" data-cd-preset="900">15m</button>
+            <button class="countdown-preset" data-cd-preset="1800">30m</button>
+            <button class="countdown-preset" data-cd-preset="3600">1h</button>
+            <button class="countdown-preset" data-cd-preset="7200">2h</button>
           </div>
+          <div class="countdown-input-row">
+            <div class="countdown-digit-group">
+              <input type="number" class="countdown-digit" id="cdHours" min="0" max="23" value="0" placeholder="0">
+              <span class="countdown-digit-label">hours</span>
+            </div>
+            <span class="countdown-sep">:</span>
+            <div class="countdown-digit-group">
+              <input type="number" class="countdown-digit" id="cdMinutes" min="0" max="59" value="0" placeholder="0">
+              <span class="countdown-digit-label">min</span>
+            </div>
+            <span class="countdown-sep">:</span>
+            <div class="countdown-digit-group">
+              <input type="number" class="countdown-digit" id="cdSeconds" min="0" max="59" value="0" placeholder="0">
+              <span class="countdown-digit-label">sec</span>
+            </div>
+          </div>
+          <div class="countdown-actions">
+            <button class="countdown-btn start" id="cdStart">Start</button>
+          </div>`;
+
+      const alarmSetup = `
+          <div class="alarm-input-row">
+            <input type="number" class="alarm-time-input" id="alarmHours" min="1" max="12" value="${defaultH}" placeholder="12">
+            <span class="countdown-sep">:</span>
+            <input type="number" class="alarm-time-input" id="alarmMinutes" min="0" max="59" value="00" placeholder="00">
+            <div class="alarm-period-toggle">
+              <button class="alarm-period-btn ${defaultPeriod==='am'?'active':''}" data-period="am">AM</button>
+              <button class="alarm-period-btn ${defaultPeriod==='pm'?'active':''}" data-period="pm">PM</button>
+            </div>
+          </div>
+          <div class="countdown-actions">
+            <button class="countdown-btn start" id="alarmStart">Start</button>
+          </div>`;
+
+      return `
+        <div class="countdown-view">
+          <div class="cd-modes">
+            <button class="cd-mode-btn ${cdMode==='countdown'?'active':''}" data-cd-mode="countdown">Countdown</button>
+            <button class="cd-mode-btn ${cdMode==='alarm'?'active':''}" data-cd-mode="alarm">Alarm</button>
+          </div>
+          ${cdMode === 'countdown' ? countdownSetup : alarmSetup}
+        </div>`;
+    }
+
+    function renderTimer() {
+      const pomodoroContent = `
           <div class="modes">
             <button class="mode-btn ${timerState.mode==='focus'?'active':''}" data-mode="focus">Focus</button>
             <button class="mode-btn ${timerState.mode==='short'?'active':''}" data-mode="short">Short</button>
@@ -2504,7 +3254,19 @@
             <button class="btn-icon" id="btnSkip">${icons.skipFwd}</button>
           </div>
           <div class="sessions" id="sessions"></div>
-          ${renderTaskArea()}
+          ${renderTaskArea()}`;
+
+      return `
+        <div class="timer-view">
+          <div class="timer-top-bar">
+            <button class="timer-top-btn" data-action="home">${icons.arrowLeft}</button>
+            <button class="timer-top-btn" id="btnSettings">${icons.settings}</button>
+          </div>
+          <div class="focus-tabs">
+            <button class="focus-tab ${focusTab==='pomodoro'?'active':''}" data-focus-tab="pomodoro">Pomodoro</button>
+            <button class="focus-tab ${focusTab==='countdown'?'active':''}" data-focus-tab="countdown">Timer</button>
+          </div>
+          ${focusTab === 'pomodoro' ? pomodoroContent : renderCountdownContent()}
         </div>
       `;
     }
@@ -2560,18 +3322,28 @@
         });
       });
 
-      // Timer controls
+      // Focus tab switching + settings (shared across tabs)
       if (currentView === 'timer') {
+        document.querySelectorAll('[data-focus-tab]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            focusTab = btn.dataset.focusTab;
+            render();
+          });
+        });
+        document.getElementById('btnSettings')?.addEventListener('click', openSettings);
+      }
+
+      // Timer controls (pomodoro)
+      if (currentView === 'timer' && focusTab === 'pomodoro') {
         document.getElementById('btnToggle')?.addEventListener('click', timerToggle);
         document.getElementById('btnSkip')?.addEventListener('click', timerSkip);
         document.getElementById('btnPrev')?.addEventListener('click', timerPrev);
-        document.getElementById('btnSettings')?.addEventListener('click', openSettings);
 
         document.querySelectorAll('.mode-btn').forEach(btn => {
           btn.addEventListener('click', () => timerSwitchMode(btn.dataset.mode));
         });
 
-        // Task capture
+        // Task capture (pomodoro tab)
         const taskArea = document.querySelector('.task-area');
         if (taskArea) {
           const taskInput = document.getElementById('taskInput');
@@ -2600,19 +3372,62 @@
         }
 
         updateTimerDOM();
+
+      // Countdown controls
+      } else if (currentView === 'timer' && focusTab === 'countdown') {
+        document.getElementById('cdStart')?.addEventListener('click', countdownStart);
+        document.getElementById('cdPause')?.addEventListener('click', countdownPause);
+        document.getElementById('cdResume')?.addEventListener('click', countdownResume);
+        document.getElementById('cdReset')?.addEventListener('click', countdownReset);
+        document.getElementById('alarmStart')?.addEventListener('click', alarmStart);
+
+        // Sub-mode switcher (countdown vs alarm)
+        document.querySelectorAll('[data-cd-mode]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            cdMode = btn.dataset.cdMode;
+            render();
+          });
+        });
+
+        // AM/PM toggle
+        document.querySelectorAll('.alarm-period-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('.alarm-period-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+          });
+        });
+
+        document.querySelectorAll('[data-cd-preset]').forEach(btn => {
+          btn.addEventListener('click', () => countdownSetPreset(+btn.dataset.cdPreset));
+        });
+
+        // Auto-select digits on focus
+        document.querySelectorAll('.countdown-digit, .alarm-time-input').forEach(input => {
+          input.addEventListener('focus', () => input.select());
+        });
       }
     }
 
     // Update home badge + timer bar when timer is running (via interval)
     setInterval(() => {
-      if (timerState.running && currentView === 'home') {
+      if (currentView === 'home') {
         const badge = document.querySelector('.home-card-badge');
-        if (badge) badge.innerHTML = `<span class="badge-dot"></span>${timerFmt(timerState.timeLeft)}`;
+        if (countdownState.running && badge) {
+          badge.innerHTML = `<span class="badge-dot" style="background:#f0883e"></span>${countdownFmt(countdownState.timeLeft)}`;
+        } else if (timerState.running && badge) {
+          badge.innerHTML = `<span class="badge-dot"></span>${timerFmt(timerState.timeLeft)}`;
+        }
       }
       // Update timer bar time on non-timer views
       if (currentView !== 'timer') {
         const barTime = document.querySelector('.timer-bar-time');
-        if (barTime) barTime.textContent = timerFmt(timerState.timeLeft);
+        if (barTime) {
+          if (countdownState.running || countdownState.timeLeft > 0) {
+            barTime.textContent = countdownFmt(countdownState.timeLeft);
+          } else {
+            barTime.textContent = timerFmt(timerState.timeLeft);
+          }
+        }
       }
     }, 1000);
 
