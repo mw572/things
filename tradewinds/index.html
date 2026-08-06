@@ -58389,6 +58389,7 @@ class Voyage {
     const fwdB = new THREE.Vector3(Math.sin(bRad), 0, -Math.cos(bRad));   // along the quay
     const sideB = new THREE.Vector3(fwdB.z, 0, -fwdB.x);                  // toward the land
     const seaward = sideB.clone().negate();
+    this._fwdB = fwdB; this._sideB = sideB;
 
     // The wind blows across the approach rather than straight down it, so
     // there is a real sailing problem in getting alongside.
@@ -58533,6 +58534,33 @@ class Voyage {
     // Leeway: a badly-drawing sail pushes her sideways instead of forwards.
     const leeway = (1 - power) * this.trim * 0.5 + 0.06;
     this.pos.addScaledVector(windVec, leeway * WORLD_PER_KN * dt * windScale);
+
+    // Ground her rather than letting her sail through the coast. The terrain
+    // has a height function; anything shallower than the draft is not water.
+    if (this.harbour?.groundAt && this._sideB) {
+      const along = this.pos.x * this._fwdB.x + this.pos.z * this._fwdB.z;
+      const off = this.pos.x * this._sideB.x + this.pos.z * this._sideB.z;
+      const g0 = this.harbour.groundAt(along, off);
+      const DRAFT = -3.0;
+      if (g0 > DRAFT) {
+        // Push back down the steepest seaward gradient until she floats.
+        const e = 6;
+        const gA = this.harbour.groundAt(along + e, off) - this.harbour.groundAt(along - e, off);
+        const gO = this.harbour.groundAt(along, off + e) - this.harbour.groundAt(along, off - e);
+        const push = new THREE.Vector3(
+          -(this._fwdB.x * gA + this._sideB.x * gO),
+          0,
+          -(this._fwdB.z * gA + this._sideB.z * gO));
+        if (push.lengthSq() < 1e-6) push.copy(this._sideB).negate();
+        push.normalize();
+        this.pos.addScaledVector(push, Math.min(9, (g0 - DRAFT) * 0.8 + 1.2));
+        if (this.speedKn > 1.2 && this.t - this.bumped > 3) {
+          this.bumped = this.t;
+          this.opts?.onMessage?.("You touch the bottom. Get her off before the tide leaves you.");
+        }
+        this.speedKn *= 0.80;
+      }
+    }
 
     // Fend off the quay rather than sailing through it.
     const dist = Math.hypot(this.pos.x - this.berth.x, this.pos.z - this.berth.z);
