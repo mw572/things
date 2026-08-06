@@ -56560,12 +56560,15 @@ const THREE = __three_ns;
 // 9 ship-lengths, which is what an Atlantic swell looks like from a caravel's
 // deck. Amplitudes are deliberately generous; a physically-scaled sea reads as
 // flat on a screen.
+// Amplitudes sum to about 2.6 units against a hull with roughly 3.5 units of
+// freeboard. They used to sum to 6.3, which is a survival storm for a 26-unit
+// caravel: the sea stood higher than her deck and washed straight through it.
 const WAVES = [
-  { dir: [1.00, 0.16],   amp: 3.10, len: 240, speed: 0.62, steep: 0.90 },
-  { dir: [0.62, 0.79],   amp: 1.70, len: 132, speed: 0.86, steep: 0.80 },
-  { dir: [-0.48, 0.88],  amp: 0.86, len: 68,  speed: 1.15, steep: 0.68 },
-  { dir: [0.28, -0.96],  amp: 0.42, len: 34,  speed: 1.55, steep: 0.56 },
-  { dir: [-0.92, -0.39], amp: 0.21, len: 17,  speed: 2.10, steep: 0.44 },
+  { dir: [1.00, 0.16],   amp: 1.30, len: 240, speed: 0.62, steep: 0.86 },
+  { dir: [0.62, 0.79],   amp: 0.70, len: 132, speed: 0.86, steep: 0.76 },
+  { dir: [-0.48, 0.88],  amp: 0.36, len: 68,  speed: 1.15, steep: 0.64 },
+  { dir: [0.28, -0.96],  amp: 0.18, len: 34,  speed: 1.55, steep: 0.54 },
+  { dir: [-0.92, -0.39], amp: 0.09, len: 17,  speed: 2.10, steep: 0.42 },
 ];
 
 const norm = ([x, z]) => { const l = Math.hypot(x, z) || 1; return [x / l, z / l]; };
@@ -57306,10 +57309,10 @@ class Ship3D {
     this.mat = {
       hull:   new THREE.MeshStandardMaterial({
         map: plankTexture(), color: darken(0xb08a5e, wear),
-        roughness: 0.86, metalness: 0.02,
+        roughness: 0.86, metalness: 0.02, side: THREE.DoubleSide,
       }),
-      wale:   new THREE.MeshStandardMaterial({ color: darken(0x2e1d10, wear), roughness: 0.92 }),
-      deck:   new THREE.MeshStandardMaterial({ color: darken(0x8a6a44, wear), roughness: 0.86 }),
+      wale:   new THREE.MeshStandardMaterial({ color: darken(0x6b4a28, wear), roughness: 0.92, side: THREE.DoubleSide }),
+      deck:   new THREE.MeshStandardMaterial({ color: darken(0xa78355, wear), roughness: 0.86, side: THREE.DoubleSide }),
       trim:   new THREE.MeshStandardMaterial({ color: darken(0x6d4a26, wear), roughness: 0.8 }),
       gold:   new THREE.MeshStandardMaterial({ color: 0xb08d3e, roughness: 0.42, metalness: 0.55 }),
       iron:   new THREE.MeshStandardMaterial({ color: 0x35383c, roughness: 0.62, metalness: 0.6 }),
@@ -57329,7 +57332,9 @@ class Ship3D {
   }
 
   _buildHull(S) {
-    const dims = { len: this.len, beam: this.beam, draft: 2.6 * S, rise: 2.5 * S };
+    // rise is freeboard at the waist. The waterline sits at y=0, so this is
+    // literally how much ship there is between the sea and the deck.
+    const dims = { len: this.len, beam: this.beam, draft: 2.4 * S, rise: 3.6 * S };
     this.dims = dims;
 
     const hull = new THREE.Mesh(buildHull(dims), this.mat.hull);
@@ -57338,7 +57343,7 @@ class Ship3D {
     this.group.add(hull);
     this.hullMesh = hull;
 
-    const deck = new THREE.Mesh(buildDeck({ len: this.len, beam: this.beam, y: 1.55 * S }), this.mat.deck);
+    const deck = new THREE.Mesh(buildDeck({ len: this.len, beam: this.beam, y: 2.35 * S }), this.mat.deck);
     deck.receiveShadow = true;
     this.group.add(deck);
 
@@ -57352,34 +57357,34 @@ class Ship3D {
 
     // Frame heads standing proud of the rail, the way a period hull shows its
     // ribs above the sheer strake.
-    for (let i = 2; i < 30; i += 2) {
+    for (let i = 4; i < 30; i += 3) {
       const u = i / 32;
       const p = hullPoint(u, 1, dims);
       for (const side of [1, -1]) {
         const head = new THREE.Mesh(
-          new THREE.BoxGeometry(0.16 * S, 0.55 * S, 0.3 * S), this.mat.wale
+          new THREE.BoxGeometry(0.13 * S, 0.26 * S, 0.22 * S), this.mat.trim
         );
-        head.position.set(side * p.x, p.y + 0.2 * S, p.z);
+        head.position.set(side * p.x, p.y + 0.10 * S, p.z);
         this.group.add(head);
       }
     }
 
     // Stem post and bowsprit
     const stem = new THREE.Mesh(new THREE.BoxGeometry(0.4 * S, 4.2 * S, 0.9 * S), this.mat.trim);
-    stem.position.set(0, 2.0 * S, -this.len * 0.49);
+    stem.position.set(0, 2.8 * S, -this.len * 0.49);
     stem.rotation.x = -0.28;
     this.group.add(stem);
 
     const bowsprit = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * S, 0.26 * S, 9 * S, 7), this.mat.trim);
     bowsprit.rotation.x = Math.PI / 2 - 0.34;
-    bowsprit.position.set(0, 3.3 * S, -this.len * 0.60);
+    bowsprit.position.set(0, 4.1 * S, -this.len * 0.60);
     this.group.add(bowsprit);
     this.bowsprit = bowsprit;
   }
 
   _buildCastles(S, spec) {
     // Sterncastle: the raised aft structure with the great cabin under it.
-    const castleH = (spec.type === "galleon" || spec.type === "carrack") ? 4.4 : 2.9;
+    const castleH = (spec.type === "galleon" || spec.type === "carrack") ? 3.4 : 2.2;
     // Tapered: narrower at the top and drawn in aft, which is what a stern
     // actually does. A straight box reads as a shed on a boat.
     const castleGeo = new THREE.CylinderGeometry(1, 1, castleH * S, 4, 1);
@@ -57391,9 +57396,10 @@ class Ship3D {
     }
     castleGeo.computeVertexNormals();
     const castle = new THREE.Mesh(castleGeo, this.mat.trim);
-    castle.position.set(0, (1.55 + castleH / 2) * S, this.len * 0.31);
+    castle.position.set(0, (2.35 + castleH / 2) * S, this.len * 0.31);
     castle.castShadow = true;
     this.group.add(castle);
+    this.castleTop = (2.35 + castleH) * S;
 
     // Taffrail round the poop.
     const rail = new THREE.Mesh(
@@ -57403,20 +57409,20 @@ class Ship3D {
     rail.rotation.x = Math.PI / 2;
     rail.rotation.z = Math.PI / 4;
     rail.scale.set(1, this.len * 0.115 / (this.beam * 0.30), 1);
-    rail.position.set(0, (1.55 + castleH) * S + 0.5 * S, this.len * 0.31);
+    rail.position.set(0, (2.35 + castleH) * S + 0.5 * S, this.len * 0.31);
     this.group.add(rail);
 
     const poop = new THREE.Mesh(
       new THREE.BoxGeometry(this.beam * 0.6, 0.34 * S, this.len * 0.2),
       this.mat.deck
     );
-    poop.position.set(0, (1.55 + castleH) * S + 0.17 * S, this.len * 0.31);
+    poop.position.set(0, (2.35 + castleH) * S + 0.17 * S, this.len * 0.31);
     this.group.add(poop);
 
     // Stern gallery windows, picked out in gilt.
     for (let i = -1; i <= 1; i++) {
       const win = new THREE.Mesh(new THREE.BoxGeometry(0.9 * S, 1.1 * S, 0.12 * S), this.mat.gold);
-      win.position.set(i * 1.5 * S, (1.55 + castleH * 0.55) * S, this.len * 0.43);
+      win.position.set(i * 1.3 * S, (2.35 + castleH * 0.5) * S, this.len * 0.425);
       this.group.add(win);
     }
 
@@ -57425,7 +57431,7 @@ class Ship3D {
         new THREE.BoxGeometry(this.beam * 0.6, 2.6 * S, this.len * 0.15),
         this.mat.trim
       );
-      fore.position.set(0, (1.55 + 1.3) * S, -this.len * 0.33);
+      fore.position.set(0, (2.35 + 1.2) * S, -this.len * 0.33);
       fore.castShadow = true;
       this.group.add(fore);
     }
@@ -57436,7 +57442,7 @@ class Ship3D {
         for (let i = 0; i < 4; i++) {
           const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * S, 0.18 * S, 1.5 * S, 6), this.mat.iron);
           gun.rotation.z = Math.PI / 2;
-          gun.position.set(side * this.beam * 0.44, 1.35 * S, (-0.18 + i * 0.13) * this.len);
+          gun.position.set(side * this.beam * 0.44, 2.1 * S, (-0.18 + i * 0.13) * this.len);
           this.group.add(gun);
         }
       }
@@ -57463,11 +57469,11 @@ class Ship3D {
       const mast = new THREE.Mesh(
         new THREE.CylinderGeometry(0.16 * S, 0.30 * S, height, 8), this.mat.trim
       );
-      mast.position.set(0, 1.55 * S + height / 2, z);
+      mast.position.set(0, 2.35 * S + height / 2, z);
       mast.castShadow = true;
       this.group.add(mast);
 
-      const top = 1.55 * S + height;
+      const top = 2.35 * S + height;
       this.masts.push({ mesh: mast, z, height, top });
 
       // Shrouds, and the ratlines rung across them. Shrouds alone read as a few
@@ -57477,7 +57483,7 @@ class Ship3D {
         const feet = [], heads = [];
         for (let k = 0; k < SHROUDS; k++) {
           const spread = (0.30 + k * 0.085) * this.beam;
-          const foot = new THREE.Vector3(side * spread, 1.5 * S, z + (k - (SHROUDS - 1) / 2) * 0.55 * S);
+          const foot = new THREE.Vector3(side * spread, 2.3 * S, z + (k - (SHROUDS - 1) / 2) * 0.55 * S);
           const head = new THREE.Vector3(side * 0.26 * S, top - 1.6 * S, z);
           feet.push(foot); heads.push(head);
           this.group.add(line(foot, head, this.mat.rope));
@@ -57492,7 +57498,7 @@ class Ship3D {
         const chan = new THREE.Mesh(
           new THREE.BoxGeometry(0.5 * S, 0.16 * S, SHROUDS * 0.62 * S), this.mat.wale
         );
-        chan.position.set(side * 0.40 * this.beam, 1.45 * S, z);
+        chan.position.set(side * 0.40 * this.beam, 2.25 * S, z);
         this.group.add(chan);
 
         // Ratlines every 0.42 units up the shrouds, narrowing as they climb.
@@ -57508,11 +57514,11 @@ class Ship3D {
       if (i === 0) {
         this.group.add(line(
           new THREE.Vector3(0, top - 1.2 * S, z),
-          new THREE.Vector3(0, 4.6 * S, -this.len * 0.66), this.mat.rope));
+          new THREE.Vector3(0, 5.4 * S, -this.len * 0.66), this.mat.rope));
       }
       this.group.add(line(
         new THREE.Vector3(0, top - 1.2 * S, z),
-        new THREE.Vector3(0, 2.2 * S, this.len * 0.47), this.mat.rope));
+        new THREE.Vector3(0, 3.0 * S, this.len * 0.47), this.mat.rope));
 
       // Canvas
       if (lateen && isMizzen) {
@@ -57533,7 +57539,7 @@ class Ship3D {
           const yFrac = t === 0 ? 0.46 : 0.76;
           const w = this.beam * (t === 0 ? 1.55 : 1.12);
           const h = height * (t === 0 ? 0.34 : 0.24);
-          const yy = 1.55 * S + height * yFrac;
+          const yy = 2.35 * S + height * yFrac;
 
           const yard = new THREE.Mesh(new THREE.CylinderGeometry(0.10 * S, 0.10 * S, w * 1.12, 6), this.mat.trim);
           yard.rotation.z = Math.PI / 2;
@@ -57561,40 +57567,55 @@ class Ship3D {
   }
 
   _buildDetails(S, spec) {
+    const castleTop = this.castleTop || 4 * S;
     // Rudder and tiller
-    const rudder = new THREE.Mesh(new THREE.BoxGeometry(0.24 * S, 3.4 * S, 1.5 * S), this.mat.trim);
-    rudder.position.set(0, -0.9 * S, this.len * 0.50);
-    this.group.add(rudder);
-    this.rudderMesh = rudder;
+    // Hung on the sternpost and pivoting about it, so the blade swings rather
+    // than sliding sideways when the helm goes over.
+    const rudderPivot = new THREE.Group();
+    rudderPivot.position.set(0, -0.6 * S, this.len * 0.47);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.22 * S, 3.0 * S, 1.4 * S), this.mat.wale);
+    blade.position.set(0, -0.5 * S, 0.7 * S);
+    rudderPivot.add(blade);
+    this.group.add(rudderPivot);
+    this.rudderMesh = rudderPivot;
 
-    // Ensign at the stern
-    const flagGeo = new THREE.PlaneGeometry(2.6 * S, 1.6 * S, 8, 4);
+    // Ensign at the stern, built as one group so the flag cannot part company
+    // with its own staff — which it had, and was flying along beside the ship.
+    const ensign = new THREE.Group();
+    const staffH = 5.5 * S;
+    const staff = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07 * S, 0.10 * S, staffH, 6), this.mat.trim);
+    staff.position.y = staffH / 2;
+    ensign.add(staff);
+
     const fc = document.createElement("canvas");
     fc.width = 64; fc.height = 40;
     const fg = fc.getContext("2d");
-    fg.fillStyle = "#0d5c3a"; fg.fillRect(0, 0, 32, 40);
-    fg.fillStyle = "#c8302a"; fg.fillRect(32, 0, 32, 40);
-    fg.fillStyle = "#e8c860"; fg.beginPath(); fg.arc(32, 20, 8, 0, Math.PI * 2); fg.fill();
+    fg.fillStyle = "#0d5c3a"; fg.fillRect(0, 0, 26, 40);
+    fg.fillStyle = "#c8302a"; fg.fillRect(26, 0, 38, 40);
+    fg.fillStyle = "#e8c860"; fg.beginPath(); fg.arc(26, 20, 7, 0, Math.PI * 2); fg.fill();
     const ftex = new THREE.CanvasTexture(fc);
     ftex.colorSpace = THREE.SRGBColorSpace;
-    const flag = new THREE.Mesh(flagGeo, new THREE.MeshStandardMaterial({
-      map: ftex, side: THREE.DoubleSide, roughness: 0.9,
-    }));
-    flag.position.set(1.3 * S, 8.5 * S, this.len * 0.46);
-    this.group.add(flag);
+    const flag = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4 * S, 1.5 * S, 10, 4),
+      new THREE.MeshStandardMaterial({ map: ftex, side: THREE.DoubleSide, roughness: 0.9 }));
+    // Anchored by its hoist to the staff, so it streams from the mast.
+    flag.geometry.translate(1.2 * S, 0, 0);
+    flag.position.set(0, staffH - 1.1 * S, 0);
+    ensign.add(flag);
     this.flag = flag;
+    this.flagGeo = flag.geometry;
 
-    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * S, 0.08 * S, 5 * S, 5), this.mat.trim);
-    staff.position.set(0, 7.4 * S, this.len * 0.46);
-    staff.rotation.x = -0.22;
-    this.group.add(staff);
+    ensign.position.set(0, 1.9 * S + castleTop, this.len * 0.40);
+    ensign.rotation.x = -0.16;
+    this.group.add(ensign);
 
-    // Stern lantern, lit after dark
+    // Stern lantern, sitting on the taffrail rather than hovering astern.
     const lantern = new THREE.Mesh(
-      new THREE.SphereGeometry(0.42 * S, 8, 6),
+      new THREE.CylinderGeometry(0.30 * S, 0.38 * S, 0.85 * S, 8),
       new THREE.MeshStandardMaterial({ color: 0xffcf7a, emissive: 0xffa542, emissiveIntensity: 0 })
     );
-    lantern.position.set(0, 6.4 * S, this.len * 0.44);
+    lantern.position.set(0, 1.55 * S + castleTop, this.len * 0.395);
     this.group.add(lantern);
     this.lantern = lantern;
     this.lanternLight = new THREE.PointLight(0xffb055, 0, 60 * S, 2);
@@ -57608,7 +57629,7 @@ class Ship3D {
     );
     boat.rotation.x = Math.PI;
     boat.scale.set(0.6, 0.5, 1.5);
-    boat.position.set(0, 2.1 * S, this.len * 0.06);
+    boat.position.set(0, 2.85 * S, this.len * 0.06);
     this.group.add(boat);
   }
 
@@ -57657,8 +57678,14 @@ class Ship3D {
 
     if (this.rudderMesh) this.rudderMesh.rotation.y = -rudder * 0.5;
     if (this.flag) {
-      this.flag.rotation.y = Math.sin(t * 2.6) * 0.22;
-      this.flag.rotation.z = Math.sin(t * 3.4) * 0.09;
+      // Ripple along the fly: the hoist stays put, the free edge moves most.
+      const p = this.flagGeo.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const along = (p.getX(i) / (2.4 * this.scale));   // 0 at the hoist, 1 at the fly
+        p.setZ(i, Math.sin(t * 5.5 - along * 4.2) * along * 0.34 * this.scale);
+      }
+      p.needsUpdate = true;
+      this.flag.rotation.y = Math.sin(t * 1.6) * 0.10;
     }
 
     const lit = clamp((night - 0.35) / 0.35, 0, 1);
