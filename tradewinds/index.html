@@ -57223,13 +57223,18 @@ function buildDeck({ len, beam, y }) {
 /* --------------------------------------------------------------- sails ---- */
 
 function squareSail(w, h, belly = 1.0) {
-  const geo = new THREE.PlaneGeometry(w, h, 12, 8);
+  const geo = new THREE.PlaneGeometry(w, h, 16, 10);
   const p = geo.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i);
+    // Belly: full across the middle, pinched at the leeches where the sail is
+    // bent to the yard and hauled down at the clews.
     const acrossW = Math.cos((x / w) * Math.PI);
-    const acrossH = Math.cos((y / h) * Math.PI) * 0.45 + 0.55;
-    p.setZ(i, -acrossW * acrossH * belly * (h * 0.17));
+    const down = (y / h) + 0.5;                        // 0 at the foot, 1 at the head
+    const acrossH = Math.sin(down * Math.PI) * 0.55 + 0.45;
+    p.setZ(i, -acrossW * acrossH * belly * (h * 0.30));
+    // The foot scoops: an unsheeted sail hangs in a curve, not a straight edge.
+    if (down < 0.06) p.setY(i, y + Math.abs(acrossW) * h * 0.07);
   }
   geo.computeVertexNormals();
   return geo;
@@ -57310,11 +57315,15 @@ class Ship3D {
       iron:   new THREE.MeshStandardMaterial({ color: 0x35383c, roughness: 0.62, metalness: 0.6 }),
       rope:   new THREE.LineBasicMaterial({ color: 0x2b241a, transparent: true, opacity: 0.78 }),
       ratline: new THREE.LineBasicMaterial({ color: 0x4a3d2a, transparent: true, opacity: 0.5 }),
+      // Canvas is thin and lit from both sides: a real sail glows a little where
+      // the sun is behind it. A plain opaque standard material reads as card.
       sail:   new THREE.MeshStandardMaterial({
-        map: sailTexture(true), side: THREE.DoubleSide, roughness: 0.95, metalness: 0,
+        map: sailTexture(true), side: THREE.DoubleSide, roughness: 0.92, metalness: 0,
+        emissive: 0x6b5f45, emissiveIntensity: 0.30,
       }),
       sailPlain: new THREE.MeshStandardMaterial({
-        map: sailTexture(false), side: THREE.DoubleSide, roughness: 0.95, metalness: 0,
+        map: sailTexture(false), side: THREE.DoubleSide, roughness: 0.92, metalness: 0,
+        emissive: 0x6b5f45, emissiveIntensity: 0.30,
       }),
     };
   }
@@ -57371,13 +57380,31 @@ class Ship3D {
   _buildCastles(S, spec) {
     // Sterncastle: the raised aft structure with the great cabin under it.
     const castleH = (spec.type === "galleon" || spec.type === "carrack") ? 4.4 : 2.9;
-    const castle = new THREE.Mesh(
-      new THREE.BoxGeometry(this.beam * 0.72, castleH * S, this.len * 0.24),
-      this.mat.trim
-    );
+    // Tapered: narrower at the top and drawn in aft, which is what a stern
+    // actually does. A straight box reads as a shed on a boat.
+    const castleGeo = new THREE.CylinderGeometry(1, 1, castleH * S, 4, 1);
+    castleGeo.rotateY(Math.PI / 4);
+    castleGeo.scale(this.beam * 0.38, 1, this.len * 0.13);
+    const cp = castleGeo.attributes.position;
+    for (let i = 0; i < cp.count; i++) {
+      if (cp.getY(i) > 0) { cp.setX(i, cp.getX(i) * 0.84); cp.setZ(i, cp.getZ(i) * 0.90); }
+    }
+    castleGeo.computeVertexNormals();
+    const castle = new THREE.Mesh(castleGeo, this.mat.trim);
     castle.position.set(0, (1.55 + castleH / 2) * S, this.len * 0.31);
     castle.castShadow = true;
     this.group.add(castle);
+
+    // Taffrail round the poop.
+    const rail = new THREE.Mesh(
+      new THREE.TorusGeometry(this.beam * 0.30, 0.11 * S, 5, 4),
+      this.mat.wale
+    );
+    rail.rotation.x = Math.PI / 2;
+    rail.rotation.z = Math.PI / 4;
+    rail.scale.set(1, this.len * 0.115 / (this.beam * 0.30), 1);
+    rail.position.set(0, (1.55 + castleH) * S + 0.5 * S, this.len * 0.31);
+    this.group.add(rail);
 
     const poop = new THREE.Mesh(
       new THREE.BoxGeometry(this.beam * 0.6, 0.34 * S, this.len * 0.2),
@@ -58230,7 +58257,7 @@ class Voyage {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.15;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -58319,36 +58346,50 @@ class Voyage {
     if (this.harbour) { this.scene.remove(this.harbour.group); this.harbour.dispose(); }
     this.berth = new THREE.Vector3(0, 0, 0);
     this.berthRadius = 26;
-    this.berthHeading = opts.windDeg;                 // moored bow to wind
+
+    // The quay runs alongshore and the land sits to one side of it. That
+    // orientation has to be fixed per port and independent of the weather:
+    // when it was tied to the wind direction the whole coast swung round with
+    // it, and on some headings the ship spawned several hundred metres inland.
+    let hash = 0;
+    for (let i = 0; i < opts.port.id.length; i++) hash = (hash * 31 + opts.port.id.charCodeAt(i)) >>> 0;
+    this.berthHeading = (hash % 360);
     this.harbour = new Harbour(opts.port, this.berth, this.berthHeading, this.berthRadius);
     this.scene.add(this.harbour.group);
 
-    this.windFrom = opts.windDeg;
+    // Seaward is the opposite of the direction the harbour builds its land in.
+    const bRad = this.berthHeading * DEG;
+    const fwdB = new THREE.Vector3(Math.sin(bRad), 0, -Math.cos(bRad));   // along the quay
+    const sideB = new THREE.Vector3(fwdB.z, 0, -fwdB.x);                  // toward the land
+    const seaward = sideB.clone().negate();
+
+    // The wind blows across the approach rather than straight down it, so
+    // there is a real sailing problem in getting alongside.
+    this.windFrom = (this.berthHeading + (Math.random() < 0.5 ? -1 : 1) * (55 + Math.random() * 55) + 360) % 360;
+    this.opts.windDeg = this.windFrom;
     this.baseWindKn = opts.windKn ?? 14;
     this.windKn = this.baseWindKn;
-    this.gust = 0;            // -1 lull .. +1 hard gust
+    this.gust = 0;
     this.gustPhase = Math.random() * 100;
-    this.heelAngle = 0;       // radians, spring-damped
+    this.heelAngle = 0;
     this.heelVel = 0;
     this.pitchAngle = 0;
     this.pitchVel = 0;
     this.maxKn = Math.max(3, opts.shipSpec?.speedKn ?? 7);
 
-    // Start downwind of the berth and off to one side, so the run in is a
-    // reach rather than a beat. Starting on the direct downwind line would put
-    // her dead head-to-wind, which is in irons, which is unsailable.
+    // Always start well out to sea, offset along the shore so the run in is a
+    // reach rather than a straight line at the quay.
     const startDist = clamp(560 + (opts.legNm ?? 300) * 0.16, 560, 1250);
-    const side = Math.random() < 0.5 ? -1 : 1;
-    const b = (this.windFrom + 180 + side * 52) * DEG;
-    this.pos = new THREE.Vector3(Math.sin(b) * startDist, 0, -Math.cos(b) * startDist);
+    const along = (Math.random() < 0.5 ? -1 : 1) * startDist * 0.45;
+    this.pos = new THREE.Vector3()
+      .addScaledVector(seaward, startDist)
+      .addScaledVector(fwdB, along);
 
     // Head roughly at the berth, but never inside the no-go zone.
     const toBerth = Math.atan2(this.berth.x - this.pos.x, -(this.berth.z - this.pos.z));
     let heading = ((toBerth / DEG) + 360) % 360;
-    if (angleDiff(heading, this.windFrom) < 52) {
-      // Bear away to the side she is already on, so the first thing the player
-      // sees is a drawing sail rather than a luffing one.
-      heading = (this.windFrom + side * 62 + 360) % 360;
+    if (angleDiff(heading, this.windFrom) < 50) {
+      heading = (this.windFrom + (angleDiff((heading + 60) % 360, this.windFrom) > 50 ? 60 : -60) + 360) % 360;
     }
     this.heading = heading;
     this.speedKn = 2.5;
@@ -58519,10 +58560,11 @@ class Voyage {
     if (speedFrac > 0.18 && Math.random() < speedFrac * dt * 12) this.ocean.addWake(g.x, g.z);
 
     const p = this.sky.palette;
-    this.hemi.intensity = 0.35 + p.ambient * 0.6;
+    // A floor under the ambient: even at dusk the ship has to read.
+    this.hemi.intensity = 0.62 + p.ambient * 0.72;
     this.hemi.color.copy(p.horizon);
     this.sun.color.copy(p.sunColor);
-    this.sun.intensity = 0.25 + p.intensity * 1.7;
+    this.sun.intensity = 0.55 + p.intensity * 1.85;
     this.sun.position.copy(this.sky.sunDir).multiplyScalar(240).add(grp.position);
     this.sun.target.position.copy(grp.position);
     this.sun.target.updateMatrixWorld();
@@ -59480,8 +59522,11 @@ function startVoyage() {
 
   const windDeg = Math.floor(Math.random() * 360);
   const windKn = 8 + Math.floor(Math.random() * 18);
-  // Time of day drifts with the game day, so successive landfalls differ.
-  const dayFraction = ((h.day * 0.37) % 1) * 0.62 + 0.16;
+  // Time of day drifts with the game day so successive landfalls differ, but it
+  // stays between early morning and late afternoon. The night palette is
+  // gorgeous on the water and turns the ship into a grey silhouette, which is
+  // not what you want on the screen you spend the voyage looking at.
+  const dayFraction = 0.30 + ((h.day * 0.37) % 1) * 0.42;
 
   $("hud-dest").textContent = dest.name;
   $("hud-wind").textContent = `${cardinal(windDeg)} ${windKn} kn`;
