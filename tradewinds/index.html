@@ -56174,6 +56174,7 @@ const VERT = /* glsl */ `
   uniform float uSteep[5];
   uniform vec2  uDir[5];
   uniform vec3  uWake[8];      // xz = world position, z-slot = age 0..1
+  uniform float uWindAmp;      // 0.45 in a calm .. 1.6 in a gale
 
   varying vec3  vWorld;
   varying vec3  vNormal;
@@ -56194,8 +56195,8 @@ const VERT = /* glsl */ `
       vec2  d = uDir[i];
       float ph = dot(d, base) * k + uTime * uPhaseSpeed[i] * k;
       float c = cos(ph), s = sin(ph);
-      float q = uSteep[i] / (k * uAmp[i] * 5.0);
-      float a = uAmp[i];
+      float a = uAmp[i] * uWindAmp;
+      float q = uSteep[i] / (k * a * 5.0);
 
       disp.x += q * a * d.x * c;
       disp.z += q * a * d.y * c;
@@ -56251,11 +56252,23 @@ const FRAG = /* glsl */ `
   uniform vec3  uHorizon;
   uniform float uFogNear;
   uniform float uFogFar;
+  uniform vec2  uWindDir;      // unit vector the wind blows TOWARDS
+  uniform float uWindStr;      // 0 calm .. 1 hard
+  uniform float uTime2;
 
   varying vec3  vWorld;
   varying vec3  vNormal;
   varying float vFoam;
   varying float vHeight;
+
+  // Cheap value noise. Two octaves is plenty for wind texture on water.
+  float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise(vec2 p){
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1,0)), u.x),
+               mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);
+  }
 
   void main() {
     vec3 N = normalize(vNormal);
@@ -56284,6 +56297,17 @@ const FRAG = /* glsl */ `
     float ndh = clamp(dot(N, H), 0.0, 1.0);
     col += uSunColor * pow(ndh, 420.0) * 1.5;
     col += uSunColor * pow(ndh, 28.0) * 0.16;
+
+    // Cat's paws: the dark ruffled patches wind drags across water. Stretched
+    // along the wind axis and scrolled downwind, they are the single clearest
+    // signal on screen that the air is moving and which way.
+    vec2 windPerp = vec2(-uWindDir.y, uWindDir.x);
+    vec2 wp = vec2(dot(vWorld.xz, uWindDir), dot(vWorld.xz, windPerp));
+    vec2 streakUV = vec2(wp.x * 0.0055 - uTime2 * 0.42, wp.y * 0.030);
+    float paw = vnoise(streakUV) * 0.65 + vnoise(streakUV * 2.7 + 11.0) * 0.35;
+    paw = smoothstep(0.48, 0.86, paw) * uWindStr;
+    col *= 1.0 - paw * 0.30;                       // ruffled water is darker
+    col += uSunColor * paw * 0.05;                 // and glitters a little more
 
     // Foam sits on top of everything, slightly blue in shadow.
     vec3 foamCol = mix(vec3(0.72, 0.80, 0.83), vec3(1.0), clamp(dot(N, L), 0.0, 1.0));
@@ -56341,6 +56365,10 @@ class Ocean {
       uHorizon:    { value: new THREE.Color(0xa8c2c4) },
       uFogNear:    { value: 1500 },
       uFogFar:     { value: 4200 },
+      uWindAmp:    { value: 1 },
+      uWindDir:    { value: new THREE.Vector2(1, 0) },
+      uWindStr:    { value: 0.5 },
+      uTime2:      { value: 0 },
     };
 
     this.mesh = new THREE.Mesh(geo, new THREE.ShaderMaterial({
@@ -56367,9 +56395,18 @@ class Ocean {
    * uCenter keeps the wave field locked to world space. Without this the waves
    * would appear to travel with the ship and she would never seem to move.
    */
-  update(t, shipPos, camera, palette) {
+  update(t, shipPos, camera, palette, wind) {
     this._t = t;
     this.uniforms.uTime.value = t;
+    this.uniforms.uTime2.value = t;
+    if (wind) {
+      // Wave height follows the wind, but not linearly: a sea takes time to get
+      // up, so the exponent keeps a fresh breeze from looking like a storm.
+      this.uniforms.uWindAmp.value = 0.45 + Math.pow(Math.min(wind.kn, 34) / 22, 1.35) * 1.05;
+      const r = (wind.fromDeg + 180) * Math.PI / 180;
+      this.uniforms.uWindDir.value.set(Math.sin(r), -Math.cos(r));
+      this.uniforms.uWindStr.value = Math.min(1, Math.max(0, (wind.kn - 4) / 22));
+    }
     this.mesh.position.set(shipPos.x, 0, shipPos.z);
     this.uniforms.uCenter.value.set(shipPos.x, shipPos.z);
     this.uniforms.uCam.value.copy(camera.position);
@@ -56574,10 +56611,100 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /* ------------------------------------------------------- hull geometry ---- */
 
-// Shared with the deck builder so the deck sits exactly inside the gunwale.
+// The three curves that define the hull. Hoisted to module scope because the
+// wales, the deck and the rail all have to follow exactly the same shape — the
+// moment they are approximated separately you get gaps and floating trim.
 const beamProfile = (u) =>
   Math.pow(Math.sin(Math.PI * clamp(u * 1.14, 0, 1)), 0.62) *
   (1 - Math.pow(clamp((u - 0.72) / 0.28, 0, 1), 1.8) * 0.42);
+
+const draftProfile = (u) =>
+  Math.pow(Math.sin(Math.PI * clamp(u * 1.06, 0, 1)), 0.5) *
+  (1 - Math.pow(clamp((u - 0.85) / 0.15, 0, 1), 2) * 0.55);
+
+const sheerProfile = (u) => 0.62 + 0.72 * Math.pow(Math.abs(u - 0.46) * 2.05, 1.7);
+
+/** A point on the hull skin. u runs bow to stern, v runs keel to gunwale. */
+function hullPoint(u, v, d) {
+  const b = (d.beam * 0.5) * beamProfile(u);
+  const dr = d.draft * draftProfile(u);
+  const sh = d.rise * sheerProfile(u);
+  return {
+    x: b * Math.pow(v, 0.72),
+    y: -dr + (dr + sh) * Math.pow(v, 1.35),
+    z: (u - 0.5) * d.len,
+  };
+}
+
+/**
+ * A wale: the heavy rubbing strake that runs the length of a hull. Built as a
+ * ribbon swept along a constant-v line of the hull skin and pushed slightly
+ * proud, so it hugs the tumblehome instead of hovering over it.
+ *
+ * This replaces a scaled TorusGeometry, which was quick to write and read on
+ * screen as a black hula hoop around the ship.
+ */
+function buildWale(d, v, thickness, proud) {
+  const N = 40;
+  const pos = [], idx = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    const c = hullPoint(u, v, d);
+    // Outward normal in the beam plane, approximated from the local slope.
+    const cUp = hullPoint(u, Math.min(1, v + 0.05), d);
+    const nx = 1, ny = -(cUp.x - c.x) / 0.05 * 0.12;
+    const nl = Math.hypot(nx, ny) || 1;
+    const ox = (nx / nl) * proud, oy = (ny / nl) * proud;
+    for (const side of [1, -1]) {
+      for (const dy of [thickness, -thickness]) {
+        pos.push(side * (c.x + ox), c.y + oy + dy, c.z);
+      }
+    }
+  }
+  // Four vertices per station: stbd-top, stbd-bottom, port-top, port-bottom.
+  for (let i = 0; i < N; i++) {
+    const a = i * 4, b = (i + 1) * 4;
+    idx.push(a, b, a + 1, a + 1, b, b + 1);           // starboard face
+    idx.push(a + 2, a + 3, b + 2, a + 3, b + 3, b + 2); // port face
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Oak planking: horizontal strakes with caulked seams and weathering. */
+function plankTexture() {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 256;
+  const g = c.getContext("2d");
+  g.fillStyle = "#5b3d22"; g.fillRect(0, 0, 256, 256);
+  for (let y = 0; y < 256; y += 8) {
+    const shade = 0.82 + Math.random() * 0.36;
+    g.fillStyle = `rgb(${Math.round(91 * shade)},${Math.round(61 * shade)},${Math.round(34 * shade)})`;
+    g.fillRect(0, y, 256, 7);
+    g.fillStyle = "rgba(24,14,7,0.55)";           // the caulked seam
+    g.fillRect(0, y + 7, 256, 1);
+  }
+  // Butt joints between plank ends, and a little tar and salt staining.
+  g.fillStyle = "rgba(24,14,7,0.4)";
+  for (let i = 0; i < 90; i++) {
+    const x = Math.random() * 256, y = Math.floor(Math.random() * 32) * 8;
+    g.fillRect(x, y, 1.2, 7);
+  }
+  g.fillStyle = "rgba(180,190,180,0.05)";
+  for (let i = 0; i < 40; i++) {
+    g.beginPath();
+    g.ellipse(Math.random() * 256, Math.random() * 256, 6 + Math.random() * 22, 3 + Math.random() * 8, 0, 0, 7);
+    g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 2);
+  return t;
+}
 
 /**
  * Loft a hull.
@@ -56586,49 +56713,40 @@ const beamProfile = (u) =>
  *  draft — keel below the waterline
  *  rise  — freeboard at the waist
  */
-function buildHull({ len, beam, draft, rise }) {
-  const STATIONS = 28;
-  const RIBS = 13;
-
-  const beamAt = (u) => (beam * 0.5) * beamProfile(u);
-  // Deepest just aft of midships, rockered up to stem and transom.
-  const draftAt = (u) => draft * Math.pow(Math.sin(Math.PI * clamp(u * 1.06, 0, 1)), 0.5) *
-    (1 - Math.pow(clamp((u - 0.85) / 0.15, 0, 1), 2) * 0.55);
-  // High at bow and stern, low at the waist. This line is what makes a hull
-  // read as a ship rather than a hot dog.
-  const sheerAt = (u) => rise * (0.62 + 0.72 * Math.pow(Math.abs(u - 0.46) * 2.05, 1.7));
-
-  const pos = [], idx = [], grid = [];
+function buildHull(d) {
+  const STATIONS = 34;
+  const RIBS = 15;
+  const pos = [], uvs = [], idx = [], grid = [];
 
   for (let i = 0; i < STATIONS; i++) {
     const u = i / (STATIONS - 1);
-    const z = (u - 0.5) * len;
-    const b = beamAt(u), d = draftAt(u), s = sheerAt(u);
     const row = [];
     for (let j = 0; j < RIBS; j++) {
-      const v = j / (RIBS - 1);              // 0 = keel, 1 = gunwale
-      const x = b * Math.pow(v, 0.72);       // rounded V, straightening as it rises
-      const y = -d + (d + s) * Math.pow(v, 1.35);
+      const v = j / (RIBS - 1);
+      const p = hullPoint(u, v, d);
       row.push(pos.length / 3);
-      pos.push(x, y, z);
+      pos.push(p.x, p.y, p.z);
+      uvs.push(u, v);
     }
     grid.push(row);
   }
 
   for (let i = 0; i < STATIONS - 1; i++) {
     for (let j = 0; j < RIBS - 1; j++) {
-      const a = grid[i][j], b = grid[i][j + 1], c = grid[i + 1][j], d = grid[i + 1][j + 1];
-      idx.push(a, c, b, b, c, d);
+      const a = grid[i][j], b = grid[i][j + 1], c = grid[i + 1][j], e = grid[i + 1][j + 1];
+      idx.push(a, c, b, b, c, e);
     }
   }
 
-  // Mirror to port, with the winding flipped so the normals face outward.
+  // Mirror to port with the winding flipped so the normals face outward.
   const half = pos.length / 3;
-  for (let k = 0; k < half; k++) pos.push(-pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]);
+  for (let k = 0; k < half; k++) {
+    pos.push(-pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]);
+    uvs.push(uvs[k * 2], uvs[k * 2 + 1]);
+  }
   const tri = idx.length;
   for (let k = 0; k < tri; k += 3) idx.push(idx[k] + half, idx[k + 2] + half, idx[k + 1] + half);
 
-  // Close the transom.
   for (let j = 0; j < RIBS - 1; j++) {
     const s0 = grid[STATIONS - 1][j], s1 = grid[STATIONS - 1][j + 1];
     idx.push(s0, s1, s0 + half, s1, s1 + half, s0 + half);
@@ -56636,6 +56754,7 @@ function buildHull({ len, beam, draft, rise }) {
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geo.setIndex(idx);
   geo.computeVertexNormals();
   return geo;
@@ -56735,13 +56854,17 @@ class Ship3D {
     const wear = clamp(spec.condition ?? 1, 0.15, 1);
     const darken = (hex, k) => new THREE.Color(hex).multiplyScalar(0.72 + 0.28 * k);
     this.mat = {
-      hull:   new THREE.MeshStandardMaterial({ color: darken(0x53381f, wear), roughness: 0.88, metalness: 0.02, flatShading: false }),
+      hull:   new THREE.MeshStandardMaterial({
+        map: plankTexture(), color: darken(0xb08a5e, wear),
+        roughness: 0.86, metalness: 0.02,
+      }),
       wale:   new THREE.MeshStandardMaterial({ color: darken(0x2e1d10, wear), roughness: 0.92 }),
       deck:   new THREE.MeshStandardMaterial({ color: darken(0x8a6a44, wear), roughness: 0.86 }),
       trim:   new THREE.MeshStandardMaterial({ color: darken(0x6d4a26, wear), roughness: 0.8 }),
       gold:   new THREE.MeshStandardMaterial({ color: 0xb08d3e, roughness: 0.42, metalness: 0.55 }),
       iron:   new THREE.MeshStandardMaterial({ color: 0x35383c, roughness: 0.62, metalness: 0.6 }),
-      rope:   new THREE.LineBasicMaterial({ color: 0x2b241a, transparent: true, opacity: 0.72 }),
+      rope:   new THREE.LineBasicMaterial({ color: 0x2b241a, transparent: true, opacity: 0.78 }),
+      ratline: new THREE.LineBasicMaterial({ color: 0x4a3d2a, transparent: true, opacity: 0.5 }),
       sail:   new THREE.MeshStandardMaterial({
         map: sailTexture(true), side: THREE.DoubleSide, roughness: 0.95, metalness: 0,
       }),
@@ -56752,9 +56875,10 @@ class Ship3D {
   }
 
   _buildHull(S) {
-    const hull = new THREE.Mesh(buildHull({
-      len: this.len, beam: this.beam, draft: 2.6 * S, rise: 2.5 * S,
-    }), this.mat.hull);
+    const dims = { len: this.len, beam: this.beam, draft: 2.6 * S, rise: 2.5 * S };
+    this.dims = dims;
+
+    const hull = new THREE.Mesh(buildHull(dims), this.mat.hull);
     hull.castShadow = true;
     hull.receiveShadow = true;
     this.group.add(hull);
@@ -56764,17 +56888,26 @@ class Ship3D {
     deck.receiveShadow = true;
     this.group.add(deck);
 
-    // Wales: rubbing strakes running the sheer. Torus segments are a cheap way
-    // to get a curved strake that hugs the tumblehome.
-    for (const [yy, rr] of [[0.9 * S, 0.97], [1.9 * S, 0.93]]) {
-      const strake = new THREE.Mesh(
-        new THREE.TorusGeometry(this.len * 0.36, 0.16 * S, 6, 40, Math.PI * 2),
-        this.mat.wale
-      );
-      strake.rotation.x = Math.PI / 2;
-      strake.scale.set(this.beam * 0.5 / (this.len * 0.36) * rr, 1, 1);
-      strake.position.y = yy;
+    // Wales, swept along constant-v lines of the hull skin so they follow the
+    // sheer and the tumblehome exactly.
+    for (const [v, th, proud] of [[0.62, 0.20, 0.10], [0.82, 0.16, 0.09], [0.97, 0.13, 0.06]]) {
+      const strake = new THREE.Mesh(buildWale(dims, v, th * S, proud * S), this.mat.wale);
+      strake.castShadow = true;
       this.group.add(strake);
+    }
+
+    // Frame heads standing proud of the rail, the way a period hull shows its
+    // ribs above the sheer strake.
+    for (let i = 2; i < 30; i += 2) {
+      const u = i / 32;
+      const p = hullPoint(u, 1, dims);
+      for (const side of [1, -1]) {
+        const head = new THREE.Mesh(
+          new THREE.BoxGeometry(0.16 * S, 0.55 * S, 0.3 * S), this.mat.wale
+        );
+        head.position.set(side * p.x, p.y + 0.2 * S, p.z);
+        this.group.add(head);
+      }
     }
 
     // Stem post and bowsprit
@@ -56865,13 +56998,38 @@ class Ship3D {
       const top = 1.55 * S + height;
       this.masts.push({ mesh: mast, z, height, top });
 
-      // Shrouds: from the channels out at the gunwale up to the masthead.
+      // Shrouds, and the ratlines rung across them. Shrouds alone read as a few
+      // stray threads; it is the horizontal rungs that make rigging look rigged.
+      const SHROUDS = 5;
       for (const side of [-1, 1]) {
-        for (let k = 0; k < 4; k++) {
-          const spread = (0.34 + k * 0.10) * this.beam;
-          const foot = new THREE.Vector3(side * spread, 1.5 * S, z + (k - 1.5) * 0.5 * S);
-          const head = new THREE.Vector3(side * 0.28 * S, top - 1.6 * S, z);
+        const feet = [], heads = [];
+        for (let k = 0; k < SHROUDS; k++) {
+          const spread = (0.30 + k * 0.085) * this.beam;
+          const foot = new THREE.Vector3(side * spread, 1.5 * S, z + (k - (SHROUDS - 1) / 2) * 0.55 * S);
+          const head = new THREE.Vector3(side * 0.26 * S, top - 1.6 * S, z);
+          feet.push(foot); heads.push(head);
           this.group.add(line(foot, head, this.mat.rope));
+
+          // A deadeye where each shroud is set up to the channel.
+          const eye = new THREE.Mesh(new THREE.CylinderGeometry(0.17 * S, 0.17 * S, 0.11 * S, 7), this.mat.trim);
+          eye.rotation.x = Math.PI / 2;
+          eye.position.copy(foot).setY(foot.y + 0.35 * S);
+          this.group.add(eye);
+        }
+        // A channel: the shelf the shrouds are spread on, outboard of the rail.
+        const chan = new THREE.Mesh(
+          new THREE.BoxGeometry(0.5 * S, 0.16 * S, SHROUDS * 0.62 * S), this.mat.wale
+        );
+        chan.position.set(side * 0.40 * this.beam, 1.45 * S, z);
+        this.group.add(chan);
+
+        // Ratlines every 0.42 units up the shrouds, narrowing as they climb.
+        const RUNGS = Math.floor(height / (0.9 * S));
+        for (let r = 1; r < RUNGS; r++) {
+          const t = r / RUNGS;
+          const a = feet[0].clone().lerp(heads[0], t);
+          const b = feet[SHROUDS - 1].clone().lerp(heads[SHROUDS - 1], t);
+          this.group.add(line(a, b, this.mat.ratline));
         }
       }
       // Forestay and backstay
@@ -57165,11 +57323,12 @@ class Wake {
   }
 }
 
-return { Ship3D, Wake };
+return { hullPoint, buildHull, Ship3D, Wake };
 })();
 /* ===== harbour.js ===== */
 const __harbour = (function(){
 const THREE = __three_ns;
+const { buildHull } = __ship3d;
 // harbour.js — the landfall you are steering for.
 //
 // Each port builds from its own `berth` spec in world.js, so Lisbon arrives as
@@ -57177,6 +57336,7 @@ const THREE = __three_ns;
 // generated from a seeded PRNG keyed on the port id, which means a given
 // harbour looks the same every time you make it without any of it being
 // authored by hand.
+
 
 const rngFrom = (str) => {
   let h = 2166136261;
@@ -57228,33 +57388,105 @@ class Harbour {
         .addScaledVector(side, offshore)
         .setY(y);
 
-    /* ---- the land: terraces rising away from the water, not a flat slab ----
-     * Each shelf is set further offshore and stands higher than the last, so
-     * the coast reads as ground climbing from a low foreshore to a headland
-     * behind the town. Deep boxes, so no shelf edge is visible from seaward. */
-    // The near edge of the first shelf must clear the pier, or the coast eats
-    // the berth you are trying to steer into.
-    const DEPTH = 240 * S;
-    for (let i = 0; i < 6; i++) {
-      const w = (400 - i * 44) * S;
-      const top = (3.5 + i * i * 1.15) * S;       // height of this shelf above the water
-      const h = top + 70 * S;                     // buried deep, so no floating edge shows
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(w, h, DEPTH), mat.land);
-      slab.position.copy(at((rnd() - 0.5) * 44 * S, (DEPTH / 2 + 58 * S) + i * 66 * S, top - h / 2));
-      slab.rotation.y = hRad + (rnd() - 0.5) * 0.18;
-      slab.receiveShadow = true;
-      this.group.add(slab);
+    /* ------------------------------- the land -------------------------------
+     * A heightmap, not stacked boxes. Ground height is a ramp from the
+     * waterline plus two octaves of value noise, so the coast has bays and
+     * headlands instead of a straight edge, and the ground behind the town
+     * rises into hills. Colour is per-vertex by height and slope: wet sand,
+     * dry sand, grass, scrub, then bare rock on anything steep.
+     *
+     * The harbour basin is carved by pulling the height down inside a radius
+     * of the berth, which is what stops the town growing over the water you
+     * are trying to steer into. */
+    const TERRAIN_SIZE = 1500 * S;
+    const TERRAIN_SEG = 132;
+    const SHORE_AT = 46 * S;          // offshore distance where the ground meets the sea
+
+    const n2 = (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y);
+      const xf = x - xi, yf = y - yi;
+      const h = (a, b) => {
+        let v = Math.imul(a * 374761393 + b * 668265263, 1274126177);
+        v = (v ^ (v >>> 13)) >>> 0;
+        return v / 4294967296;
+      };
+      const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+      return (h(xi, yi) * (1 - u) + h(xi + 1, yi) * u) * (1 - v) +
+             (h(xi, yi + 1) * (1 - u) + h(xi + 1, yi + 1) * u) * v;
+    };
+    const fbm = (x, y) =>
+      n2(x, y) * 0.55 + n2(x * 2.1 + 5.3, y * 2.1 + 1.7) * 0.28 +
+      n2(x * 4.3 + 9.1, y * 4.3 + 3.3) * 0.17;
+
+    // Height above sea level at a point given in (alongBerth, offshore) units.
+    const groundAt = (along, off) => {
+      const a = along / S, o = off / S;
+      // Coastline wobble: the shore is not a ruled line.
+      const wobble = (fbm(a * 0.006 + 3.1, 17.0) - 0.5) * 84;
+      const d = o - (SHORE_AT / S) - wobble;         // metres inland of the shore
+      if (d < -60) return -9 * S;                    // well out to sea
+      // Ramp inland, then hills, with a bay scooped out around the berth.
+      const ramp = Math.min(1, Math.max(0, d / 105));
+      const hill = fbm(a * 0.0045 + 11, o * 0.0045 + 7) * 44 + fbm(a * 0.013, o * 0.013) * 13;
+      let h = -7 + ramp * (15 + hill * ramp);
+      // Carve the basin: pull everything down near the berth so there is water
+      // to manoeuvre in, and a shelving bottom rather than a cliff.
+      const distBerth = Math.hypot(a, o);
+      h -= Math.max(0, 1 - distBerth / 190) * 62;
+      return h * S;
+    };
+    this.groundAt = groundAt;
+
+    const tGeo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SEG, TERRAIN_SEG);
+    tGeo.rotateX(-Math.PI / 2);
+    const tp = tGeo.attributes.position;
+    const colors = new Float32Array(tp.count * 3);
+    const CG = {
+      wet:   new THREE.Color(0xa89468),
+      sand:  new THREE.Color(0xd6c493),
+      grass: new THREE.Color(pal.land),
+      dry:   new THREE.Color(pal.land).lerp(new THREE.Color(0xb9b06a), 0.45),
+      rock:  new THREE.Color(pal.stone).multiplyScalar(0.92),
+    };
+    const tmpC = new THREE.Color();
+
+    // The plane's local +x runs along the berth and +z runs offshore; the mesh
+    // is rotated into place afterwards, so the height function reads directly.
+    for (let i = 0; i < tp.count; i++) {
+      const lx = tp.getX(i), lz = tp.getZ(i);
+      const off = lz + TERRAIN_SIZE / 2;
+      const h = groundAt(lx, off);
+      tp.setY(i, h);
     }
-    // A pale foreshore where the ground meets the sea. Narrower than the shelf
-    // behind it, or it juts out past the coast as a bare rectangle.
-    const beach = new THREE.Mesh(
-      new THREE.BoxGeometry(330 * S, 6 * S, 44 * S),
-      new THREE.MeshStandardMaterial({ color: 0xc9b98f, roughness: 1 })
-    );
-    beach.position.copy(at(0, 42 * S, 1.2 * S));
-    beach.rotation.y = hRad;
-    beach.receiveShadow = true;
-    this.group.add(beach);
+    tGeo.computeVertexNormals();
+
+    const tn = tGeo.attributes.normal;
+    for (let i = 0; i < tp.count; i++) {
+      const h = tp.getY(i) / S;
+      const slope = 1 - Math.abs(tn.getY(i));
+      if (h < -1.0) tmpC.copy(CG.wet);
+      else if (h < 1.6) tmpC.copy(CG.wet).lerp(CG.sand, (h + 1.0) / 2.6);
+      else if (h < 5.5) tmpC.copy(CG.sand).lerp(CG.grass, (h - 1.6) / 3.9);
+      else if (h < 40) tmpC.copy(CG.grass);
+      else if (h < 68) tmpC.copy(CG.grass).lerp(CG.dry, (h - 40) / 28);
+      else tmpC.copy(CG.dry).lerp(CG.rock, Math.min(1, (h - 68) / 45));
+      if (slope > 0.42) tmpC.lerp(CG.rock, Math.min(1, (slope - 0.42) * 2.2));
+      // Break up the flat fill so a hillside is not one colour.
+      const j = 0.94 + fbm(tp.getX(i) * 0.05, tp.getZ(i) * 0.05) * 0.14;
+      colors[i * 3] = tmpC.r * j;
+      colors[i * 3 + 1] = tmpC.g * j;
+      colors[i * 3 + 2] = tmpC.b * j;
+    }
+    tGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    const terrain = new THREE.Mesh(tGeo, new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 0.97, metalness: 0, flatShading: false,
+    }));
+    terrain.position.copy(at(0, TERRAIN_SIZE / 2, 0));
+    terrain.rotation.y = hRad;
+    terrain.receiveShadow = true;
+    terrain.castShadow = true;
+    this.group.add(terrain);
 
     /* ------------------------------ the pier ------------------------------ */
     const pier = new THREE.Mesh(new THREE.BoxGeometry(11 * S, 7 * S, 88 * S), mat.stone);
@@ -57296,15 +57528,15 @@ class Harbour {
       const storeys = 1 + Math.floor(rnd() * (spec.style === "city" ? 4 : 2));
       const h = (7 + storeys * 4.5) * S;
 
-      const along = (rnd() - 0.5) * 250 * S;
-      // Push the town up the hill: further from the water means higher ground.
-      // The 66 floor keeps every building on the first shelf rather than
-      // standing in the harbour.
-      const off = (66 + rnd() * 230) * S;
-      const ground = Math.min(24 * S, Math.pow((off / S - 58) / 66, 2) * 1.15 * S + 3.5 * S);
+      const along = (rnd() - 0.5) * 300 * S;
+      const off = (78 + rnd() * 260) * S;
+      const ground = groundAt(along, off);
+      if (ground < 1.5 * S) continue;      // do not build below the tide line
 
       const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat.walls[Math.floor(rnd() * mat.walls.length)]);
-      b.position.copy(at(along, off, ground + h / 2));
+      // Sunk by a fifth of their height: on a slope a box placed exactly on the
+      // sampled height leaves daylight under its downhill corner.
+      b.position.copy(at(along, off, ground + h / 2 - h * 0.20));
       b.rotation.y = hRad + (rnd() - 0.5) * 0.55;
       b.castShadow = true; b.receiveShadow = true;
       this.group.add(b);
@@ -57328,25 +57560,25 @@ class Harbour {
     /* ------------------------- landmark per style ------------------------- */
     if (spec.style === "fortress") {
       const keep = new THREE.Mesh(new THREE.BoxGeometry(46 * S, 26 * S, 46 * S), mat.stone);
-      keep.position.copy(at(-70 * S, 150 * S, 15 * S));
+      keep.position.copy(at(-70 * S, 150 * S, groundAt(-70 * S, 150 * S) + 13 * S));
       keep.rotation.y = hRad;
       keep.castShadow = true;
       this.group.add(keep);
       for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
         const t = new THREE.Mesh(new THREE.CylinderGeometry(7 * S, 8 * S, 34 * S, 10), mat.stone);
-        t.position.copy(at((-70 + dx * 24) * S, (150 + dz * 24) * S, 18 * S));
+        t.position.copy(at((-70 + dx * 24) * S, (150 + dz * 24) * S, groundAt((-70 + dx * 24) * S, (150 + dz * 24) * S) + 17 * S));
         t.castShadow = true;
         this.group.add(t);
       }
     } else if (spec.style === "kasbah") {
       const wall = new THREE.Mesh(new THREE.BoxGeometry(190 * S, 14 * S, 5 * S), mat.stone);
-      wall.position.copy(at(0, 165 * S, 13 * S));
+      wall.position.copy(at(0, 165 * S, groundAt(0, 165 * S) + 7 * S));
       wall.rotation.y = hRad;
       this.group.add(wall);
     } else {
       // A cathedral or a great church
       const nave = new THREE.Mesh(new THREE.BoxGeometry(20 * S, 22 * S, 34 * S), mat.walls[0]);
-      nave.position.copy(at(-58 * S, 158 * S, 14 * S));
+      nave.position.copy(at(-58 * S, 158 * S, groundAt(-58 * S, 158 * S) + 11 * S));
       nave.rotation.y = hRad;
       nave.castShadow = true;
       this.group.add(nave);
@@ -57359,7 +57591,8 @@ class Harbour {
     if (spec.lighthouse) {
       const towerH = 40 * S;
       const tower = new THREE.Mesh(new THREE.CylinderGeometry(4.2 * S, 6.4 * S, towerH, 14), mat.stone);
-      const tPos = at(-118 * S, 30 * S, towerH / 2 - 3 * S);
+      const gh = Math.max(0, groundAt(-118 * S, 52 * S));
+      const tPos = at(-118 * S, 52 * S, gh + towerH / 2 - 4 * S);
       tower.position.copy(tPos);
       tower.castShadow = true;
       this.group.add(tower);
@@ -57375,29 +57608,37 @@ class Harbour {
       this.group.add(this.beacon);
     }
 
-    /* -------------------------- moored shipping -------------------------- */
+    /* -------------------------- moored shipping --------------------------
+     * Real lofted hulls at a smaller scale. These were a scaled hemisphere with
+     * two sails floating above it, which from the water read as canvas on
+     * sticks with no boat underneath. */
     for (let i = 0; i < (spec.moored || 0); i++) {
       const m = new THREE.Group();
-      const hull = new THREE.Mesh(
-        new THREE.SphereGeometry(6 * S, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat.wood
-      );
-      hull.rotation.x = Math.PI;
-      hull.scale.set(0.42, 0.55, 1.5);
+      const sc = 0.42 + rnd() * 0.30;
+      const dims = { len: 26 * S * sc, beam: 7.4 * S * sc, draft: 2.6 * S * sc, rise: 2.5 * S * sc };
+      const hull = new THREE.Mesh(buildHull(dims), mat.wood);
+      hull.castShadow = true;
       m.add(hull);
-      for (let k = 0; k < 2; k++) {
-        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * S, 0.3 * S, 20 * S, 6), mat.wood);
-        mast.position.set(0, 10 * S, (k - 0.5) * 6 * S);
+
+      const masts = 1 + Math.floor(rnd() * 2);
+      for (let k = 0; k < masts; k++) {
+        const mh = 15 * S * sc;
+        const z = (k - (masts - 1) / 2) * 6 * S * sc;
+        const mast = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.16 * S * sc, 0.24 * S * sc, mh, 6), mat.wood);
+        mast.position.set(0, 1.4 * S * sc + mh / 2, z);
         m.add(mast);
-        const sail = new THREE.Mesh(
-          new THREE.PlaneGeometry(7 * S, 8 * S),
-          new THREE.MeshStandardMaterial({ color: 0xe4dcc6, side: THREE.DoubleSide, roughness: 0.95 })
-        );
-        sail.position.set(0, 13 * S, (k - 0.5) * 6 * S + 0.4);
-        m.add(sail);
+        // Furled, because a ship at her moorings does not carry canvas.
+        const furl = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.42 * S * sc, 0.42 * S * sc, 6 * S * sc, 6),
+          new THREE.MeshStandardMaterial({ color: 0xded5bd, roughness: 0.95 }));
+        furl.rotation.z = Math.PI / 2;
+        furl.position.set(0, 1.4 * S * sc + mh * 0.62, z);
+        m.add(furl);
       }
-      m.position.copy(at((-70 + i * 34 + rnd() * 12) * S, (24 + rnd() * 14) * S, 0));
-      m.rotation.y = hRad + (rnd() - 0.5) * 0.5;
-      m.castShadow = true;
+      m.position.copy(at((-80 + i * 38 + rnd() * 14) * S, (26 + rnd() * 18) * S, -0.4 * S));
+      m.rotation.y = hRad + (rnd() - 0.5) * 0.7;
+      m.rotation.z = (rnd() - 0.5) * 0.06;
       this.group.add(m);
     }
 
@@ -57416,7 +57657,7 @@ class Harbour {
     for (let i = 0; i < 2; i++) {
       const markH = (14 + i * 9) * S;
       const mark = new THREE.Mesh(new THREE.ConeGeometry(2.4 * S, markH, 4), mat.stone);
-      mark.position.copy(at(0, (78 + i * 46) * S, markH / 2 + 3 * S));
+      mark.position.copy(at(0, (78 + i * 46) * S, Math.max(0, groundAt(0, (78 + i * 46) * S)) + markH / 2));
       mark.rotation.y = hRad + Math.PI / 4;
       this.group.add(mark);
     }
@@ -57638,7 +57879,14 @@ class Voyage {
     this.scene.add(this.harbour.group);
 
     this.windFrom = opts.windDeg;
-    this.windKn = opts.windKn ?? 14;
+    this.baseWindKn = opts.windKn ?? 14;
+    this.windKn = this.baseWindKn;
+    this.gust = 0;            // -1 lull .. +1 hard gust
+    this.gustPhase = Math.random() * 100;
+    this.heelAngle = 0;       // radians, spring-damped
+    this.heelVel = 0;
+    this.pitchAngle = 0;
+    this.pitchVel = 0;
     this.maxKn = Math.max(3, opts.shipSpec?.speedKn ?? 7);
 
     // Start downwind of the berth and off to one side, so the run in is a
@@ -57735,9 +57983,19 @@ class Voyage {
     const wantRudder = clamp((leftKey ? -1 : 0) + (rightKey ? 1 : 0) + this.touchRudder, -1, 1);
     this.rudder += (wantRudder - this.rudder) * clamp(dt * 5.5, 0, 1);
 
+    // The wind is never steady. Two slow sine terms of different periods give
+    // gusts and lulls that arrive at irregular intervals without needing noise,
+    // and the heading wanders a few degrees with them the way real wind does.
+    this.gustPhase += dt;
+    const g1 = Math.sin(this.gustPhase * 0.21);
+    const g2 = Math.sin(this.gustPhase * 0.083 + 2.1);
+    this.gust = clamp(g1 * 0.6 + g2 * 0.55, -1, 1);
+    this.windKn = Math.max(2, this.baseWindKn * (1 + this.gust * 0.32));
+    this.windFrom = (this.opts.windDeg + g2 * 7 + 360) % 360;
+
     const twa = angleDiff(this.heading, this.windFrom);
     const power = sailPower(twa);
-    const windScale = clamp(this.windKn / 14, 0.55, 1.45);
+    const windScale = clamp(this.windKn / 14, 0.45, 1.7);
     const targetKn = this.trim * this.maxKn * power * windScale;
 
     // She builds way slowly and loses it fast. That asymmetry is the game.
@@ -57787,10 +58045,26 @@ class Voyage {
     const n = waveNormal(this.pos.x, this.pos.z, this.t, 4);
     const roll = Math.asin(clamp(n.x * Math.cos(hRad) - n.z * Math.sin(hRad), -1, 1));
     const pitch = Math.asin(clamp(n.x * Math.sin(hRad) + n.z * Math.cos(hRad), -1, 1));
+
+    // Heel is a damped spring rather than a value assigned straight from the
+    // wind. A hull has mass and a righting moment: she leans INTO a gust over a
+    // second or so, hangs there, and rolls back upright when it eases. Setting
+    // the angle directly made her snap between attitudes like a hinge.
     const heelSign = Math.sin((this.heading - this.windFrom) * DEG);
-    const heel = heelSign * this.trim * power * 0.20 * windScale;
-    grp.rotation.z = -roll * 0.75 + heel;
-    grp.rotation.x = pitch * 0.75;
+    const heelTarget = -roll * 0.72 + heelSign * this.trim * power * 0.30 * windScale;
+    const STIFF = 26, DAMP = 6.4;        // righting moment, and the water's drag on it
+    this.heelVel += (heelTarget - this.heelAngle) * STIFF * dt - this.heelVel * DAMP * dt;
+    this.heelAngle += this.heelVel * dt;
+    this.heelAngle = clamp(this.heelAngle, -0.55, 0.55);
+
+    // Pitch: the swell drives it, and driving hard into a head sea lifts the bow.
+    const bury = clamp(Math.cos(twa * DEG), -1, 1) * -1;
+    const pitchTarget = pitch * 0.72 + bury * (this.speedKn / this.maxKn) * 0.05;
+    this.pitchVel += (pitchTarget - this.pitchAngle) * 30 * dt - this.pitchVel * 7 * dt;
+    this.pitchAngle += this.pitchVel * dt;
+
+    grp.rotation.z = this.heelAngle;
+    grp.rotation.x = this.pitchAngle;
 
     const speedFrac = this.speedKn / this.maxKn;
     const night = 1 - clamp((this.sky.sunDir.y + 0.12) / 0.42, 0, 1);
@@ -57808,7 +58082,8 @@ class Voyage {
     this.sun.target.position.copy(grp.position);
     this.sun.target.updateMatrixWorld();
 
-    this.ocean.update(this.t, this.pos, this.camera, { ...p, sunDir: this.sky.sunDir });
+    this.ocean.update(this.t, this.pos, this.camera, { ...p, sunDir: this.sky.sunDir },
+      { kn: this.windKn, fromDeg: this.windFrom });
     this.harbour.update(this.t, night);
 
     const aligned = angleDiff(this.heading, this.berthHeading) < 60;
@@ -57831,6 +58106,8 @@ class Voyage {
       progress: clamp(1 - dist / this.startDist, 0, 1),
       windFrom: this.windFrom,
       windKn: this.windKn,
+      gust: this.gust,
+      heelDeg: Math.round((this.heelAngle * 180) / Math.PI),
       inIrons: twa < 30,
       dockable: this.dockable,
       night,
@@ -57840,9 +58117,16 @@ class Voyage {
   _camera(dt, fwd, g, speedFrac) {
     let desired, look;
     if (this.camMode === 0) {
-      const back = 52 + speedFrac * 16;
-      desired = new THREE.Vector3(g.x - fwd.x * back, g.y + 26, g.z - fwd.z * back);
-      look = new THREE.Vector3(g.x + fwd.x * 26, g.y + 5, g.z + fwd.z * 26);
+      // Quarter view from astern and above, opening out as she picks up speed
+      // so the sense of motion comes from the frame as well as the wake.
+      const back = 74 + speedFrac * 26;
+      const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
+      const off = 13 + speedFrac * 7;
+      desired = new THREE.Vector3(
+        g.x - fwd.x * back + side.x * off,
+        g.y + 34 + speedFrac * 9,
+        g.z - fwd.z * back + side.z * off);
+      look = new THREE.Vector3(g.x + fwd.x * 30, g.y + 9, g.z + fwd.z * 30);
     } else if (this.camMode === 1) {
       const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
       desired = new THREE.Vector3(
@@ -57858,6 +58142,7 @@ class Voyage {
     if (!this._look) this._look = look.clone();
     this._look.lerp(look, clamp(dt * 3.4, 0, 1));
     this.camera.lookAt(this._look);
+    this.camera.rotation.z += (this.heelAngle || 0) * 0.16;
   }
 
   _loop() {
