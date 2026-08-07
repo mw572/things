@@ -379,6 +379,47 @@ html, body {
 .port-label.shut { fill: #8a7a5c; }
 .port-label.is-here { font-weight: 700; fill: #7a4a12; }
 
+/* ---- Admiralty chart, 1880: an instrument, not an artefact ---- */
+#chart[data-era="steam"] .grat-label,
+.adm-grat      { fill: #4a5560; font-family: var(--sans); font-size: 9.5px; }
+.adm-sounding  { fill: #3f5a6b; font-family: var(--sans); font-size: 7.5px; }
+.adm-lightchar { fill: #a8322a; font-family: var(--sans); font-style: italic; font-size: 8.5px; }
+.adm-note      { fill: #7a5a34; font-family: var(--sans); font-style: italic; font-size: 9px; }
+.adm-h1        { fill: #23231f; font-family: var(--serif); font-size: 17px; letter-spacing: .07em; }
+.adm-h2        { fill: #23231f; font-family: var(--serif); font-size: 12px; letter-spacing: .16em; }
+.adm-small     { fill: #4a4a44; font-family: var(--sans); font-size: 9.5px; }
+#chart[data-era="steam"] .port-dot { fill: #fdfbf4; stroke: #23231f; stroke-width: 1.3; }
+#chart[data-era="steam"] .port-dot.here { fill: #a8322a; stroke: #23231f; }
+#chart[data-era="steam"] .port-dot.dest { fill: #2f6b45; stroke: #23231f; }
+#chart[data-era="steam"] .port-label { fill: #23231f; stroke: rgba(253,251,244,.9); }
+#chart[data-era="steam"] .port-label.is-here { fill: #8c2018; }
+#chart[data-era="steam"] .rose-n { fill: #23231f; }
+#chart[data-era="steam"] .course-shadow { stroke: rgba(253,251,244,.9); }
+
+/* ---- Service network, 1985: a schematic, not a map ---- */
+.net-land   { }
+.net-leg    { stroke: #2e4d5e; stroke-width: 2; stroke-linecap: round; }
+.net-active { stroke: #48c8a8; stroke-width: 3.5; stroke-linecap: round; }
+.net-chip   { fill: #0f2a30; stroke: #48c8a8; stroke-width: 1; }
+.net-chiptext { fill: #7ce0c4; font-family: var(--mono); font-size: 11px; }
+.net-node   { fill: #16323f; stroke: #6fa8bf; stroke-width: 1.6; }
+.net-node.here { fill: #e8b84b; stroke: #fff0c8; stroke-width: 2.2; }
+.net-node.dest { fill: #48c8a8; stroke: #d3fff2; stroke-width: 2.2; }
+.net-node.shut { fill: #1a2830; stroke: #33454f; }
+.net-label  { fill: #cfe0e8; font-family: var(--sans); font-size: 12px; paint-order: stroke;
+  stroke: rgba(13,27,36,.85); stroke-width: 3.5px; stroke-linejoin: round; }
+.net-label.shut { fill: #526672; }
+.net-h      { fill: #6fa8bf; font-family: var(--mono); font-size: 11px; letter-spacing: .22em; }
+.net-row    { fill: rgba(255,255,255,.04); }
+.net-row.on { fill: rgba(232,184,75,.16); }
+.net-rowtext { fill: #b6c9d3; font-family: var(--mono); font-size: 11.5px; }
+.net-rowtext.on { fill: #f0d089; }
+.net-rowtext.dim { fill: #5e7683; }
+.net-kv     { fill: #90a8b4; font-family: var(--sans); font-size: 12px; }
+.net-kvv    { fill: #e8eef2; font-family: var(--mono); font-size: 12.5px; }
+#chart[data-era="box"] .port-g.clickable:hover .net-node { stroke: #48c8a8; stroke-width: 3; }
+#chart[data-era="box"] .port-g.clickable:hover .net-label { fill: #7ce0c4; }
+
 .course        { stroke: #9a4030; stroke-width: 2; stroke-dasharray: 9 5; }
 .course-shadow { stroke: rgba(239,230,205,.9); stroke-width: 5; }
 .course-label  { fill: #6b2418; font-family: var(--serif); font-size: 11.5px; letter-spacing: .02em; }
@@ -603,7 +644,7 @@ html, body {
   <section id="title-screen" class="screen active">
     <div class="title-bg" aria-hidden="true"></div>
     <div class="title-inner">
-      <p class="eyebrow">Lisbon &middot; Anno 1620</p>
+      <p class="eyebrow" id="title-eyebrow">Lisbon &middot; Anno 1620</p>
       <h1 class="game-title">TRADEWINDS</h1>
       <p id="tagline" class="tagline">The wind is your engine, and it does not take instruction.</p>
       <p id="era-blurb" class="blurb">
@@ -632,18 +673,18 @@ html, body {
       <div class="topbar-right">
         <div class="stat"><span class="stat-label">Cash</span><span id="stat-cash" class="stat-val">&pound;1,400</span></div>
         <div class="stat" id="stat-debt-wrap" hidden><span class="stat-label">Debt</span><span id="stat-debt" class="stat-val neg">&pound;0</span></div>
-        <div class="stat"><span class="stat-label">Hold</span><span id="stat-hold" class="stat-val">0 / 40</span></div>
-        <div class="stat"><span class="stat-label">Net worth</span><span id="stat-net" class="stat-val">&pound;1,400</span></div>
+        <div class="stat"><span class="stat-label" data-s="holdLabel">Hold</span><span id="stat-hold" class="stat-val">0 / 40</span></div>
+        <div class="stat"><span class="stat-label" data-s="netLabel">Net worth</span><span id="stat-net" class="stat-val">&pound;1,400</span></div>
         <div class="stat"><span class="stat-label">Date</span><span id="stat-date" class="stat-val">1 Mar 1620</span></div>
       </div>
     </header>
 
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="exchange" role="tab">Exchange</button>
-      <button class="tab" data-tab="chart" role="tab">Chart</button>
-      <button class="tab" data-tab="commissions" role="tab">Commissions <span id="tab-badge-c" class="badge" hidden>0</span></button>
-      <button class="tab" data-tab="shipyard" role="tab">Shipyard</button>
-      <button class="tab" data-tab="counting" role="tab">Counting house</button>
+      <button class="tab active" data-tab="exchange" role="tab" data-s="tabExchange">Exchange</button>
+      <button class="tab" data-tab="chart" role="tab" data-s="tabChart">Chart</button>
+      <button class="tab" data-tab="commissions" role="tab"><span data-s="tabCommissions">Commissions</span> <span id="tab-badge-c" class="badge" hidden>0</span></button>
+      <button class="tab" data-tab="shipyard" role="tab" data-s="tabYard">Shipyard</button>
+      <button class="tab" data-tab="counting" role="tab" data-s="tabCounting">Counting house</button>
     </nav>
 
     <div class="port-body">
@@ -652,7 +693,7 @@ html, body {
       <div class="tabpane active" data-pane="exchange">
         <div class="panel">
           <div class="panel-head">
-            <h2>The Exchange</h2>
+            <h2 data-s="exchangeTitle">The Exchange</h2>
             <p id="port-flavor" class="panel-sub"></p>
           </div>
           <div id="port-events" class="events"></div>
@@ -676,8 +717,8 @@ html, body {
         </div>
 
         <aside class="panel side-panel">
-          <div class="panel-head"><h2>Worth a look</h2>
-            <p class="panel-sub">Best runs from here, after wages.</p></div>
+          <div class="panel-head"><h2 data-s="opsTitle">Worth a look</h2>
+            <p class="panel-sub" data-s="opsSub">Best runs from here, after wages.</p></div>
           <div id="ops-list" class="ops-list"></div>
           <div class="ship-card">
             <div class="ship-card-head">
@@ -699,8 +740,8 @@ html, body {
       <div class="tabpane" data-pane="chart">
         <div class="panel chart-panel">
           <div class="panel-head">
-            <h2>The chart table</h2>
-            <p class="panel-sub">Pick your landfall. Distances are great-circle; the trades favour the southbound run.</p>
+            <h2 data-s="chartTitle">The chart table</h2>
+            <p class="panel-sub" data-s="chartSub">Pick your landfall. Distances are great-circle; the trades favour the southbound run.</p>
           </div>
           <div class="chart-wrap">
             <svg id="chart" viewBox="0 0 600 780" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Chart of the Atlantic"></svg>
@@ -717,12 +758,12 @@ html, body {
       <!-- ---------------- COMMISSIONS ---------------- -->
       <div class="tabpane" data-pane="commissions">
         <div class="panel">
-          <div class="panel-head"><h2>On offer</h2>
-            <p class="panel-sub">Carry a named cargo to a named port by a named day. Miss it and you forfeit.</p></div>
+          <div class="panel-head"><h2 data-s="offersTitle">On offer</h2>
+            <p class="panel-sub" data-s="offersSub">Carry a named cargo to a named port by a named day. Miss it and you forfeit.</p></div>
           <div id="offers-list" class="cards"></div>
         </div>
         <aside class="panel side-panel">
-          <div class="panel-head"><h2>Signed</h2><p class="panel-sub">Delivered by selling at the destination.</p></div>
+          <div class="panel-head"><h2 data-s="signedTitle">Signed</h2><p class="panel-sub" data-s="signedSub">Delivered by selling at the destination.</p></div>
           <div id="contracts-list" class="cards"></div>
         </aside>
       </div>
@@ -730,14 +771,14 @@ html, body {
       <!-- ---------------- SHIPYARD ---------------- -->
       <div class="tabpane" data-pane="shipyard">
         <div class="panel">
-          <div class="panel-head"><h2>The yard</h2><p class="panel-sub">Hulls for sale, and refits for the one you have.</p></div>
+          <div class="panel-head"><h2 data-s="yardTitle">The yard</h2><p class="panel-sub" data-s="yardSub">Hulls for sale, and refits for the one you have.</p></div>
           <h3 class="sub-head">Hulls</h3>
           <div id="hulls-list" class="cards"></div>
           <h3 class="sub-head">Refits for <span id="refit-ship">Andorinha</span></h3>
           <div id="refits-list" class="cards"></div>
         </div>
         <aside class="panel side-panel">
-          <div class="panel-head"><h2>Your fleet</h2><p class="panel-sub">One hull sails at a time.</p></div>
+          <div class="panel-head"><h2 data-s="fleetTitle">Your fleet</h2><p class="panel-sub" data-s="fleetSub">One hull sails at a time.</p></div>
           <div id="fleet-list" class="cards"></div>
           <button id="careen-btn" class="btn">Careen and recaulk</button>
         </aside>
@@ -746,7 +787,7 @@ html, body {
       <!-- ---------------- COUNTING HOUSE ---------------- -->
       <div class="tabpane" data-pane="counting">
         <div class="panel">
-          <div class="panel-head"><h2>The counting house</h2><p class="panel-sub">Credit runs at daily interest. It compounds whether you sail or not.</p></div>
+          <div class="panel-head"><h2 data-s="countingTitle">The counting house</h2><p class="panel-sub" data-s="countingSub">Credit runs at daily interest. It compounds whether you sail or not.</p></div>
           <div class="credit-grid">
             <div class="credit-box">
               <span class="credit-label">Cash</span><b id="c-cash">&pound;0</b>
@@ -764,9 +805,9 @@ html, body {
           <div id="stats-grid" class="stats-grid"></div>
         </div>
         <aside class="panel side-panel">
-          <div class="panel-head"><h2>Ship's log</h2></div>
+          <div class="panel-head"><h2 data-s="logTitle">Ship&rsquo;s log</h2></div>
           <div id="log-list" class="log-list"></div>
-          <button id="reset-btn" class="btn btn-ghost btn-danger">Abandon the house and start again</button>
+          <button id="reset-btn" class="btn btn-ghost btn-danger" data-s="resetBtn">Abandon the house and start again</button>
         </aside>
       </div>
 
@@ -780,7 +821,7 @@ html, body {
     <div id="hud" class="hud">
       <div class="hud-top">
         <div class="hud-block">
-          <span class="hud-label">Bound for</span>
+          <span class="hud-label" data-s="boundFor">Bound for</span>
           <span id="hud-dest" class="hud-strong">&mdash;</span>
           <div class="progress"><div id="hud-progress" class="progress-fill"></div></div>
         </div>
@@ -56946,7 +56987,23 @@ const FRAG = /* glsl */ `
   uniform vec3  uSunColor;
   uniform float uSunIntensity;
   uniform float uHaze;
+  uniform float uCover;      // 0 clear .. 1 solid overcast
+  uniform float uTime;
+  uniform vec2  uWindDir;
   varying vec3  vDir;
+
+  float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vn(vec2 p){
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(h21(i), h21(i + vec2(1,0)), u.x),
+               mix(h21(i + vec2(0,1)), h21(i + vec2(1,1)), u.x), u.y);
+  }
+  float fbm2(vec2 p){
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 5; i++) { v += a * vn(p); p *= 2.03; a *= 0.5; }
+    return v;
+  }
 
   void main() {
     vec3 d = normalize(vDir);
@@ -56968,6 +57025,25 @@ const FRAG = /* glsl */ `
     col += uSunColor * pow(mu, 220.0) * 0.9 * uSunIntensity;
     float disc = smoothstep(0.99965, 0.99988, mu);
     col += uSunColor * disc * 6.0 * uSunIntensity;
+
+    // Cloud. The dome is projected onto a plane at a nominal height so the
+    // cover stretches toward the horizon the way real cloud does, and it drifts
+    // downwind. Below the horizon there is nothing to draw.
+    if (h > 0.005 && uCover > 0.01) {
+      vec2 cp = d.xz / max(h, 0.02) * 0.55 + uWindDir * uTime * 0.006;
+      float n = fbm2(cp * 0.9);
+      // The cover threshold decides how much sky is filled; the softness of the
+      // edge decides whether it reads as fair-weather cumulus or as a front.
+      float edge = mix(0.62, 0.20, uCover);
+      float cloud = smoothstep(edge, edge + mix(0.30, 0.12, uCover), n);
+      cloud *= smoothstep(0.0, 0.16, h);                 // fade into the horizon
+      // Lit tops, dark bases: shade by a second sample offset toward the sun.
+      float lit = fbm2(cp * 0.9 + normalize(uSun.xz) * 0.22);
+      vec3 top = mix(vec3(0.96, 0.95, 0.92), uSunColor, 0.35);
+      vec3 base = mix(vec3(0.42, 0.44, 0.48), uHorizon, 0.45) * (0.55 + uSunIntensity * 0.5);
+      vec3 cc = mix(base, top, clamp((lit - n) * 3.0 + 0.55, 0.0, 1.0));
+      col = mix(col, cc, cloud * (0.55 + uCover * 0.45));
+    }
 
     gl_FragColor = vec4(col, 1.0);
   }
@@ -57021,6 +57097,9 @@ class Sky {
       uSunColor:     { value: new THREE.Color(0xffffff) },
       uSunIntensity: { value: 1 },
       uHaze:         { value: 0.5 },
+      uCover:        { value: 0.25 },
+      uTime:         { value: 0 },
+      uWindDir:      { value: new THREE.Vector2(1, 0) },
     };
     this.mesh = new THREE.Mesh(
       new THREE.SphereGeometry(1, 32, 24),
@@ -57045,6 +57124,15 @@ class Sky {
    * `dayFraction` 0..1 across a 24-hour day; 0.5 is noon. `bearing` in degrees
    * sets which way the sun sits, so successive voyages don't all look alike.
    */
+  /** Cloud cover 0..1, and the wind that drifts it. */
+  setWeather(cover, windFromDeg, t) {
+    this.uniforms.uCover.value = cover;
+    this.uniforms.uTime.value = t;
+    const r = ((windFromDeg + 180) * Math.PI) / 180;
+    this.uniforms.uWindDir.value.set(Math.sin(r), -Math.cos(r));
+    this.cover = cover;
+  }
+
   setTime(dayFraction, bearingDeg = 120) {
     const angle = (dayFraction - 0.25) * Math.PI * 2;   // sunrise at 0.25
     const elev = Math.sin(angle);
@@ -59381,6 +59469,13 @@ class Voyage {
     this.bumped = -99;
     this._look = null;
 
+    // Weather for the passage. Rough seas are dangerous under canvas, merely
+    // uncomfortable under steam, and only a schedule risk for a box ship, so
+    // the same weather is worth a different amount of worry in each age.
+    this.weather = clamp((opts.windKn - 8) / 20 + (Math.random() - 0.4) * 0.5, 0, 1);
+    this.rain = this.weather > 0.66 ? (this.weather - 0.66) / 0.34 : 0;
+    this._buildRain();
+
     this.wake.clear();
     this.sky.setTime(opts.dayFraction ?? 0.42, (this.windFrom + 140) % 360);
 
@@ -59409,6 +59504,56 @@ class Voyage {
     this.canvas.removeEventListener("touchmove", this._onTouchMove);
     this.canvas.removeEventListener("touchend", this._onTouchEnd);
     this.keys.clear();
+  }
+
+  _buildRain() {
+    if (this.rainPts) { this.scene.remove(this.rainPts); this.rainPts.geometry.dispose(); }
+    if (this.rain <= 0.01) { this.rainPts = null; return; }
+    // Line segments, not points. Points render as little squares whatever you
+    // do to them; rain is a streak, and the streak is the whole read.
+    const N = Math.floor(700 + this.rain * 2000);
+    const pos = new Float32Array(N * 6);
+    const len = 3.2 + this.rain * 3.0;
+    for (let i = 0; i < N; i++) {
+      const x = (Math.random() - 0.5) * 260;
+      const y = Math.random() * 150;
+      const z = (Math.random() - 0.5) * 260;
+      pos[i * 6] = x;     pos[i * 6 + 1] = y;       pos[i * 6 + 2] = z;
+      pos[i * 6 + 3] = x; pos[i * 6 + 4] = y - len; pos[i * 6 + 5] = z;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    this.rainPts = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+      color: 0xbdd0da, transparent: true,
+      opacity: 0.16 + this.rain * 0.26, depthWrite: false,
+    }));
+    this.rainPts.frustumCulled = false;
+    this.scene.add(this.rainPts);
+  }
+
+  _updateRain(dt) {
+    if (!this.rainPts) return;
+    // The block of rain is kept centred on the ship and the drops simply fall
+    // through it, so a few thousand points cover an unbounded ocean.
+    const a = this.rainPts.geometry.attributes.position.array;
+    const fall = (48 + this.rain * 55) * dt;
+    const drift = this.windKn * 0.14 * dt;
+    const wr = (this.windFrom + 180) * DEG;
+    const dx = Math.sin(wr) * drift, dz = -Math.cos(wr) * drift;
+    const len = 3.2 + this.rain * 3.0;
+    // Six floats per drop: both ends of the streak move together.
+    for (let i = 0; i < a.length; i += 6) {
+      a[i + 1] -= fall; a[i + 4] -= fall;
+      a[i] += dx; a[i + 3] += dx;
+      a[i + 2] += dz; a[i + 5] += dz;
+      if (a[i + 1] < 0) {
+        const x = (Math.random() - 0.5) * 260, y = 150, z = (Math.random() - 0.5) * 260;
+        a[i] = x; a[i + 1] = y; a[i + 2] = z;
+        a[i + 3] = x; a[i + 4] = y - len; a[i + 5] = z;
+      }
+    }
+    this.rainPts.geometry.attributes.position.needsUpdate = true;
+    this.rainPts.position.set(this.pos.x, 0, this.pos.z);
   }
 
   _resize() {
@@ -59599,10 +59744,17 @@ class Voyage {
     this.hemi.intensity = 0.62 + p.ambient * 0.72;
     this.hemi.color.copy(p.horizon);
     this.sun.color.copy(p.sunColor);
-    this.sun.intensity = 0.55 + p.intensity * 1.85;
+    const overcast = clamp(0.12 + this.weather * 0.85, 0, 1);
+    this.sun.intensity = (0.55 + p.intensity * 1.85) * (1 - overcast * 0.62);
+    this.hemi.intensity *= 1 + overcast * 0.25;
     this.sun.position.copy(this.sky.sunDir).multiplyScalar(240).add(grp.position);
     this.sun.target.position.copy(grp.position);
     this.sun.target.updateMatrixWorld();
+
+    // Sky and weather.
+    const cover = clamp(0.12 + this.weather * 0.85 + this.gust * 0.06, 0, 1);
+    this.sky.setWeather(cover, this.windFrom, this.t);
+    this._updateRain(dt);
 
     this.ocean.update(this.t, this.pos, this.camera, { ...p, sunDir: this.sky.sunDir },
       {
@@ -59636,6 +59788,8 @@ class Voyage {
       windFrom: this.windFrom,
       windKn: this.windKn,
       gust: this.gust,
+      weather: this.weather,
+      rain: this.rain,
       heelDeg: Math.round((this.heelAngle * 180) / Math.PI),
       inIrons: this.propulsion === "wind" && twa < 30,
       revs: this.revs,
@@ -60086,9 +60240,270 @@ function course(house, dest) {
   </g>`;
 }
 
+
+/* ======================= ADMIRALTY CHART, 1880 =======================
+ * White paper, fine black linework, soundings in fathoms, lights with their
+ * characteristics, submarine cables and coaling stations. A portolan is a
+ * beautiful object; an Admiralty chart is an instrument, and by 1880 that is
+ * what is on the chart room table.
+ */
+
+// Deterministic scatter, so the soundings do not dance about between redraws.
+function seeded(n) {
+  let x = n >>> 0;
+  return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+}
+
+function admiraltyDefs() {
+  return `<defs>
+    <pattern id="dryingSand" width="5" height="5" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="0.5" fill="#8a7f63" opacity="0.5"/>
+      <circle cx="3.8" cy="3.6" r="0.4" fill="#8a7f63" opacity="0.4"/>
+    </pattern>
+    <linearGradient id="admPaper" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0%" stop-color="#fbf8ef"/>
+      <stop offset="100%" stop-color="#f0ebdc"/>
+    </linearGradient>
+  </defs>`;
+}
+
+/** Depth contours: a few smoothed offsets of the coast, as a chart would show. */
+function admiraltyContours() {
+  const out = [];
+  for (const [off, dash] of [[7, "none"], [15, "5 3"], [26, "2 3"]]) {
+    for (const [hole, area, flat] of COAST) {
+      if (hole || area < MAJOR_AREA) continue;
+      // Offset outward by pushing each point away from the ring's centroid.
+      let cx = 0, cy = 0, n = 0;
+      for (let i = 0; i < flat.length; i += 2) {
+        const q = project(flat[i + 1], flat[i]);
+        cx += q.x; cy += q.y; n++;
+      }
+      cx /= n; cy /= n;
+      let d = "";
+      for (let i = 0; i < flat.length; i += 2) {
+        const q = project(flat[i + 1], flat[i]);
+        const vx = q.x - cx, vy = q.y - cy;
+        const l = Math.hypot(vx, vy) || 1;
+        const x = q.x + (vx / l) * off, y = q.y + (vy / l) * off;
+        d += `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`;
+      }
+      out.push(`<path d="${d}Z" fill="none" stroke="#5f7f96" stroke-width="0.6"
+        stroke-dasharray="${dash}" opacity="0.55"/>`);
+    }
+  }
+  return `<g class="adm-contours">${out.join("")}</g>`;
+}
+
+function admiraltySoundings() {
+  const rnd = seeded(20250806);
+  const out = [];
+  // Reject anything that falls on land, so soundings only appear in water.
+  const inLand = (x, y) => COAST.some(([hole, area, flat]) => {
+    if (hole || area < 2) return false;
+    let inside = false;
+    for (let i = 0, j = flat.length - 2; i < flat.length; j = i, i += 2) {
+      const a = project(flat[i + 1], flat[i]), b = project(flat[j + 1], flat[j]);
+      if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    return inside;
+  });
+  let tries = 0;
+  while (out.length < 210 && tries < 1400) {
+    tries++;
+    const x = 30 + rnd() * (VB_W - 60);
+    const y = 30 + rnd() * (VB_H - 60);
+    if (inLand(x, y)) continue;
+    // Deeper offshore: a crude but readable shelf model.
+    const shelf = Math.min(1, Math.hypot(x - 780, y - 400) / 520);
+    const depth = Math.round(6 + shelf * shelf * 2400 + rnd() * 40);
+    out.push(`<text x="${x.toFixed(0)}" y="${y.toFixed(0)}" class="adm-sounding">${depth}</text>`);
+  }
+  return `<g class="adm-soundings">${out.join("")}</g>`;
+}
+
+function admiraltyLights(house) {
+  const CHARS = ["Fl.10s", "Gp.Fl.(2)15s", "F.R.", "Fl.5s", "Occ.8s", "Gp.Fl.(3)20s"];
+  return PORTS.filter((p) => p.berth?.lighthouse).map((p, i) => {
+    const q = project(p.lat, p.lon);
+    return `<g class="adm-light">
+      <path d="M${q.x},${q.y - 9} l4,7 h-8 Z" fill="#a8322a"/>
+      <circle cx="${q.x}" cy="${q.y - 9}" r="2.6" fill="none" stroke="#a8322a" stroke-width="0.9"/>
+      <text x="${q.x + 7}" y="${q.y - 11}" class="adm-lightchar">${CHARS[i % CHARS.length]}</text>
+    </g>`;
+  }).join("");
+}
+
+function admiraltyCables() {
+  // The Atlantic telegraph and the West African coast cables, roughly where
+  // they ran. A chart of this date would show them and warn against anchoring.
+  const runs = [
+    [["bristol"], ["azores"], ["cabo_verde"], ["recife"]],
+    [["lisbon"], ["funchal"], ["canaries"], ["cabo_verde"]],
+    [["cabo_verde"], ["elmina"], ["sao_tome"]],
+  ];
+  return runs.map((run) => {
+    const d = run.map(([id], i) => {
+      const q = project(PORT[id].lat, PORT[id].lon);
+      return `${i ? "L" : "M"}${q.x.toFixed(1)},${q.y.toFixed(1)}`;
+    }).join(" ");
+    return `<path d="${d}" fill="none" stroke="#7a5a34" stroke-width="1" stroke-dasharray="1 4" opacity="0.7"/>`;
+  }).join("") +
+  `<text x="300" y="252" class="adm-note" transform="rotate(-12 300 252)">Submarine telegraph</text>`;
+}
+
+function admiraltyTitleBlock(house) {
+  const x = 40, y = 560, w = 300, h = 168;
+  return `<g class="adm-title">
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#fdfbf4" stroke="#2b2b28" stroke-width="1.4"/>
+    <rect x="${x + 5}" y="${y + 5}" width="${w - 10}" height="${h - 10}" fill="none" stroke="#2b2b28" stroke-width="0.5"/>
+    <text x="${x + w / 2}" y="${y + 34}" class="adm-h1" text-anchor="middle">NORTH ATLANTIC OCEAN</text>
+    <text x="${x + w / 2}" y="${y + 54}" class="adm-h2" text-anchor="middle">EASTERN PORTION</text>
+    <line x1="${x + 40}" y1="${y + 66}" x2="${x + w - 40}" y2="${y + 66}" stroke="#2b2b28" stroke-width="0.6"/>
+    <text x="${x + w / 2}" y="${y + 88}" class="adm-small" text-anchor="middle">Soundings in fathoms at low water</text>
+    <text x="${x + w / 2}" y="${y + 106}" class="adm-small" text-anchor="middle">Heights in feet above high water</text>
+    <text x="${x + w / 2}" y="${y + 130}" class="adm-small" text-anchor="middle">Mercator projection &#183; Var. 18&#176; W (1880)</text>
+    <text x="${x + w / 2}" y="${y + 152}" class="adm-small" text-anchor="middle">Corrected to day ${house.day}</text>
+  </g>`;
+}
+
+function drawAdmiralty(house, dest) {
+  const parts = [admiraltyDefs()];
+  parts.push(`<rect width="${VB_W}" height="${VB_H}" fill="url(#admPaper)"/>`);
+
+  // Graticule: fine, ruled, with ticked borders.
+  const g = [];
+  for (let lon = -50; lon <= 15; lon += 5) {
+    const a = project(LAT_TOP, lon), b = project(LAT_BOT, lon);
+    g.push(`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#8a9aa6" stroke-width="${lon % 10 ? 0.3 : 0.6}" opacity="0.7"/>`);
+    if (lon % 10 === 0) g.push(`<text x="${a.x}" y="20" class="adm-grat" text-anchor="middle">${Math.abs(lon)}&#176;${lon < 0 ? "W" : "E"}</text>`);
+  }
+  for (let lat = -20; lat <= 55; lat += 5) {
+    const a = project(lat, -52), b = project(lat, 16);
+    g.push(`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#8a9aa6" stroke-width="${lat % 10 ? 0.3 : 0.6}" opacity="0.7"/>`);
+    if (lat % 10 === 0) g.push(`<text x="26" y="${a.y + 3}" class="adm-grat" text-anchor="end">${Math.abs(lat)}&#176;${lat < 0 ? "S" : "N"}</text>`);
+  }
+  parts.push(`<g>${g.join("")}</g>`);
+
+  parts.push(admiraltySoundings());
+  parts.push(admiraltyContours());
+
+  // Land: pale buff, firm black coastline, drying sand along the shore.
+  const fills = [], strokes = [];
+  for (const [hole, area, flat] of COAST) {
+    const d = ringPath(flat);
+    fills.push(`<path d="${d}" fill="${hole ? "url(#admPaper)" : "#e9e0c4"}"/>`);
+    strokes.push(`<path d="${d}" fill="none" stroke="#23231f" stroke-width="${area >= MAJOR_AREA ? 1.2 : 0.8}"/>`);
+  }
+  parts.push(`<g>${fills.join("")}</g><g>${strokes.join("")}</g>`);
+
+  parts.push(admiraltyCables());
+  parts.push(admiraltyLights(house));
+  parts.push(compassRose(240, 214, 44));
+  parts.push(course(house, dest));
+  parts.push(ports(house, dest));
+  parts.push(admiraltyTitleBlock(house));
+  parts.push(`<rect x="10" y="10" width="${VB_W - 20}" height="${VB_H - 20}" fill="none" stroke="#23231f" stroke-width="2"/>`);
+  return parts.join("");
+}
+
+/* ========================= SERVICE NETWORK, 1985 =========================
+ * Not a chart. A liner operator does not plot courses; they publish a rotation
+ * and sell slots against it. So this is a schematic of the service, with the
+ * geography behind it faint enough to orient by and no more.
+ */
+
+function drawNetwork(house, dest) {
+  const parts = [];
+  parts.push(`<rect width="${VB_W}" height="${VB_H}" fill="#0d1b24"/>`);
+
+  // Geography, ghosted right back.
+  const land = COAST.map(([hole, area, flat]) =>
+    `<path d="${ringPath(flat)}" fill="${hole ? "#0d1b24" : "#16242e"}" stroke="#1e3340" stroke-width="0.8"/>`).join("");
+  parts.push(`<g class="net-land">${land}</g>`);
+
+  // The rotation: the loop this service actually runs, north to south and back.
+  const open = PORTS.filter((p) => house.portOpen(p.id));
+  const rot = [...open].sort((a, b) => b.lat - a.lat).map((p) => p.id);
+  const loop = [...rot, ...rot.slice(1, -1).reverse()];
+
+  const legs = [];
+  for (let i = 0; i < loop.length - 1; i++) {
+    const a = project(PORT[loop[i]].lat, PORT[loop[i]].lon);
+    const b = project(PORT[loop[i + 1]].lat, PORT[loop[i + 1]].lon);
+    legs.push(`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="net-leg"/>`);
+  }
+  parts.push(`<g class="net-legs">${legs.join("")}</g>`);
+
+  // The leg you are actually about to run, and its transit time.
+  if (dest && dest !== house.location) {
+    const a = project(PORT[house.location].lat, PORT[house.location].lon);
+    const b = project(PORT[dest].lat, PORT[dest].lon);
+    const leg = passage(house.location, dest, 18, "box");
+    parts.push(`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="net-active"/>`);
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    parts.push(`<g transform="translate(${mx.toFixed(1)},${my.toFixed(1)})">
+      <rect x="-52" y="-13" width="104" height="24" rx="12" class="net-chip"/>
+      <text y="4" class="net-chiptext" text-anchor="middle">${leg.days} days transit</text></g>`);
+  }
+
+  // Ports as terminal nodes with their berth windows.
+  const nodes = PORTS.map((p) => {
+    const q = project(p.lat, p.lon);
+    const isHere = p.id === house.location;
+    const isDest = p.id === dest;
+    const shut = !house.portOpen(p.id);
+    const cls = ["net-node", isHere ? "here" : "", isDest ? "dest" : "", shut ? "shut" : ""].filter(Boolean).join(" ");
+    return { p, q, isHere, isDest, shut, cls };
+  });
+
+  const entries = nodes.map((n) => ({ name: n.p.name, x: n.q.x, y: n.q.y }));
+  placeLabels(entries);
+
+  parts.push(nodes.map((n, i) => {
+    const l = entries[i].label;
+    return `<g class="port-g ${!n.shut && !n.isHere ? "clickable" : ""}" data-port="${n.p.id}">
+      <circle cx="${n.q.x.toFixed(1)}" cy="${n.q.y.toFixed(1)}" r="16" class="port-hit"/>
+      <rect x="${(n.q.x - 5).toFixed(1)}" y="${(n.q.y - 5).toFixed(1)}" width="10" height="10" rx="2" class="${n.cls}"/>
+      <text x="${l.tx.toFixed(1)}" y="${l.ty.toFixed(1)}" text-anchor="${l.anchor}" class="net-label ${n.shut ? "shut" : ""}">${esc(n.p.name)}</text>
+    </g>`;
+  }).join(""));
+
+  // The rotation panel: the thing a liner operator actually reads.
+  const rows = rot.slice(0, 9).map((id, i) => {
+    const p = PORT[id];
+    const here = id === house.location;
+    return `<g transform="translate(0,${i * 26})">
+      <rect x="0" y="0" width="252" height="22" class="net-row ${here ? "on" : ""}"/>
+      <text x="10" y="15" class="net-rowtext ${here ? "on" : ""}">${String(i + 1).padStart(2, "0")}</text>
+      <text x="34" y="15" class="net-rowtext ${here ? "on" : ""}">${esc(p.name)}</text>
+      <text x="242" y="15" class="net-rowtext dim" text-anchor="end">${p.country}</text>
+    </g>`;
+  }).join("");
+  parts.push(`<g transform="translate(36,${VB_H - 40 - rot.slice(0, 9).length * 26})">
+    <text x="0" y="-12" class="net-h">SERVICE ROTATION</text>
+    ${rows}
+  </g>`);
+
+  parts.push(`<g transform="translate(${VB_W - 250},44)">
+    <text x="0" y="0" class="net-h">ATLANTIC LOOP</text>
+    <text x="0" y="24" class="net-kv">Ports on service<tspan x="210" text-anchor="end" class="net-kvv">${rot.length}</tspan></text>
+    <text x="0" y="46" class="net-kv">Round voyage<tspan x="210" text-anchor="end" class="net-kvv">${loop.length - 1} legs</tspan></text>
+    <text x="0" y="68" class="net-kv">Slots<tspan x="210" text-anchor="end" class="net-kvv">${house.ship.hold.toLocaleString()} TEU</tspan></text>
+    <text x="0" y="90" class="net-kv">Service speed<tspan x="210" text-anchor="end" class="net-kvv">${house.ship.speedKn} kn</tspan></text>
+  </g>`);
+
+  return parts.join("");
+}
+
 /* ---------------------------------------------------------------- draw ---- */
 
 function drawChart(svg, house, dest) {
+  svg.setAttribute("viewBox", `0 0 ${VB_W} ${VB_H}`);
+  svg.dataset.era = house.eraId;
+  if (house.eraId === "steam") { svg.innerHTML = drawAdmiralty(house, dest); return; }
+  if (house.eraId === "box") { svg.innerHTML = drawNetwork(house, dest); return; }
+
   const parts = [
     defs(),
     paper(),
@@ -60395,7 +60810,7 @@ function renderDestPanel() {
       : `<p class="empty">The hold is empty. You would be sailing in ballast.</p>`}`;
 
   btn.disabled = false;
-  btn.textContent = `Set sail for ${p.name}`;
+  btn.textContent = `${STRINGS[h.eraId].sail} ${p.name}`;
 }
 
 /* --------------------------------------------------------- commissions --- */
@@ -60413,7 +60828,7 @@ function renderCommissions() {
       <div class="card-head"><b>${o.qty} &times; ${GOOD[o.goodId].name}</b><span class="card-pay">${money(o.reward)}</span></div>
       <div class="card-body">To <b>${PORT[o.to].name}</b> by day ${o.dueDay} &middot; ${leg.days} days' sail
         <br/>Worth about ${money(h.market.spot(o.to, o.goodId) * o.qty)} on that market. Forfeit ${money(o.penalty)}.</div>
-      <button class="btn btn-sm" data-accept="${o.id}">Sign</button>`;
+      <button class="btn btn-sm" data-accept="${o.id}">${STRINGS[h.eraId].sign}</button>`;
     offers.appendChild(el);
   }
   offers.querySelectorAll("[data-accept]").forEach((b) =>
@@ -60574,6 +60989,7 @@ function startVoyage() {
   const dayFraction = 0.30 + ((h.day * 0.37) % 1) * 0.42;
 
   $("hud-dest").textContent = dest.name;
+  applyStrings(h.eraId);
   $("hud-wind").textContent = `${cardinal(windDeg)} ${windKn} kn`;
   $("dock-prompt").classList.remove("show");
   $("arrival").classList.remove("show");
@@ -60612,6 +61028,76 @@ function flashHelm(msg) {
 
 // The helm instruments are named for the age. A steamer has no point of sail
 // and a container ship has no canvas.
+/* Every age calls the same thing by a different name, and the names are how you
+ * know which century you are in before you have read a single number. */
+const STRINGS = {
+  sail: {
+    tabExchange: "Exchange", tabChart: "Chart", tabCommissions: "Commissions",
+    tabYard: "Shipyard", tabCounting: "Counting house",
+    exchangeTitle: "The Exchange", opsTitle: "Worth a look",
+    opsSub: "Best runs from here, after wages.",
+    chartTitle: "The chart table",
+    chartSub: "Pick your landfall. Distances are great-circle; the trades favour the southbound run.",
+    offersTitle: "On offer",
+    offersSub: "Carry a named cargo to a named port by a named day. Miss it and you forfeit.",
+    signedTitle: "Signed", signedSub: "Delivered by selling at the destination.",
+    yardTitle: "The yard", yardSub: "Hulls for sale, and refits for the one you have.",
+    fleetTitle: "Your fleet", fleetSub: "One hull sails at a time.",
+    countingTitle: "The counting house",
+    countingSub: "Credit runs at daily interest. It compounds whether you sail or not.",
+    logTitle: "Ship\u2019s log", netLabel: "Net worth", holdLabel: "Hold",
+    boundFor: "Bound for", resetBtn: "Abandon the house and start again",
+    eyebrow: "Lisbon \u00b7 Anno 1620", sign: "Sign", sail: "Set sail for",
+  },
+  steam: {
+    tabExchange: "The Baltic", tabChart: "Chart", tabCommissions: "Fixtures",
+    tabYard: "The yard", tabCounting: "The office",
+    exchangeTitle: "The Baltic Exchange", opsTitle: "Open cargoes",
+    opsSub: "Best-paying runs from here, after wages and bunkers.",
+    chartTitle: "The chart room",
+    chartSub: "Lay off your course. Steam holds her speed where canvas could not.",
+    offersTitle: "Fixtures on offer",
+    offersSub: "A charterer wants a stated tonnage at a stated port by a stated date. Miss the laycan and you pay.",
+    signedTitle: "Fixed", signedSub: "Discharged by selling at the destination.",
+    yardTitle: "The shipyard", yardSub: "Hulls on the stocks, and refits for the one you run.",
+    fleetTitle: "Your fleet", fleetSub: "One hull carries your flag at a time.",
+    countingTitle: "The office",
+    countingSub: "The mortgage runs at daily interest whether the ship earns or not.",
+    logTitle: "Deck log", netLabel: "Capital", holdLabel: "Deadweight",
+    boundFor: "Bound for", resetBtn: "Wind up the company and start again",
+    eyebrow: "Liverpool \u00b7 1880", sign: "Fix", sail: "Sail for",
+  },
+  box: {
+    tabExchange: "Rate board", tabChart: "Network", tabCommissions: "Bookings",
+    tabYard: "Fleet", tabCounting: "Head office",
+    exchangeTitle: "The rate board", opsTitle: "Where the money is",
+    opsSub: "Best contribution per slot from here, after crew and bunkers.",
+    chartTitle: "The service network",
+    chartSub: "Your rotation. The schedule is the product; the map is just where it happens.",
+    offersTitle: "Bookings on offer",
+    offersSub: "A shipper wants boxes lifted to a named port by a named day. Roll the cargo and you pay the penalty.",
+    signedTitle: "Booked", signedSub: "Closed out by discharging at the destination.",
+    yardTitle: "Tonnage", yardSub: "Hulls on the market, and upgrades for the one you operate.",
+    fleetTitle: "Your fleet", fleetSub: "One ship on service at a time.",
+    countingTitle: "Head office",
+    countingSub: "The facility accrues daily. Utilisation is the only thing that clears it.",
+    logTitle: "Voyage log", netLabel: "Net assets", holdLabel: "Slots",
+    boundFor: "Next port", resetBtn: "Wind up the line and start again",
+    eyebrow: "Rotterdam \u00b7 1985", sign: "Book", sail: "Sail for",
+  },
+};
+
+function applyStrings(eraId) {
+  const t = STRINGS[eraId] || STRINGS.sail;
+  document.querySelectorAll("[data-s]").forEach((el) => {
+    const v = t[el.dataset.s];
+    if (v !== undefined) el.textContent = v;
+  });
+  const eb = $("title-eyebrow");
+  if (eb) eb.textContent = t.eyebrow;
+  return t;
+}
+
 const HELM_LABELS = {
   sail:  { pos: "Point of sail", trim: "Canvas", key: "canvas", dock: "SPACE make fast" },
   steam: { pos: "Engine", trim: "Revolutions", key: "telegraph", dock: "SPACE ring off" },
@@ -60726,6 +61212,7 @@ function newGame() {
   clearSave();
   state.house = new House(Math.floor(Math.random() * 1e9), state.era);
   state.dest = null;
+  applyStrings(state.era);
   showTab("exchange");
   renderPort();
   show("port-screen");
@@ -60740,6 +61227,7 @@ function init() {
     $("continue-btn").addEventListener("click", () => {
       state.house = saved;
       state.era = saved.eraId;
+      applyStrings(state.era);
       showTab("exchange");
       renderPort();
       show("port-screen");
