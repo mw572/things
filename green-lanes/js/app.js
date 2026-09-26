@@ -110,7 +110,8 @@ function cells(bb){
 function putWay(id, tags, coords){
   let a = 90, b = 180, c = -90, d = -180;
   for (const [la, lo] of coords) { if (la < a) a = la; if (lo < b) b = lo; if (la > c) c = la; if (lo > d) d = lo; }
-  const w = { id, tags, coords, cls: classify(tags), bbox: [a, b, c, d], len: lineLen(coords) };
+  const council = window.COUNCIL_FLAGS?.ways?.[id] || null;   // the council's own record says it isn't a byway
+  const w = { id, tags, coords, cls: council ? "closed" : classify(tags), council, bbox: [a, b, c, d], len: lineLen(coords) };
   osmWays.set(id, w);
   for (const k of cells(w.bbox)) { if (!grid.has(k)) grid.set(k, new Set()); grid.get(k).add(id); }
 }
@@ -173,7 +174,7 @@ function lanePopup(w){
   const surface = [t.surface, t.tracktype && t.tracktype.replace("grade", "grade ")].filter(Boolean).join(", ");
   div.innerHTML = `<h3>${esc(laneName(t))}</h3>
     <div><span class="chip" style="background:${css(c.color)}">${esc(DESIG[t.designation] || "Byway")}</span> ${km(w.len)} km${surface ? " · " + esc(surface) : ""}</div>
-    <p style="margin-top:6px">${esc(c.say)}</p>`;
+    <p style="margin-top:6px">${esc(w.council ? `OpenStreetMap calls this a byway, but ${w.council.council} Council's rights-of-way record calls it a ${w.council.calls} (${w.council.ref.split("|").slice(1).join(" ")}). Treated as not open to motor vehicles.` : c.say)}</p>`;
   const away = view === "route" && !inRoute(w.id) ? distFromRoute(w) : null;
   if (away != null) div.insertAdjacentHTML("beforeend", `<p class="small muted">${away < 150 ? "Right next to your route." : `About ${km(away)} km from your route.`}</p>`);
   if (c.ride && view !== "tour") {
@@ -928,8 +929,10 @@ function drawRoute(){
   }
   trip.items.forEach((it, i) => { if (it.via) dragMarker(it.coords[0], "via", (w, p) => { w ? insertAt(i, itemFromWay(w), true) : (it.coords = [p], built = null, saveTrip(), drawRoute(), build()); }).addTo(routeLayer); });
 }
-function routeWarnings(b){
+function routeWarnings(b, t = trip){
   const warn = [];
+  const flagged = t.items.filter(it => it.ids?.some(id => window.COUNCIL_FLAGS?.ways?.[id]));
+  if (flagged.length) warn.push(`${flagged.length} lane${flagged.length > 1 ? "s" : ""} in this route (${flagged.map(it => it.name).join(", ")}) ${flagged.length > 1 ? "are" : "is"} recorded by the council as not open to motor vehicles. Take ${flagged.length > 1 ? "them" : "it"} out.`);
   if (b?.jumps) warn.push(`${b.jumps} lane end${b.jumps > 1 ? "s are" : " is"} more than 100 m from a road or another lane, so the GPX has a straight line there. Look at it on the map.`);
   if (b?.failed) warn.push(`${b.failed} road link${b.failed > 1 ? "s" : ""} couldn't be routed and ${b.failed > 1 ? "are" : "is"} a straight line.`);
   return warn;
@@ -1303,7 +1306,7 @@ function renderTour(){
   tour.days.forEach((d, i) => {
     const b = d.built, card = document.createElement("div");
     card.className = "day"; card.setAttribute("aria-pressed", tourPick === i); card.tabIndex = 0; card.setAttribute("role", "button");
-    const warn = routeWarnings(b);
+    const warn = routeWarnings(b, d.trip);
     card.innerHTML = `<div class="top"><h3>${esc(d.trip.name || dayName(i))}</h3></div>
       <div class="stats"><span><b>${b ? hm(b.hours) : "–"}</b> riding</span><span><b>${b ? km(b.total) : "–"}</b> km</span><span><b>${b && b.total ? Math.round(100 * b.off / b.total) : 0}%</b> lanes</span><span><b>${d.trip.items.length}</b> lanes</span>${b?.fuelGap ? `<span>fuel gap <b>${km(b.fuelGap)}</b> km</span>` : ""}</div>
       ${b && b.hours > tour.dayHours * 1.3 ? `<div class="small" style="color:#b45309">Longer than your ${tour.dayHours} h a day.</div>` : ""}

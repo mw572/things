@@ -78,7 +78,21 @@ code{font-size:14px;background:var(--card);border:1px solid var(--rule);border-r
   </ul>
 
   <h2 id="council-check">Checked against council data</h2>
-  <p id="councilPending">A comparison with councils' own rights-of-way records (published on rowmaps.com under the Open Government Licence) for four counties is being added here.</p>
+  <p>Councils publish their rights-of-way records, and rowmaps.com republishes them under the Open Government Licence. On 26 September 2026 I compared the planner's OpenStreetMap byways with the records for four lane-rich areas. Byways are rights of way, so they appear in both. Unclassified roads aren't, so this check says nothing about them.</p>
+  <div class="wrap"><table>
+    <tr><th>Council (record dated)</th><th class="n">Council byways, km</th><th class="n">Found in the planner as byways</th><th class="n">Found, but as another kind</th><th class="n">Missing</th><th class="n">Planner byways the council says aren't open to motors</th></tr>
+    <tr><td>Wiltshire (Jul 2026)</td><td class="n">719</td><td class="n">84%</td><td class="n">4%</td><td class="n">12%</td><td class="n">9 lanes, 3.3 km</td></tr>
+    <tr><td>Derbyshire (Apr 2026)</td><td class="n">60</td><td class="n">66%</td><td class="n">16%</td><td class="n">18%</td><td class="n">7 lanes, 1.2 km</td></tr>
+    <tr><td>Powys (Apr 2026)</td><td class="n">215</td><td class="n">76%</td><td class="n">4%</td><td class="n">19%</td><td class="n">5 lanes, 5.8 km</td></tr>
+    <tr><td>Gloucestershire (Jan 2025)</td><td class="n">5</td><td class="n">97%</td><td class="n">1%</td><td class="n">2%</td><td class="n">1 lane, 0.1 km</td></tr>
+  </table></div>
+  <p>A lane counts as found when the planner's data runs within 25 m of the council's line.</p>
+  <ul>
+    <li><b>The planner misses 12 to 19% of real byways</b> in Wiltshire, Derbyshire and Powys. A further 3 to 12% is there but marked closed or restricted in OpenStreetMap. Some of those will be real closures and some will be mistakes.</li>
+    <li><b>22 lanes are tagged as byways in OpenStreetMap, but the council records them as restricted byway, bridleway or footpath,</b> which are not open to motor vehicles. The longest are Whitelawn Lane in Wiltshire (1.2 km) and two in Powys near Talgarth and Churchstoke (2.2 km and 1.9 km). The planner now treats these 22 as not open to motors, and its popup says what the council calls each one. Six more lanes matched a council footpath or bridleway, but their own OpenStreetMap reference pointed to a real byway nearby, so I left them alone.</li>
+    <li><b>Gloucestershire's council record has only 5 km of byways.</b> OpenStreetMap has 18 km tagged as byways there, and 13 km of that matches no council right of way at all. Some of it may be unclassified roads tagged as byways, which could still be legal, but the council record doesn't back them up as byways. Gloucestershire's record is also the oldest of the four, from January 2025.</li>
+  </ul>
+  <p class="muted">Limits: rowmaps' copy is an interpretation of each council's Definitive Map, not the map itself, and the council's record can be out of date too. The county edge is approximated from the council's own data, and a 25 m tolerance can confuse two paths running side by side. The full method and every mismatch are in the repo's <code>checks/rowmaps-comparison.md</code>. Covering every council in England and Wales would take about 150 more downloads and the same script.</p>
 
   <h2>How the planning works</h2>
   <h3>Picking lanes</h3>
