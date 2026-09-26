@@ -74,8 +74,11 @@ const bases = {
 };
 let baseName = store.get("base", "Map"); if (!bases[baseName]) baseName = "Map";
 bases[baseName].addTo(map);
+let restyleLanes = null;   // set once the lanes exist
 function setBase(name){
   map.removeLayer(bases[baseName]); baseName = name; bases[name].addTo(map); bases[name].bringToBack(); store.set("base", name);
+  // on the aerial photo the lanes are drawn brighter and the photo is toned down, or green lanes vanish into green fields
+  document.body.classList.toggle("sat", name === "Satellite"); restyleLanes?.();
   document.querySelectorAll("#baseSeg button").forEach(b => b.setAttribute("aria-selected", b.dataset.base === name));
 }
 document.querySelectorAll("#baseSeg button").forEach(b => b.onclick = () => setBase(b.dataset.base));
@@ -179,9 +182,11 @@ $("#dataNote").textContent = `Lanes: ${osmPieces.toLocaleString()} pieces from O
 const laneLayer = L.layerGroup().addTo(map);
 const shown = new Set();
 let fadeLanes = false;
+const SAT_COLOR = { "--boat": "#52ff85", "--ucr": "#ffc629", "--closed": "#ff6a5c" };
 function laneStyle(w){
-  const c = CLASSES[w.cls], z = map.getZoom();
-  return { color: css(c.color), weight: c.weight + (z >= 13 ? 1 : 0), dashArray: w.tags.source === "council" ? "10 4" : c.dash, opacity: fadeLanes ? .22 : .5 };
+  const c = CLASSES[w.cls], z = map.getZoom(), sat = baseName === "Satellite";
+  return { color: sat ? SAT_COLOR[c.color] : css(c.color), weight: c.weight + (z >= 13 ? 1 : 0) + (sat ? 1.5 : 0), dashArray: w.tags.source === "council" ? "10 4" : c.dash,
+    opacity: fadeLanes ? (sat ? .45 : .22) : (sat ? .95 : .5) };
 }
 function layerOf(w){
   if (!w.layer) w.layer = L.polyline(w.coords, laneStyle(w)).bindPopup(() => lanePopup(w), { maxWidth: 300 })
@@ -222,6 +227,7 @@ function drawLanes(){
   if (band !== lastZoomBand) { lastZoomBand = band; for (const id of shown) osmWays.get(id).layer.setStyle(laneStyle(osmWays.get(id))); }
 }
 function setFade(on){ if (fadeLanes === on) return; fadeLanes = on; for (const id of shown) osmWays.get(id).layer.setStyle(laneStyle(osmWays.get(id))); }
+restyleLanes = () => { for (const id of shown) osmWays.get(id).layer.setStyle(laneStyle(osmWays.get(id))); };
 const inRoute = id => trip.items.some(it => it.ids.some(i => i === id || laneOf.get(i) === id));
 // Street View links from each end of a lane, facing up it, labelled by compass side so "north end" means something.
 function endViews(c){
@@ -379,39 +385,45 @@ const pinIcon = (code, small) => L.divIcon({ className: "", html: `<div class="p
 const stopLayer = L.layerGroup().addTo(map), routeStopLayer = L.layerGroup().addTo(map);
 let routeStopIdx = new Set();
 const groupBadge = g => `<span class="poi" style="background:${g.color};--pc:${g.color}"><svg viewBox="0 0 16 16" aria-hidden="true">${ICON[g.icon]}</svg></span>`;
-// Draw stops grouped: one marker per patch of screen, showing up to three kinds and how many places are in it.
-// Zooming in splits the patches (big when zoomed out, smaller closer in) and from zoom 16 every place shows
-// where it really is. Tapping a group zooms in on it.
-function drawGrouped(layer, idxs, pickRep){
-  const z = map.getZoom(), px = z >= 16 ? 0 : z >= 14 ? 58 : z >= 13 ? 70 : 88, groups = new Map();
+// Stops are only worth showing where someone riding lanes would use them. At most one of each kind per patch of
+// screen (smaller patches as you zoom in, every place from zoom 16), each at a real place you can tap. No counts:
+// "38 cafés here" doesn't help anyone choose one.
+function drawPicked(layer, idxs, rank){
+  const z = map.getZoom(), px = z >= 16 ? 0 : z >= 15 ? 56 : z >= 14 ? 80 : 110, best = new Map();
   for (const i of idxs) {
     const s = stops[i], pt = map.latLngToLayerPoint([s.lat, s.lng]);
-    const key = px ? Math.floor(pt.x / px) + ":" + Math.floor(pt.y / px) : "i" + i;
-    if (!groups.has(key)) groups.set(key, []); groups.get(key).push(i);
+    const key = px ? CODE[s.code].g + ":" + Math.floor(pt.x / px) + ":" + Math.floor(pt.y / px) : "i" + i;
+    const sc = rank(i), cur = best.get(key); if (!cur || sc < cur.sc) best.set(key, { i, sc });
   }
-  const order = Object.keys(GROUPS);
-  for (const m of groups.values()) {
-    const rep = pickRep ? pickRep(m) : m[Math.floor(m.length / 2)], s = stops[rep];
-    if (m.length === 1) { L.marker([s.lat, s.lng], { icon: pinIcon(s.code, z < 13), keyboard: false }).bindPopup(() => stopPopup(s)).addTo(layer); continue; }
-    const tally = {}; for (const i of m) { const g = CODE[stops[i].code].g; tally[g] = (tally[g] || 0) + 1; }
-    const kinds = Object.keys(tally).sort((a, b) => tally[b] - tally[a] || order.indexOf(a) - order.indexOf(b));
-    const lat = m.reduce((t, i) => t + stops[i].lat, 0) / m.length, lng = m.reduce((t, i) => t + stops[i].lng, 0) / m.length;
-    const words = kinds.map(k => GROUPS[k].label.toLowerCase()).join(", ");
-    L.marker(pickRep ? [s.lat, s.lng] : [lat, lng], { keyboard: false, title: `${m.length} places: ${words}. Tap to zoom in.`,
-      icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<div class="poi-pin cl">${groupBadge(GROUPS[kinds[0]])}<b class="count">${m.length > 99 ? "99+" : m.length}</b>${kinds.length > 1 ? `<span class="dots">${kinds.slice(1, 5).map(k => `<i style="background:${GROUPS[k].color}"></i>`).join("")}</span>` : ""}</div>` }) })
-      .on("click", () => { const b = L.latLngBounds(m.map(i => [stops[i].lat, stops[i].lng])); b.getNorthEast().distanceTo(b.getSouthWest()) > 30 ? map.fitBounds(b.pad(0.3), { maxZoom: Math.min(18, z + 3) }) : map.setView([lat, lng], Math.min(18, z + 3)); })
-      .addTo(layer);
+  for (const { i } of best.values()) {
+    const s = stops[i];
+    L.marker([s.lat, s.lng], { icon: pinIcon(s.code, z < 13), keyboard: false, title: stopName(s) }).bindPopup(() => stopPopup(s)).addTo(layer);
   }
+}
+// Squares of about 1 km that have a ridable lane in them or next to them (two squares out for fuel), built once.
+let laneNearCells = null, laneNearFuel = null;
+const NCELL = 0.01, nkey = (la, lo) => Math.floor(la / NCELL) + "," + Math.floor(lo / NCELL);
+function nearLane(s){
+  if (!laneNearCells) {
+    const base = new Set(); laneNearCells = new Set(); laneNearFuel = new Set();
+    for (const w of osmWays.values()) if (CLASSES[w.cls].ride) for (const c of w.coords) base.add(nkey(c[0], c[1]));
+    for (const k of base) { const [i, j] = k.split(",").map(Number);
+      for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) { const kk = (i + a) + "," + (j + b); laneNearFuel.add(kk); if (Math.abs(a) <= 1 && Math.abs(b) <= 1) laneNearCells.add(kk); } }
+  }
+  return (s.code === "fuel" ? laneNearFuel : laneNearCells).has(nkey(s.lat, s.lng));
 }
 function drawStops(){
   stopLayer.clearLayers();
-  if (!Object.values(GROUPS).some(g => g.on) || map.getZoom() < 13) return;   // everywhere: town level only; along your route they show from zoom 10
+  // browsing: near lanes, from town level. With a route or tour, its own stops do the work and the rest only
+  // show close in (zoom 15), so you can drag the route onto one.
+  const minZ = view === "route" || view === "tour" ? 15 : 13;
+  if (!Object.values(GROUPS).some(g => g.on) || map.getZoom() < minZ) return;
   if (!stops) { loadStops().then(s => s && drawStops()); return; }
   const b = map.getBounds().pad(0.05), idxs = [];
   for (let i = Math.floor(b.getSouth()/SCELL); i <= Math.floor(b.getNorth()/SCELL); i++)
     for (let j = Math.floor(b.getWest()/SCELL); j <= Math.floor(b.getEast()/SCELL); j++)
-      for (const k of stopGrid.get(i + "," + j) || []) { const s = stops[k]; if (!routeStopIdx.has(k) && groupOn(s.code) && b.contains([s.lat, s.lng])) idxs.push(k); }
-  drawGrouped(stopLayer, idxs);
+      for (const k of stopGrid.get(i + "," + j) || []) { const s = stops[k]; if (!routeStopIdx.has(k) && groupOn(s.code) && b.contains([s.lat, s.lng]) && nearLane(s)) idxs.push(k); }
+  drawPicked(stopLayer, idxs, k => stops[k].name ? 0 : 1);
 }
 // The Show menu: one compact button showing the symbols that are on; it opens a tick-list.
 function renderPoiMenu(){
@@ -425,11 +437,11 @@ function renderPoiMenu(){
       g.on = e.target.checked; store.set("poiOn", Object.fromEntries(Object.entries(GROUPS).map(([a, x]) => [a, x.on])));
       renderPoiMenu(); $("#poiMenu").hidden = false; drawStops(); drawRouteStops(); renderStops();
       if (g.on && !stops) loadStops().then(() => { drawStops(); if (built) findRouteStops(); });
-      else if (g.on && map.getZoom() < 13 && !routeStopIdx.size) status("Zoom in to town level to see them on the map", 3500);
+      else if (g.on && map.getZoom() < 13 && !routeStopIdx.size) status("Zoom in near some lanes to see them", 3500);
     };
     menu.append(lab);
   }
-  menu.insertAdjacentHTML("beforeend", `<p class="small muted">Shown when you zoom in, and along your route. The ones ticked also go into the GPX.</p>`);
+  menu.insertAdjacentHTML("beforeend", `<p class="small muted">Shown near lanes when you zoom in, and along your route. The ones ticked also go into the GPX.</p>`);
 }
 $("#poiBtn").onclick = e => { e.stopPropagation(); const m = $("#poiMenu"); m.hidden = !m.hidden; $("#poiBtn").setAttribute("aria-expanded", !m.hidden); };
 document.addEventListener("click", e => { if (!e.target.closest("#poiWrap")) { $("#poiMenu").hidden = true; $("#poiBtn").setAttribute("aria-expanded", "false"); } });
@@ -1211,7 +1223,7 @@ function drawRouteStops(){
   const lists = view === "route" ? [routeStops] : view === "tour" && tour ? tour.days.filter((d, i) => tourPick < 0 || i === tourPick).map(d => d.stops || []) : [];
   const off = new Map(), idxs = [];
   for (const list of lists) for (const r of list) { if (!groupOn(stops[r.i].code)) continue; routeStopIdx.add(r.i); off.set(r.i, r.off); idxs.push(r.i); }
-  drawGrouped(routeStopLayer, idxs, m => m.reduce((a, b) => (off.get(a) <= off.get(b) ? a : b)));
+  drawPicked(routeStopLayer, idxs, i => off.get(i));
 }
 function renderStops(){
   if (!built || !stops) { $("#stopList").innerHTML = `<li class="muted">${built ? "Loading stops…" : "Stops appear once the route is ready."}</li>`; $("#fuelNote").textContent = ""; $("#stopChips").innerHTML = ""; return; }
