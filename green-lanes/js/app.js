@@ -692,7 +692,7 @@ async function fitPlan(sk, widthM, wr0, targetH, alive, passes = 3){
 
 /* ---------- route ideas: one screen with the controls and the ideas, re-planned as you change things ---------- */
 const ideaLayer = L.layerGroup().addTo(map);
-const IDEA_COLORS = ["#c2185b", "#1d4ed8", "#1f1d18"];
+const IDEA_COLORS = ["#c2185b", "#1d4ed8", "#7e22ce"];   // pink, blue, purple: clear of the lane greens, amber and red
 let ideas = [], picked = -1, ideaRun = 0, replanTimer;
 function replanSoon(){ if (view !== "ideas" || !lastKind) return; clearTimeout(replanTimer); replanTimer = setTimeout(() => { if (lastKind === "loop" ? loopStart : strokes.length) runIdeas(); }, 600); }
 function placeSettings(where){
@@ -754,12 +754,16 @@ async function runIdeas(){
 }
 function fitTo(idea){ map.fitBounds(L.latLngBounds(idea.sketch.concat(idea.chain.flatMap(n => [n.a, n.b]))).pad(0.08), { paddingBottomRight: phone() ? [0, innerHeight * 0.5] : [0, 0] }); }
 function drawChain(layer, it, on, color){
-  const R = routeRenderer, road = { color, weight: on ? 3 : 2, opacity: on ? .9 : .3, dashArray: "6 6", interactive: false, renderer: R };
-  if (it.roadGeom) for (const g of it.roadGeom) { if (g.length > 1) L.polyline(g, road).addTo(layer); }
-  else { let p = it.sketch[0]; for (const n of it.chain) { L.polyline([p, n.a], road).addTo(layer); p = n.b; } }
+  // the chosen idea is drawn bold with a dark outline; the others drop right back so it's obvious which one you're looking at
+  const R = routeRenderer, line = (c, o) => L.polyline(c, { interactive: false, renderer: R, ...o }).addTo(layer);
+  const roads = it.roadGeom ? it.roadGeom.filter(g => g.length > 1) : (() => { const out = []; let p = it.sketch[0]; for (const n of it.chain) { out.push([p, n.a]); p = n.b; } return out; })();
+  for (const g of roads) {
+    if (on) line(g, { color: "#fff", weight: 8, opacity: .9 });
+    line(g, { color, weight: on ? 4 : 2.5, opacity: on ? 1 : .4, dashArray: on ? "9 6" : "5 7" });
+  }
   for (const n of it.chain) {
-    if (on) L.polyline(n.coords, { color: "#fff", weight: 11, opacity: 1, interactive: false, renderer: R }).addTo(layer);
-    L.polyline(n.coords, { color, weight: on ? 6 : 4, opacity: on ? 1 : .35, interactive: false, renderer: R }).addTo(layer);
+    if (on) { line(n.coords, { color: "#1f1d18", weight: 13, opacity: .9 }); line(n.coords, { color: "#fff", weight: 10, opacity: 1 }); }
+    line(n.coords, { color, weight: on ? 7 : 4, opacity: on ? 1 : .5 });
   }
 }
 function renderIdeas(msg){
@@ -767,12 +771,19 @@ function renderIdeas(msg){
   $("#ideasNote").textContent = msg || (ideas.length ? `Change anything above and the ideas update. Times assume ${LANE_KMH} km/h on lanes and about ${Math.round(roadKmh())} km/h on roads.` : "");
   const order = ideas.map((_, i) => i).filter(i => i !== picked); if (picked >= 0) order.push(picked);
   for (const i of order) drawChain(ideaLayer, ideas[i], i === picked, ideas[i].color);
+  // a numbered badge in each idea's colour, matching its card; tap one to pick it
+  for (const i of order) {
+    const it = ideas[i], n = it.chain[Math.floor(it.chain.length / 2)]; if (!n) continue;
+    const at = n.coords[Math.floor(n.coords.length / 2)];
+    L.marker(at, { zIndexOffset: i === picked ? 1000 : 0, title: it.name, icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<span class="ibadge${i === picked ? " on" : ""}" style="--c:${it.color}">${i + 1}</span>` }) })
+      .on("click", () => { picked = i; renderIdeas(msg); }).addTo(ideaLayer);
+  }
   const box = $("#ideaList"); box.innerHTML = "";
   ideas.forEach((it, i) => {
     const roadM = it.roadM * twistF(), tot = it.laneM + roadM, boats = it.chain.filter(n => n.w.cls === "boat").length;
     const card = document.createElement("div"); card.className = "card"; card.style.setProperty("--c", it.color);
     card.setAttribute("role", "button"); card.tabIndex = 0; card.setAttribute("aria-pressed", i === picked);
-    card.innerHTML = `<div class="top"><h3>${esc(it.name)}</h3></div>
+    card.innerHTML = `<div class="top"><h3><span class="inum">${i + 1}</span>${esc(it.name)}${i === picked ? `<span class="onmap">On the map</span>` : ""}</h3></div>
       <div class="stats"><span><b>${hm(hoursOf(it.laneM, roadM))}</b> riding</span><span><b>${km(tot)}</b> km</span><span><b>${Math.round(100 * it.laneM / tot)}%</b> lanes (${km(it.laneM)} km)</span><span><b>${it.chain.length}</b> lanes${boats === it.chain.length ? ", all byways" : boats ? `, ${boats} byways` : ""}</span></div>`;
     const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Ride this";
     go.onclick = ev => { ev.stopPropagation(); useIdea(i); };
