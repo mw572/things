@@ -205,6 +205,7 @@ function lanePopup(w){
 map.createPane("zones"); Object.assign(map.getPane("zones").style, { zIndex: 350, pointerEvents: "none", filter: "blur(7px)" });
 const zoneRenderer = L.canvas({ pane: "zones", padding: 0.3 });
 const zoneLayer = L.layerGroup(), zoneSum = new Map();
+const regionPinLayer = L.layerGroup(), regionRideLayer = L.layerGroup().addTo(map);
 (function buildZones(){
   for (const w of osmWays.values()) {
     if (!CLASSES[w.cls].ride) continue;
@@ -220,7 +221,8 @@ const zoneLayer = L.layerGroup(), zoneSum = new Map();
 function drawZones(){
   const on = $("#tZones").checked && map.getZoom() <= 8 && view === "plan";
   on ? zoneLayer.addTo(map) : map.removeLayer(zoneLayer);
-  $("#zoomHint").hidden = !(on && !drawing && !picking);
+  (view === "plan" && map.getZoom() <= 8) ? regionPinLayer.addTo(map) : map.removeLayer(regionPinLayer);
+  $("#zoomHint").hidden = !(on && !drawing && !picking && !(phone() && sheet.dataset.state === "open"));
 }
 // Tapping a green patch when zoomed out takes you in to see its lanes.
 map.on("click", e => {
@@ -422,20 +424,46 @@ for (const id of ["twisty", "twisty2"]) $("#" + id).onchange = e => { settings.t
 /* ---------- views and the phone sheet ---------- */
 let view = "plan";
 const sheet = $("#sheet");
-const PEEK = { plan: 176, ideas: 176, route: 206, tour: 206 };
-function setSheet(state){ sheet.dataset.state = state; $("#handleText").textContent = state === "peek" ? "▲ Pull up for more" : "▼ Show more map"; }
-$("#sheetHandle").onclick = () => setSheet(sheet.dataset.state === "peek" ? "open" : "peek");
+const PEEK = { plan: 300, region: 250, ideas: 176, route: 206, tour: 206 };
+// On a phone the panel has three positions: a collapsed bar, a preview, and full height.
+// The preview is the short peek on Explore and the area page, and half height on the working screens.
+const previewState = () => ["plan", "region"].includes(view) ? "peek" : "mid";
+const SHEET_ORDER = () => ["min", previewState(), "open"];
+function setSheet(state){
+  if (state === "peek" || state === "mid") state = previewState();
+  sheet.dataset.state = state;
+  const h = { min: "76px", peek: (PEEK[view] || 176) + "px", mid: "50vh", open: "82vh" }[state];
+  document.documentElement.style.setProperty("--sheet-h", h);
+  // map credits and the zoom hint tuck behind the panel when it's fully open, instead of floating near the top
+  document.documentElement.style.setProperty("--sheet-ctl", state === "open" ? "0px" : h);
+  if (typeof drawZones === "function" && view) drawZones();
+  $("#handleText").textContent = state === "open" ? "▼ Show the map" : "▲ Pull up for more";
+  $("#sheetHandle").setAttribute("aria-label", state === "open" ? "Show the map" : "Show more");
+}
+function stepSheet(dir){ const o = SHEET_ORDER(), i = Math.max(0, o.indexOf(sheet.dataset.state)); setSheet(o[Math.min(o.length - 1, Math.max(0, i + dir))]); }
+// Swipe the handle up or down to move between positions; a tap moves up one, or back to the preview from full.
+let handleY = null;
+$("#sheetHandle").addEventListener("pointerdown", e => { handleY = e.clientY; $("#sheetHandle").setPointerCapture?.(e.pointerId); });
+$("#sheetHandle").addEventListener("pointerup", e => {
+  if (handleY == null) return; const dy = e.clientY - handleY; handleY = null;
+  if (dy < -25) stepSheet(1); else if (dy > 25) stepSheet(-1);
+  else sheet.dataset.state === "open" ? setSheet(previewState()) : stepSheet(1);
+});
+// Moving the map on a phone tucks the panel away so the map gets the screen.
+map.on("dragstart", () => { if (phone() && !drawing && !picking && sheet.dataset.state !== "min") setSheet("min"); });
 function showView(v, sheetState){
   view = v;
-  for (const [id, name] of [["vPlan", "plan"], ["vIdeas", "ideas"], ["vRoute", "route"], ["vTour", "tour"]]) $("#" + id).hidden = v !== name;
+  for (const [id, name] of [["vPlan", "plan"], ["vRegion", "region"], ["vIdeas", "ideas"], ["vRoute", "route"], ["vTour", "tour"]]) $("#" + id).hidden = v !== name;
+  if (v !== "region") regionRideLayer.clearLayers();
+  $("#newConfirm").hidden = true;
   document.documentElement.style.setProperty("--sheet-peek", PEEK[v] + "px");
   setFade(v === "ideas" || v === "tour");
   if (v !== "ideas") { ideaLayer.clearLayers(); sketchLayer.clearLayers(); }
   if (v !== "tour") tourLayer.clearLayers();
   if (v === "route") { drawRoute(); } else routeLayer.clearLayers();
-  if (sheetState) setSheet(sheetState);
+  setSheet(sheetState || sheet.dataset.state || previewState());
   $("#sheetBody").scrollTop = 0;
-  if (v === "plan") renderSaved();
+  if (v === "plan") { renderSaved(); renderExplore(); }
   drawRouteStops(); drawStops(); drawZones();
 }
 
@@ -613,7 +641,7 @@ function setIdeasUi(){
   const loop = lastKind === "loop";
   $("#ideasTitle").textContent = loop ? "Loop from a place" : "Draw a route";
   $("#loopCtl").hidden = !loop; $("#drawCtl").hidden = loop;
-  $("#startText").textContent = loopStart ? "Start set. Tap Change start to move it." : "Start: tap the map";
+  $("#startText").textContent = loopStart ? "✓ Start set" : "Tap the map to set your start";
   const shape = drawnShape();
   document.querySelectorAll("#shapeSeg button").forEach(b => b.setAttribute("aria-selected", b.dataset.shape === shape));
   $("#undoStroke").disabled = !strokes.length; $("#clearStrokes").disabled = !strokes.length;
@@ -939,9 +967,9 @@ function drawRoute(){
 function routeWarnings(b, t = trip){
   const warn = [];
   const flagged = t.items.filter(it => it.ids?.some(id => window.COUNCIL_FLAGS?.ways?.[id]));
-  if (flagged.length) warn.push(`${flagged.length} lane${flagged.length > 1 ? "s" : ""} in this route (${flagged.map(it => it.name).join(", ")}) ${flagged.length > 1 ? "are" : "is"} recorded by the council as not open to motor vehicles. Take ${flagged.length > 1 ? "them" : "it"} out.`);
-  if (b?.jumps) warn.push(`${b.jumps} lane end${b.jumps > 1 ? "s are" : " is"} more than 100 m from a road or another lane, so the GPX has a straight line there. Look at it on the map.`);
-  if (b?.failed) warn.push(`${b.failed} road link${b.failed > 1 ? "s" : ""} couldn't be routed and ${b.failed > 1 ? "are" : "is"} a straight line.`);
+  if (flagged.length) warn.push(`The council says ${flagged.length > 1 ? `${flagged.length} of these lanes aren't` : `${flagged[0].name} isn't`} open to motors. Take ${flagged.length > 1 ? "them" : "it"} out.`);
+  if (b?.jumps) warn.push(`${b.jumps} gap${b.jumps > 1 ? "s" : ""} over 100 m from a road: the GPX draws a straight line there.`);
+  if (b?.failed) warn.push(`${b.failed} road link${b.failed > 1 ? "s" : ""} couldn't be routed.`);
   return warn;
 }
 function renderRoute(){
@@ -959,9 +987,10 @@ function renderRoute(){
   const amber = trip.items.filter(it => it.cls === "ucr" || it.cls === "tro").length;
   $("#dropUcr").hidden = settings.useUcr || !amber;
   $("#dropUcr").textContent = `Take out the ${amber} unclassified road${amber === 1 ? "" : "s"} already in this route`;
-  $("#routeStatus").textContent = built ? `${nLanes} lane${nLanes !== 1 ? "s" : ""}, ${km(built.off)} km off-road${built.joinM > 50 ? `, including ${km(built.joinM)} km of connecting lanes` : ""}. Roads by ${built.via}.` : "Finding roads between the lanes…";
+  $("#routeStatus").textContent = built ? `${nLanes} lane${nLanes !== 1 ? "s" : ""} · ${km(built.off)} km off-road` : "Finding roads between the lanes…";
+  $("#routeStatus").title = built ? `Includes ${km(built.joinM || 0)} km of connecting lanes. Roads by ${built.via}.` : "";
   const warn = routeWarnings(built).map(esc);
-  warn.push(`Before you ride, check each lane for closures on the <a href="https://www.greenroadmap.org.uk/" target="_blank" rel="noopener">TRF Green Road Map</a>.`);
+  warn.push(`Check each lane for closures before you ride (<a href="https://www.greenroadmap.org.uk/" target="_blank" rel="noopener">TRF map</a>).`);
   $("#routeWarn").innerHTML = warn.join("<br>");
   const ul = $("#laneList"); ul.innerHTML = "";
   trip.items.forEach((it, i) => {
@@ -991,7 +1020,12 @@ function armed(btn, label, then){
   if (!btn.dataset.armed) { btn.dataset.armed = 1; btn.textContent = "Sure? Tap again"; setTimeout(() => { delete btn.dataset.armed; btn.textContent = label; }, 3000); return; }
   delete btn.dataset.armed; btn.textContent = label; then();
 }
-$("#newBtn").onclick = () => armed($("#newBtn"), "✕ New", () => { trip = newTrip(); built = null; editingDay = null; saveTrip(); routeStopIdx = new Set(); showView("plan", "peek"); });
+// New route asks first, in the panel: save it, clear it, or keep going.
+function clearRoute(){ trip = newTrip(); built = null; editingDay = null; lastKind = null; saveTrip(); routeStopIdx = new Set(); routeStops = []; showView("plan", "peek"); }
+$("#newBtn").onclick = () => { $("#newConfirm").hidden = !$("#newConfirm").hidden; if (!$("#newConfirm").hidden) $("#newClear").focus(); };
+$("#newCancel").onclick = () => { $("#newConfirm").hidden = true; $("#newBtn").focus(); };
+$("#newClear").onclick = clearRoute;
+$("#newSaveFirst").onclick = () => { saveItem({ name: trip.name, trip, summary: built ? `${km(built.total)} km, ${hm(built.hours)}` : "" }); clearRoute(); };
 document.querySelectorAll("#routeTabs button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#routeTabs button").forEach(x => x.setAttribute("aria-selected", x === b));
   $("#rtLanes").hidden = b.dataset.rt !== "lanes"; $("#rtStops").hidden = b.dataset.rt !== "stops";
@@ -1203,8 +1237,10 @@ function openTour(){
 $("#goTour").onclick = () => { tour = null; tourPick = -1; openTour(); };
 $("#tourBack").onclick = () => { tourRun++; tourLayer.clearLayers(); showView(trip.items.length ? "route" : "plan", "peek"); };
 function renderTourSetup(){
-  $("#tStartPicked").textContent = tourPlaces.start ? tourPlaces.start.name : "Not set";
-  $("#tEndPicked").textContent = tourPlaces.end ? tourPlaces.end.name : "Not set";
+  $("#tStartPicked").textContent = tourPlaces.start ? "✓ Set" : "";
+  $("#tEndPicked").textContent = tourPlaces.end ? "✓ Set" : "";
+  if (tourPlaces.start && !$("#tStart").value) $("#tStart").value = tourPlaces.start.name;
+  if (tourPlaces.end && !$("#tEnd").value) $("#tEnd").value = tourPlaces.end.name;
   const chips = $("#sleepChips"); chips.innerHTML = "";
   for (const [k, label] of [["hotel", "Hotels"], ["guest", "B&Bs"], ["hostel", "Hostels"], ["camp", "Campsites"]]) {
     const b = document.createElement("button"); b.setAttribute("aria-pressed", !!settings.sleep[k]); b.textContent = label;
@@ -1385,6 +1421,103 @@ $("#tourGpx").onclick = () => tour && download(tour.name, gpxText(tour.name, tou
 $("#tourSave").onclick = () => tour && saveItem({ name: tour.name, tour, summary: `${tour.days.length} days, ${km(tour.days.reduce((a, d) => a + (d.built?.total || 0), 0))} km` });
 $("#tourNew").onclick = () => armed($("#tourNew"), "✕ New", () => { tour = null; saveTour(); tourPick = -1; openTour(); });
 $("#tourReplan").onclick = () => { if (!tour) return; tourPlaces.start = tourPlaces.start || { p: tour.start, name: tour.name.split(" to ")[0] }; tourPlaces.end = tourPlaces.end || { p: tour.round ? tour.line[Math.floor(tour.line.length / 2)] : tour.end, name: tour.name.split(" to ")[1] || "Finish" }; $("#tRound").checked = tour.round; tour = null; openTour(); };
+
+/* ---------- Explore: riding areas, ready-made rides and tours ---------- */
+const REGION_LIST = window.REGIONS || [];
+const feat = () => window.FEATURED || null;
+const regionBySlug = slug => REGION_LIST.find(r => r.slug === slug);
+const featuredIn = slug => (feat()?.rides || []).filter(r => r.region === slug);
+const posterHtml = r => `<img src="img/regions/${r.slug}.jpg" alt="Poster of ${esc(r.name)}" loading="lazy" onerror="this.remove()">`;
+const laneKmCache = new Map();
+function regionLaneKm(r){   // lane km within 25 km of the area's centre
+  if (laneKmCache.has(r.slug)) return laneKmCache.get(r.slug);
+  const c = r.centre, bb = [c[0] - 0.25, c[1] - 0.4, c[0] + 0.25, c[1] + 0.4], seen = new Set(); let m = 0;
+  for (const k of cells(bb)) for (const id of grid.get(k) || []) {
+    if (seen.has(id)) continue; seen.add(id);
+    const w = osmWays.get(id); if (!CLASSES[w.cls].ride) continue;
+    if (hav(c, w.coords[Math.floor(w.coords.length / 2)]) < 25000) m += w.len;
+  }
+  laneKmCache.set(r.slug, m); return m;
+}
+function renderExplore(){
+  const box = $("#regionCards"); box.innerHTML = "";
+  for (const r of REGION_LIST) {
+    const n = featuredIn(r.slug).length;
+    const b = document.createElement("button"); b.className = "rcard"; b.setAttribute("role", "listitem");
+    b.innerHTML = `<div class="poster">${posterHtml(r)}</div><div class="cap"><b>${esc(r.name)}</b><span>${n ? `${n} ride${n > 1 ? "s" : ""} · ` : ""}${Math.round(regionLaneKm(r) / 1000)} km of lanes</span></div>`;
+    b.onclick = () => openRegion(r.slug);
+    box.append(b);
+  }
+  const tb = $("#tourCards"); tb.innerHTML = "";
+  const feats = feat()?.tours || [];
+  if (feats.length) for (const t of feats) {
+    const tot = t.tour.days.reduce((a, d) => a + (d.built?.total || 0), 0), off = t.tour.days.reduce((a, d) => a + (d.built?.off || 0), 0);
+    const c = document.createElement("div"); c.className = "card tcard";
+    c.innerHTML = `<div><h3>${esc(t.name)}</h3><div class="stats"><span><b>${t.tour.days.length}</b> days</span><span><b>${km(tot)}</b> km</span><span><b>${tot ? Math.round(100 * off / tot) : 0}%</b> lanes</span></div></div>`;
+    const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Open"; go.setAttribute("aria-label", "Open " + t.name);
+    go.onclick = e => { e.stopPropagation(); loadFeaturedTour(t); };
+    c.onclick = () => loadFeaturedTour(t);
+    c.append(go); tb.append(c);
+  } else for (const p of window.TOUR_PRESETS || []) {
+    const c = document.createElement("div"); c.className = "card tcard";
+    c.innerHTML = `<div><h3>${esc(p.name)}</h3><div class="stats"><span><b>${p.days}</b> days</span><span><b>${p.dayHours} h</b> a day</span></div></div>`;
+    const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Plan it";
+    go.onclick = () => {
+      tourPlaces.start = { p: p.start.at, name: p.start.name }; tourPlaces.end = { p: p.end.at, name: p.end.name };
+      settings.days = p.days; settings.dayHours = p.dayHours; saveSettings(); syncSettings();
+      tour = null; tourPick = -1; openTour(); $("#tRound").checked = !!p.round;
+    };
+    c.append(go); tb.append(c);
+  }
+  $("#tourBlock").hidden = !tb.children.length;
+  // posters on the map when zoomed out
+  regionPinLayer.clearLayers();
+  for (const r of REGION_LIST) L.marker(r.centre, { keyboard: true, title: r.name, icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<div class="rpin"><span class="dot">${posterHtml(r)}</span><b>${esc(r.name)}</b></div>` }) })
+    .on("click", () => openRegion(r.slug)).addTo(regionPinLayer);
+}
+function openRegion(slug){
+  const r = regionBySlug(slug); if (!r) return;
+  showView("region", "open");
+  $("#regionPoster").innerHTML = posterHtml(r);
+  $("#regionName").textContent = r.name + (r.sub ? " " + r.sub : "");
+  $("#regionLine").textContent = r.line;
+  const rides = featuredIn(slug);
+  $("#regionStats").innerHTML = `<div><b>${Math.round(regionLaneKm(r) / 1000)}</b><span>km of lanes</span></div><div><b>${rides.length}</b><span>rides</span></div><div><b>${esc(r.starts[0].name)}</b><span>start</span></div>`;
+  const box = $("#regionRides"); box.innerHTML = rides.length ? "" : `<p class="small muted">No ready-made rides here yet. Plan your own below.</p>`;
+  regionRideLayer.clearLayers();
+  for (const rd of rides) {
+    drawBuilt(regionRideLayer, rd.trip, rd.built, false, false);
+    const b = rd.built, pct = b.total ? Math.round(100 * b.off / b.total) : 0;
+    const c = document.createElement("div"); c.className = "card";
+    c.innerHTML = `<div class="top"><h3>${esc(rd.name)}</h3></div>
+      <div class="stats"><span><b>${hm(b.hours)}</b> riding</span><span><b>${km(b.total)}</b> km</span><span><b>${pct}%</b> lanes</span></div>
+      <div>${rd.byways ? `<span class="chip" style="background:var(--boat)">Byways only</span>` : `<span class="chip" style="background:var(--ucr)">Includes unclassified roads</span>`} <span class="small muted">from ${esc(rd.startName)}</span></div>`;
+    const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Ride this"; go.setAttribute("aria-label", "Ride " + rd.name);
+    go.onclick = () => loadFeaturedRide(rd);
+    c.querySelector(".top").append(go);
+    c.onclick = e => { if (e.target !== go) map.fitBounds(L.latLngBounds(rd.built.segs.flatMap(sg => sg.coords)).pad(0.05), { paddingBottomRight: phone() ? [0, innerHeight * 0.45] : [0, 0] }); };
+    box.append(c);
+  }
+  map.flyTo(r.centre, r.zoom, { duration: 0.8 });
+  $("#regionLoop").onclick = () => { loopStart = r.starts[0].at; lastKind = "loop"; ideas = []; picked = -1; ideaRun++; openIdeas(); runIdeas(); };
+  $("#regionDraw").onclick = () => { map.setView(r.centre, r.zoom); lastKind = "draw"; strokes = []; shapeChoice = null; ideas = []; picked = -1; ideaRun++; openIdeas(); startDrawing(); };
+}
+$("#regionBack").onclick = () => { showView("plan", "peek"); map.flyTo([52.6, -2.3], 7, { duration: 0.8 }); };
+// Opening a ready-made ride or tour replaces the current one, so anything the rider planned goes to Saved first.
+const featNames = () => new Set([...(feat()?.rides || []).map(r => r.name), ...(feat()?.tours || []).map(t => t.name)]);
+function keepCurrent(){
+  if (trip.items.length && !featNames().has(trip.name)) saveItem({ name: trip.name, trip, summary: built ? `${km(built.total)} km, ${hm(built.hours)}` : "" });
+}
+function loadFeaturedRide(rd){
+  keepCurrent();
+  trip = clone(rd.trip); built = clone(rd.built); editingDay = null; lastKind = null; ideas = [];
+  saveTrip(); showView("route", "mid"); renderRoute();
+  map.fitBounds(L.latLngBounds(built.segs.flatMap(sg => sg.coords)).pad(0.05), { paddingBottomRight: phone() ? [0, innerHeight * 0.45] : [0, 0] });
+  findRouteStops();
+}
+function loadFeaturedTour(t){
+  if (tour?.days?.length && !featNames().has(tour.name)) saveItem({ name: tour.name || "My tour", tour, summary: `${tour.days.length} days` });
+  tour = clone(t.tour); tourPick = -1; saveTour(); openTour(); }
 
 /* ---------- search ---------- */
 $("#searchForm").onsubmit = async e => {
