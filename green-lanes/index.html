@@ -247,6 +247,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
     <div class="key">
       <div class="sw" style="background:var(--boat)"></div><span><b>Byway open to all traffic.</b> Motorbikes allowed.</span>
       <div class="sw" style="background:var(--ucr)"></div><span><b>Unclassified road.</b> Usually allowed, check before riding.</span>
+      <div class="sw dash" style="color:var(--boat);background:repeating-linear-gradient(90deg,var(--boat) 0 10px,transparent 10px 14px)"></div><span><b>Byway from the council's record</b> that isn't in OpenStreetMap yet. The line may be rough.</span>
       <div class="sw dot" style="color:var(--closed)"></div><span><b>Closed to motors,</b> or restricted byway.</span>
       <div class="sw" style="background:var(--route)"></div><span><b>Your route.</b> Dashed pink is the road between lanes.</span>
       <div class="sw zone" style="background:rgba(30,86,49,.55)"></div><span><b>Lane areas</b> when zoomed out. Darker green means more lanes.</span>
@@ -455,6 +456,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="data/osm-lanes.js"></script>
 <script src="data/council-flags.js" onerror="window.COUNCIL_FLAGS=null"></script>
+<script src="data/council-boats.js" onerror="window.COUNCIL_BOATS=null"></script>
 <script src="js/plan.js"></script>
 <script src="js/app.js"></script>
 </body>

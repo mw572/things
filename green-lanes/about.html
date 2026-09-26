@@ -50,6 +50,7 @@ code{font-size:14px;background:var(--card);border:1px solid var(--rule);border-r
   <div class="wrap"><table>
     <tr><th>What</th><th>Source</th><th>Notes</th></tr>
     <tr><td>Lanes</td><td>OpenStreetMap, England and Wales extracts from Geofabrik, 25 Sep 2026</td><td>Ways tagged as byways open to all traffic, unclassified county roads, unmade roads and restricted byways. Rebuilt with <code>build_osm_lanes.py</code>.</td></tr>
+    <tr><td>Council byways</td><td>All 149 councils' rights-of-way records, via rowmaps.com, 26 Sep 2026</td><td>Adds byways OpenStreetMap is missing and flags OpenStreetMap byways the council records as something else. Rebuilt with the scripts in <code>checks/</code>.</td></tr>
     <tr><td>Stops</td><td>OpenStreetMap, same extracts</td><td>144,549 cafés, pubs, restaurants, toilets, fuel stations, viewpoints, waterfalls, castles, picnic spots, hotels, B&amp;Bs, hostels and campsites. Rebuilt with <code>build_stops.py</code>.</td></tr>
     <tr><td>Roads between lanes</td><td>BRouter (brouter.de) with the planner's own motorbike profile</td><td>The twisty setting favours B-roads and back lanes and avoids A-roads, motorways and towns. OSRM's demo server is the fallback.</td></tr>
     <tr><td>Checking plans</td><td>OSRM demo server</td><td>One request checks every road join in a plan and how far each lane end is from a road.</td></tr>
@@ -68,7 +69,7 @@ code{font-size:14px;background:var(--card);border:1px solid var(--rule);border-r
     <tr><td>Marked closed to motor vehicles</td><td class="n">432</td><td>No</td></tr>
     <tr><td>Restricted byways (no motor vehicles)</td><td class="n">3,657</td><td>No</td></tr>
   </table></div>
-  <p>That gives about 6,400 km of rideable lane. The Trail Riders Fellowship puts the legal network at about 6,000 miles (9,650 km), so the planner sees roughly two-thirds of it. About half of England and Wales (986 of roughly 2,000 ten-kilometre squares) has at least 1 km of lane, 343 squares have at least 5 km, and 44 have 15 km or more.</p>
+  <p>That gives about 6,400 km of rideable lane from OpenStreetMap. The council records add another 1,127 km of byways (see below), which brings it to about 7,500 km. The Trail Riders Fellowship puts the legal network at about 6,000 miles (9,650 km), so the planner sees roughly two-thirds of it. About half of England and Wales (986 of roughly 2,000 ten-kilometre squares) has at least 1 km of lane, 343 squares have at least 5 km, and 44 have 15 km or more.</p>
   <h3>What's missing and why</h3>
   <ul>
     <li><b>Unclassified roads are the main gap.</b> They aren't public rights of way, so they aren't on councils' definitive maps. Each council records them on its own List of Streets, and few publish that as data. OpenStreetMap mappers often tag them as plain tracks without saying they're public, and the planner leaves plain tracks out because many are private.</li>
@@ -77,22 +78,24 @@ code{font-size:14px;background:var(--card);border:1px solid var(--rule);border-r
     <li><b>Scotland and Northern Ireland</b> aren't covered. They have no byway category, and Scotland's access rights don't include motor vehicles.</li>
   </ul>
 
-  <h2 id="council-check">Checked against council data</h2>
-  <p>Councils publish their rights-of-way records, and rowmaps.com republishes them under the Open Government Licence. On 26 September 2026 I compared the planner's OpenStreetMap byways with the records for four lane-rich areas. Byways are rights of way, so they appear in both. Unclassified roads aren't, so this check says nothing about them.</p>
+  <h2 id="council-check">Checked against every council's records</h2>
+  <p>Councils publish their rights-of-way records, and rowmaps.com republishes them for all 149 councils in England and Wales. On 26 September 2026 I compared every one with the planner's OpenStreetMap byways. 109 councils record byways open to all traffic; the other 40 record none, and most of those are urban. Byways are rights of way, so they appear in both sources. Unclassified roads aren't rights of way, so this check says nothing about them.</p>
   <div class="wrap"><table>
-    <tr><th>Council (record dated)</th><th class="n">Council byways, km</th><th class="n">Found in the planner as byways</th><th class="n">Found, but as another kind</th><th class="n">Missing</th><th class="n">Planner byways the council says aren't open to motors</th></tr>
-    <tr><td>Wiltshire (Jul 2026)</td><td class="n">719</td><td class="n">84%</td><td class="n">4%</td><td class="n">12%</td><td class="n">9 lanes, 3.3 km</td></tr>
-    <tr><td>Derbyshire (Apr 2026)</td><td class="n">60</td><td class="n">66%</td><td class="n">16%</td><td class="n">18%</td><td class="n">7 lanes, 1.2 km</td></tr>
-    <tr><td>Powys (Apr 2026)</td><td class="n">215</td><td class="n">76%</td><td class="n">4%</td><td class="n">19%</td><td class="n">5 lanes, 5.8 km</td></tr>
-    <tr><td>Gloucestershire (Jan 2025)</td><td class="n">5</td><td class="n">97%</td><td class="n">1%</td><td class="n">2%</td><td class="n">1 lane, 0.1 km</td></tr>
+    <tr><th>Council byways, England and Wales</th><th class="n">km</th><th class="n">share</th></tr>
+    <tr><td>In OpenStreetMap as byways</td><td class="n">3,925</td><td class="n">70.5%</td></tr>
+    <tr><td>In OpenStreetMap, but marked restricted or closed to motors</td><td class="n">369</td><td class="n">6.6%</td></tr>
+    <tr><td>In OpenStreetMap as another kind of way</td><td class="n">16</td><td class="n">0.3%</td></tr>
+    <tr><td>Nothing in the planner's data within 25 m</td><td class="n">1,254</td><td class="n">22.5%</td></tr>
+    <tr><td><b>Total in council records</b></td><td class="n"><b>5,563</b></td><td class="n"></td></tr>
   </table></div>
-  <p>A lane counts as found when the planner's data runs within 25 m of the council's line.</p>
+  <h3>What the planner now does with this</h3>
   <ul>
-    <li><b>The planner misses 12 to 19% of real byways</b> in Wiltshire, Derbyshire and Powys. A further 3 to 12% is there but marked closed or restricted in OpenStreetMap. Some of those will be real closures and some will be mistakes.</li>
-    <li><b>22 lanes are tagged as byways in OpenStreetMap, but the council records them as restricted byway, bridleway or footpath,</b> which are not open to motor vehicles. The longest are Whitelawn Lane in Wiltshire (1.2 km) and two in Powys near Talgarth and Churchstoke (2.2 km and 1.9 km). The planner now treats these 22 as not open to motors, and its popup says what the council calls each one. Six more lanes matched a council footpath or bridleway, but their own OpenStreetMap reference pointed to a real byway nearby, so I left them alone.</li>
-    <li><b>Gloucestershire's council record has only 5 km of byways.</b> OpenStreetMap has 18 km tagged as byways there, and 13 km of that matches no council right of way at all. Some of it may be unclassified roads tagged as byways, which could still be legal, but the council record doesn't back them up as byways. Gloucestershire's record is also the oldest of the four, from January 2025.</li>
+    <li><b>It adds 1,127 km of byways from council records</b> that OpenStreetMap doesn't record as byways, in 1,951 stretches of at least 150 m. They show as dashed green lines, and tapping one says it comes from the council's record. In most places I looked, OpenStreetMap has the track itself but not its byway status. The biggest gap is Northumberland, where 70% of the council's 450 km of byways weren't recorded as byways. With these added, the planner has about 91% of the council byway network.</li>
+    <li><b>It treats 209 lanes as not open to motors,</b> because OpenStreetMap tags them as byways but the council records them as restricted byway, bridleway or footpath. The check found 220 such ways, 50 km in total. The 209 are the ones in the planner's data, and tapping one says what the council calls it and gives its path reference. Before this check, the planner would have routed riders along them.</li>
+    <li><b>It leaves the 369 km where the council says byway but OpenStreetMap says restricted or closed</b> marked as not open. Some of these will be mapping mistakes. Others will be real closures, such as traffic regulation orders, which the council's rights-of-way record doesn't show. The planner can't tell which is which, so it stays on the safe side.</li>
   </ul>
-  <p class="muted">Limits: rowmaps' copy is an interpretation of each council's Definitive Map, not the map itself, and the council's record can be out of date too. The county edge is approximated from the council's own data, and a 25 m tolerance can confuse two paths running side by side. The full method and every mismatch are in the repo's <code>checks/rowmaps-comparison.md</code>. Covering every council in England and Wales would take about 150 more downloads and the same script.</p>
+  <p><b>Gloucestershire</b> is unusual. The council records only 5 km of byways, while OpenStreetMap had 18 km tagged as byways there, and 13 km of that matches no council right of way at all. Most of the county's lanes are unclassified roads or restricted byways, so "Byways only" leaves little to ride there.</p>
+  <p class="muted">Limits: rowmaps' copy is an interpretation of each council's Definitive Map, not the legal map itself, and council records range from 2020 to 2026 in date. A county's edge is approximated from its own data, and a 25 m tolerance can confuse two paths running side by side. Mismatches whose own OpenStreetMap reference pointed to a real byway nearby were left out. The full method, the table for every council and every mismatch are in the repo's <code>checks/rowmaps-comparison.md</code>.</p>
 
   <h2>How the planning works</h2>
   <h3>Picking lanes</h3>
@@ -122,7 +125,7 @@ code{font-size:14px;background:var(--card);border:1px solid var(--rule);border-r
   </ul>
 
   <h2>Credits</h2>
-  <p class="muted">Lane and stop data © OpenStreetMap contributors, available under the Open Database Licence. Road routing by BRouter and OSRM. Place search by Nominatim. Background maps by Esri and OpenTopoMap. Council rights-of-way data via rowmaps.com, Open Government Licence.</p>
+  <p class="muted">Lane and stop data © OpenStreetMap contributors, available under the Open Database Licence. Council rights-of-way data via rowmaps.com: contains public sector information licensed under the Open Government Licence v3.0, and, for Bexley, Blackburn with Darwen, Blackpool, Plymouth, Cumbria, Manchester, Merthyr Tydfil, Rochdale, Slough, Trafford, Vale of Glamorgan and Walsall, data licensed on terms equivalent to the Ordnance Survey OpenData Licence. Contains Ordnance Survey data © Crown copyright and database right. Road routing by BRouter and OSRM. Place search by Nominatim. Background maps by Esri and OpenTopoMap.</p>
 </main>
 </body>
 </html>

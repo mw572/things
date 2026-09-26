@@ -120,13 +120,20 @@ for (const [id, tags, f] of (window.OSM_LANES?.ways || [])) {
   for (let i = 2; i < f.length; i += 2) { la += f[i]; lo += f[i+1]; coords.push([la/1e5, lo/1e5]); }
   if (coords.length > 1) putWay(id, tags, coords);
 }
-$("#dataNote").textContent = `Lanes: ${osmWays.size.toLocaleString()} from OpenStreetMap, ${window.OSM_LANES?.built || "date unknown"}.`;
+// Byways in councils' own rights-of-way records that OpenStreetMap is missing (see checks/). They get negative ids.
+let councilAdded = 0;
+(window.COUNCIL_BOATS?.ways || []).forEach(([ref, council, coords], i) => {
+  if (coords.length < 2) return;
+  putWay(-(i + 1), { designation: "byway_open_to_all_traffic", name: `${council} byway ${ref.split("|").slice(1).join(" ")}`, source: "council", council }, coords);
+  councilAdded++;
+});
+$("#dataNote").textContent = `Lanes: ${(osmWays.size - councilAdded).toLocaleString()} from OpenStreetMap, ${window.OSM_LANES?.built || "date unknown"}` + (councilAdded ? `, plus ${councilAdded.toLocaleString()} byway stretches from council records.` : ".");
 const laneLayer = L.layerGroup().addTo(map);
 const shown = new Set();
 let fadeLanes = false;
 function laneStyle(w){
   const c = CLASSES[w.cls], z = map.getZoom();
-  return { color: css(c.color), weight: c.weight + (z >= 13 ? 1 : 0), dashArray: c.dash, opacity: fadeLanes ? .22 : .5 };
+  return { color: css(c.color), weight: c.weight + (z >= 13 ? 1 : 0), dashArray: w.tags.source === "council" ? "10 4" : c.dash, opacity: fadeLanes ? .22 : .5 };
 }
 function layerOf(w){
   if (!w.layer) w.layer = L.polyline(w.coords, laneStyle(w)).bindPopup(() => lanePopup(w), { maxWidth: 300 })
@@ -174,7 +181,7 @@ function lanePopup(w){
   const surface = [t.surface, t.tracktype && t.tracktype.replace("grade", "grade ")].filter(Boolean).join(", ");
   div.innerHTML = `<h3>${esc(laneName(t))}</h3>
     <div><span class="chip" style="background:${css(c.color)}">${esc(DESIG[t.designation] || "Byway")}</span> ${km(w.len)} km${surface ? " · " + esc(surface) : ""}</div>
-    <p style="margin-top:6px">${esc(w.council ? `OpenStreetMap calls this a byway, but ${w.council.council} Council's rights-of-way record calls it a ${w.council.calls} (${w.council.ref.split("|").slice(1).join(" ")}). Treated as not open to motor vehicles.` : c.say)}</p>`;
+    <p style="margin-top:6px">${esc(w.tags.source === "council" ? `From ${w.tags.council} Council's rights-of-way record, where it's a byway open to all traffic. It isn't in OpenStreetMap yet, so the line on the map may be rough.` : w.council ? `OpenStreetMap calls this a byway, but ${w.council.council} Council's rights-of-way record calls it a ${w.council.calls} (${w.council.ref.split("|").slice(1).join(" ")}). Treated as not open to motor vehicles.` : c.say)}</p>`;
   const away = view === "route" && !inRoute(w.id) ? distFromRoute(w) : null;
   if (away != null) div.insertAdjacentHTML("beforeend", `<p class="small muted">${away < 150 ? "Right next to your route." : `About ${km(away)} km from your route.`}</p>`);
   if (c.ride && view !== "tour") {
