@@ -2,10 +2,13 @@
 // been opened, and the map tiles you've looked at. Pages are network-first (so updates arrive when online) and fall
 // back to the copy kept here; data files carry a version stamp in their URL, so a kept copy is always the right one.
 // Routing and place search are never kept here: the app caches those answers itself.
-const APP = "glp-app-v1", TILES = "glp-tiles-v1", MAX_TILES = 4000;
+const APP = "glp-app-v1", TILES = "glp-tiles-v2", MAX_TILES = 4000;   // v2: Esri tiles no longer kept
 const CORE = ["./", "index.html", "about.html", "manifest.webmanifest", "img/icons/icon-192.png"];
 const NEVER = /brouter\.de|project-osrm\.org|nominatim\.openstreetmap\.org/;
-const TILE = /arcgisonline\.com|tile\.opentopomap\.org/;
+// Only tiles you've looked at, and only from a service whose terms allow that: OpenTopoMap permits caching viewed
+// tiles (never bulk download). Esri's free basemaps don't allow persistent offline caching, so they are left to the
+// browser's ordinary cache.
+const TILE = /tile\.opentopomap\.org/, NO_KEEP = /arcgisonline\.com/;
 
 self.addEventListener("install", e => { e.waitUntil(caches.open(APP).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
@@ -20,7 +23,7 @@ let trimmed = 0;
 
 self.addEventListener("fetch", e => {
   const req = e.request, url = req.url;
-  if (req.method !== "GET" || NEVER.test(url)) return;
+  if (req.method !== "GET" || NEVER.test(url) || NO_KEEP.test(url)) return;
   if (TILE.test(url)) {   // map tiles: the kept copy first, fetched and kept if missing
     e.respondWith(caches.open(TILES).then(async c => {
       const hit = await c.match(req); if (hit) return hit;
