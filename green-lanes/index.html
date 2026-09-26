@@ -163,6 +163,9 @@ ul.list li .s{font-size:13px;color:var(--muted)}
 .own{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .own .btn{flex-direction:column;min-height:64px;gap:2px;padding:6px 4px}
 .own .ic{font-size:20px;line-height:1}
+.acts4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.acts4 .btn{flex-direction:column;gap:0;min-height:50px;padding:4px 2px;font-size:13px;line-height:1.1}
+.acts4 .ic{font-size:17px;line-height:1.1}
 .stack{display:flex;flex-direction:column;gap:10px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .row2 .btn{white-space:normal;text-align:center}
@@ -489,13 +492,13 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
           <div><b id="stLane">–</b><span>lanes</span></div>
           <div><b id="stTwist">–</b><span>roads</span></div>
         </div>
-        <button class="btn pink wide" id="gpxBtn">⬇ Download GPX</button>
-        <p class="small muted" id="routeStatus"></p>
-        <div class="row3">
-          <button class="btn quiet" id="revBtn">⇄ Reverse</button>
-          <button class="btn quiet" id="saveBtn">★ Save</button>
-          <button class="btn quiet" id="newBtn">＋ New route</button>
+        <div class="acts4">
+          <button class="btn pink" id="gpxBtn" aria-label="Download GPX"><span class="ic" aria-hidden="true">⬇</span>GPX</button>
+          <button class="btn quiet" id="revBtn" aria-label="Reverse the route"><span class="ic" aria-hidden="true">⇄</span>Reverse</button>
+          <button class="btn quiet" id="saveBtn" aria-label="Save the route"><span class="ic" aria-hidden="true">★</span>Save</button>
+          <button class="btn quiet" id="newBtn" aria-label="New route"><span class="ic" aria-hidden="true">＋</span>New</button>
         </div>
+        <p class="small muted" id="routeStatus"></p>
         <div class="confirm" id="newConfirm" hidden role="alertdialog" aria-labelledby="newConfirmText">
           <p id="newConfirmText"><b>Start a new route?</b> This one will be cleared.</p>
           <div class="row3">

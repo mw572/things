@@ -1052,7 +1052,7 @@ function renderRoute(){
   $("#routeStatus").textContent = built ? `${nLanes} lane${nLanes !== 1 ? "s" : ""} · ${km(built.off)} km off-road` : "Finding roads between the lanes…";
   $("#routeStatus").title = built ? `Includes ${km(built.joinM || 0)} km of connecting lanes. Roads by ${built.via}.` : "";
   const warn = routeWarnings(built).map(esc);
-  $("#routeWarn").innerHTML = warn.join("<br>");
+  $("#routeWarn").innerHTML = warn.join("<br>"); $("#routeWarn").hidden = !warn.length;
   const ul = $("#laneList"); ul.innerHTML = "";
   trip.items.forEach((it, i) => {
     const li = document.createElement("li");
