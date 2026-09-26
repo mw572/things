@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Green Lanes Planner: how it works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Zilla+Slab:wght@600;700&display=swap">
+<style>
+:root{--paper:#f4efe1;--card:#fffdf6;--ink:#1f1d18;--muted:#5d5848;--rule:#cfc6ad;--green:#1e5631;--pink:#c2185b;--warn:#fff1c7;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 Barlow,system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+h1,h2,h3{font-family:"Zilla Slab",Georgia,serif;line-height:1.2;text-wrap:balance}
+h1{font-size:30px;margin:8px 0 4px}
+h2{font-size:23px;margin:34px 0 8px;padding-top:14px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin:20px 0 6px}
+p,ul,ol{margin:0 0 12px}
+li{margin-bottom:6px}
+a{color:var(--green)}
+.top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.btn{display:inline-block;border:2px solid var(--ink);border-radius:6px;background:var(--green);color:#fff;padding:9px 14px;font-weight:600;text-decoration:none;box-shadow:2px 2px 0 var(--ink)}
+.muted{color:var(--muted)}
+.note{background:var(--warn);border:1.5px solid #d9c27a;border-radius:6px;padding:10px 12px;margin:12px 0}
+.wrap{overflow-x:auto;margin:0 0 14px}
+table{border-collapse:collapse;width:100%;min-width:520px;background:var(--card);font-variant-numeric:tabular-nums}
+th,td{border:1px solid var(--rule);padding:6px 8px;text-align:left;vertical-align:top;font-size:15px}
+th{background:#ece5d0}
+td.n{text-align:right}
+code{font-size:14px;background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:0 4px}
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><h1>Green Lanes Planner</h1><a class="btn" href="./">Open the planner</a></div>
+  <p class="muted">How it works, where the data comes from, how complete it is, and what to check before you ride. Written 26 September 2026.</p>
+
+  <h2>What it does</h2>
+  <p>The planner finds legal green lanes in England and Wales and joins them into rides you can download as a GPX file for a sat nav or phone app. There are three ways in:</p>
+  <ul>
+    <li><b>Loop from a place.</b> You tap a start and set a ride time. It suggests three loops heading different ways, steered through the areas with most lanes. The time, off-road and twisty-road controls sit on the same screen, and the ideas re-plan when you change them.</li>
+    <li><b>Draw a route.</b> You draw roughly where you want to go, in as many strokes as you like. It works out whether you drew a loop (your end is near your start) or a one-way route, and you can switch it. It then picks lanes within a distance you set either side of your line.</li>
+    <li><b>Multi-day tour.</b> You set a start, a finish, and hours of riding a day. It heads through lane country, splits the ride into days, finds somewhere to stay each night, and plans each day's lanes.</li>
+  </ul>
+  <p>Once you have a route you can tap a green lane to look at it and add it, drag a round handle on the route onto a lane to take the route that way, take lanes out, reverse it, and save it. Tea, food, toilets, fuel, beauty spots and places to stay show on the map when you turn them on under the Show button, and the ones you turn on go into the GPX.</p>
+
+  <div class="note"><b>Before you ride:</b> lanes close for repairs, for the winter, or by order. Check each lane on the <a href="https://www.greenroadmap.org.uk/">TRF Green Road Map</a> or <a href="https://www.trailwise2.co.uk/">GLASS TrailWise</a>, and obey the signs on the ground. The planner's data is a good start, not the legal record.</div>
+
+  <h2>Where the data comes from</h2>
+  <div class="wrap"><table>
+    <tr><th>What</th><th>Source</th><th>Notes</th></tr>
+    <tr><td>Lanes</td><td>OpenStreetMap, England and Wales extracts from Geofabrik, 25 Sep 2026</td><td>Ways tagged as byways open to all traffic, unclassified county roads, unmade roads and restricted byways. Rebuilt with <code>build_osm_lanes.py</code>.</td></tr>
+    <tr><td>Stops</td><td>OpenStreetMap, same extracts</td><td>144,549 cafés, pubs, restaurants, toilets, fuel stations, viewpoints, waterfalls, castles, picnic spots, hotels, B&amp;Bs, hostels and campsites. Rebuilt with <code>build_stops.py</code>.</td></tr>
+    <tr><td>Roads between lanes</td><td>BRouter (brouter.de) with the planner's own motorbike profile</td><td>The twisty setting favours B-roads and back lanes and avoids A-roads, motorways and towns. OSRM's demo server is the fallback.</td></tr>
+    <tr><td>Checking plans</td><td>OSRM demo server</td><td>One request checks every road join in a plan and how far each lane end is from a road.</td></tr>
+    <tr><td>Place search and town names</td><td>Nominatim (OpenStreetMap)</td><td>Used for searches and for naming night stops.</td></tr>
+    <tr><td>Maps</td><td>Esri World Topo and Imagery, OpenTopoMap</td><td>Background maps only.</td></tr>
+  </table></div>
+  <p>The routing and search servers are free public services that ask users to keep requests modest, about one a second for OSRM and Nominatim. The planner queues its requests, one at a time with a gap, and remembers every answer. The queue shows on screen, so a wait is never silent. The limits apply to each person's phone or computer, not to the planner as a whole.</p>
+
+  <h2>How complete the lane data is</h2>
+  <p>Measured on the 25 September 2026 data, England and Wales only:</p>
+  <div class="wrap"><table>
+    <tr><th>Kind of lane</th><th class="n">km</th><th>Used for planning?</th></tr>
+    <tr><td>Byways open to all traffic (BOATs)</td><td class="n">3,850</td><td>Yes</td></tr>
+    <tr><td>Unclassified and unmade roads</td><td class="n">2,424</td><td>Yes, unless you choose byways only</td></tr>
+    <tr><td>Lanes with a part-time restriction noted</td><td class="n">164</td><td>Yes, shown dashed, check before riding</td></tr>
+    <tr><td>Marked closed to motor vehicles</td><td class="n">432</td><td>No</td></tr>
+    <tr><td>Restricted byways (no motor vehicles)</td><td class="n">3,657</td><td>No</td></tr>
+  </table></div>
+  <p>That gives about 6,400 km of rideable lane. The Trail Riders Fellowship puts the legal network at about 6,000 miles (9,650 km), so the planner sees roughly two-thirds of it. About half of England and Wales (986 of roughly 2,000 ten-kilometre squares) has at least 1 km of lane, 343 squares have at least 5 km, and 44 have 15 km or more.</p>
+  <h3>What's missing and why</h3>
+  <ul>
+    <li><b>Unclassified roads are the main gap.</b> They aren't public rights of way, so they aren't on councils' definitive maps. Each council records them on its own List of Streets, and few publish that as data. OpenStreetMap mappers often tag them as plain tracks without saying they're public, and the planner leaves plain tracks out because many are private.</li>
+    <li><b>Closures.</b> Traffic regulation orders are published by each council separately. The planner only knows about the ones OpenStreetMap mappers have recorded.</li>
+    <li><b>Member maps.</b> The TRF Green Road Map and GLASS TrailWise hold the best records of which unclassified roads are legal and which are closed, but they're for members and can't be downloaded.</li>
+    <li><b>Scotland and Northern Ireland</b> aren't covered. They have no byway category, and Scotland's access rights don't include motor vehicles.</li>
+  </ul>
+
+  <h2 id="council-check">Checked against council data</h2>
+  <p id="councilPending">A comparison with councils' own rights-of-way records (published on rowmaps.com under the Open Government Licence) for four counties is being added here.</p>
+
+  <h2>How the planning works</h2>
+  <h3>Picking lanes</h3>
+  <p>For a loop or a drawn route, the planner takes every lane within a set distance of the line and picks the chain that adds the most lane for the least road detour, moving from start to finish. A road join has to stay near your line, so a loop can't cut across its own middle. The off-road slider sets how much detour a lane is worth.</p>
+  <h3>Fitting the ride time</h3>
+  <p>The planner estimates the ride time at 15 km/h on lanes and about 40 km/h on roads, and adjusts how far it will detour until the plan fits the time you set. It then checks the plan against real roads. Lanes whose ends are more than 100 m from a road, or that only join the network the long way round, are taken out and the plan is redone, at most three times.</p>
+  <h3>Joining lanes</h3>
+  <p>Where two lanes meet out on the hills, the planner first looks for a join along other legal lanes. It uses that when it's short, or when a road join would leave a gap. Otherwise it routes the road with BRouter, one join at a time, and falls back to OSRM if BRouter can't. Each join is cached, so editing a route only re-routes the joins that changed.</p>
+  <h3>Twisty roads</h3>
+  <p>The motorbike profile scores roads by type. At the quickest end it prefers fast roads; at the twisty end it prefers B-roads and minor roads and avoids A-roads, motorways and towns. On a Gloucester to Cirencester test, the twisty setting went from 73 to 170 degrees of turning per km for the same 29 km. Between Rhayader and Builth Wells it went from 71 to 266 degrees per km, and the ride grew from 21 km to 36 km.</p>
+  <h3>Tours</h3>
+  <p>The tour planner finds a way from start to finish over a grid of ten-kilometre squares, where squares with more lane cost less to cross. It splits that line into days, and for each night picks a place to stay near the split, scoring a town with a choice of accommodation above a lone one. Each day is then planned like a drawn route and fitted to your hours a day. London to Rhayader at 6 hours a day came out as 3 days, 465 km, 14 hours 49 minutes of riding and 81 km of lanes, with nights on the Ridgeway and in the Forest of Dean.</p>
+
+  <h2>The GPX file</h2>
+  <ul>
+    <li>One track for a route, or one track per day for a tour. Tracks are thinned only if they pass 9,000 points, because older Garmins cut tracks at 10,000.</li>
+    <li>Waypoints for the start, each lane (each one says to check for closures), via points, night stops, the finish, and the stops you've turned on, with Garmin symbol names.</li>
+    <li>Where a lane end is more than 100 m from any road or other lane, the file has a straight line there, and the planner warns you about it before you download.</li>
+  </ul>
+
+  <h2>Known limits</h2>
+  <ul>
+    <li>OpenStreetMap is kept by volunteers. A lane can be recorded as a byway when the council says otherwise, and the other way round.</li>
+    <li>Ride times are estimates.</li>
+    <li>Places to stay come from OpenStreetMap listings. Nothing checks whether they're open, have rooms, or welcome bikes.</li>
+    <li>The routing servers are free public services. If one is busy, a plan may show estimated distances instead of checked ones.</li>
+  </ul>
+
+  <h2>Credits</h2>
+  <p class="muted">Lane and stop data © OpenStreetMap contributors, available under the Open Database Licence. Road routing by BRouter and OSRM. Place search by Nominatim. Background maps by Esri and OpenTopoMap. Council rights-of-way data via rowmaps.com, Open Government Licence.</p>
+</main>
+</body>
+</html>
