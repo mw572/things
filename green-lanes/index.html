@@ -44,7 +44,7 @@ a{color:var(--green)}
 #map{position:relative;min-width:0;background:#e8e4d6}
 #sheet{background:var(--paper);border-left:2px solid var(--ink);display:flex;flex-direction:column;min-height:0}
 #sheetHandle{display:none}
-.sheet-body{overflow:auto;padding:16px 16px 28px;display:flex;flex-direction:column;gap:14px;flex:1}
+.sheet-body{overflow:auto;overscroll-behavior-y:contain;padding:16px 16px 28px;display:flex;flex-direction:column;gap:14px;flex:1}
 .view{display:flex;flex-direction:column;gap:14px}
 
 /* buttons: chunky, bordered, obvious */
@@ -52,7 +52,7 @@ a{color:var(--green)}
 .btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
 .btn.primary{background:var(--green);color:var(--green-ink)}
 .btn.pink{background:var(--route);color:#fff}
-.btn.quiet{box-shadow:none;border-width:1.5px;min-height:38px;padding:6px 10px;font-size:14px}
+.btn.quiet{box-shadow:none;border-width:1.5px;min-height:44px;padding:6px 10px;font-size:14px}
 .btn.wide{width:100%}
 .btn:disabled{opacity:.5;cursor:default}
 button:focus-visible,input:focus-visible,a:focus-visible,label:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
@@ -70,15 +70,15 @@ button:focus-visible,input:focus-visible,a:focus-visible,label:focus-visible{out
 .ends{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted)}
 input[type=range]{width:100%;height:32px;accent-color:var(--green);margin:0}
 .stepper{display:inline-flex;align-items:center;border:2px solid var(--ink);border-radius:6px;overflow:hidden;background:var(--card)}
-.stepper button{width:44px;height:40px;border:0;background:var(--card);font:700 20px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
+.stepper button{width:44px;height:44px;border:0;background:var(--card);font:700 20px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
 .stepper output{min-width:64px;text-align:center;font:700 17px Barlow,sans-serif;font-variant-numeric:tabular-nums}
 .check{display:flex;gap:10px;align-items:flex-start;font-size:14px}
 .check input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--green);flex:0 0 auto}
 
 /* idea cards and stats */
 .card{background:var(--card);border:2px solid var(--ink);border-left:10px solid var(--c,var(--ink));border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;cursor:pointer}
-.card[aria-pressed="true"]{box-shadow:4px 4px 0 var(--ink);background:color-mix(in srgb,var(--c,var(--ink)) 16%,var(--card));border-width:3px;border-left-width:14px}
-#ideaList .card[aria-pressed="false"]{opacity:.62}
+.card[aria-pressed="true"],.card[aria-current="true"]{box-shadow:4px 4px 0 var(--ink);background:color-mix(in srgb,var(--c,var(--ink)) 16%,var(--card));border-width:3px;border-left-width:14px}
+#ideaList .card[aria-current="false"]{opacity:.62}
 @media (max-width:820px){
   #ideaList{flex-direction:row!important;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px!important;margin:0 -14px;padding:2px 14px 8px;scrollbar-width:none}
   #ideaList::-webkit-scrollbar{display:none}
@@ -107,7 +107,7 @@ html:not(.tabs-on) #tabbar{display:none}
 .planpick .ic{font-size:24px;width:30px;text-align:center;flex:0 0 auto}
 .tgroup{margin:4px 0 -2px;font:700 12px Barlow,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 #classicList .s{display:block;margin-top:2px}
-#ideaList .card[aria-pressed="false"]:hover{opacity:.9}
+#ideaList .card[aria-current="false"]:hover{opacity:.9}
 .inum{display:inline-grid;place-items:center;width:24px;height:24px;margin-right:7px;border-radius:50%;background:var(--c,var(--ink));color:#fff;font:700 14px Barlow,sans-serif;vertical-align:2px}
 .ibadge{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--c);color:#fff;border:2px solid #fff;box-shadow:0 0 0 2px var(--ink);font:700 14px Barlow,sans-serif;opacity:.8;cursor:pointer}
 .ibadge.on{width:34px;height:34px;font-size:17px;opacity:1}
@@ -123,7 +123,7 @@ html:not(.tabs-on) #tabbar{display:none}
 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:2px solid var(--ink);border-radius:6px;overflow:hidden}
 .seg button{border:0;border-right:2px solid var(--ink);background:var(--card);padding:9px 4px;font:600 15px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
 .seg button:last-child{border-right:0}
-.seg button[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
 
 /* lists */
 ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
@@ -288,7 +288,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   #sheet[data-state="min"] #sheetHandle{color:var(--ink);font-size:15px;font-weight:700;padding-top:7px;cursor:pointer}
   #sheet[data-state="mid"]{height:50vh}
   #sheet[data-state="open"]{height:82vh}
-  #sheetHandle{display:flex;flex-direction:column;align-items:center;gap:3px;border:0;background:none;padding:8px 0 2px;cursor:grab;color:var(--muted);font:600 12px Barlow,sans-serif;flex:0 0 auto;touch-action:none;min-height:30px;width:100%}
+  #sheetHandle{display:flex;flex-direction:column;align-items:center;gap:3px;border:0;background:none;padding:8px 0 2px;cursor:grab;color:var(--muted);font:600 12px Barlow,sans-serif;flex:0 0 auto;touch-action:none;min-height:44px;width:100%}
   #sheetHandle::before{content:"";width:44px;height:5px;border-radius:3px;background:var(--rule)}
   .sheet-body{padding:4px 14px 24px}
   .view{gap:12px}
@@ -298,7 +298,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   #banner{left:10px;right:10px;transform:none;max-width:none;top:66px;padding:6px 8px;gap:6px;font-size:14px;line-height:1.25}
   #bannerText{flex:1 1 100%;text-align:center}
   #status{left:10px;bottom:min(calc(var(--sheet-h) + 10px), calc(100% - 170px));max-width:calc(100% - 20px)}
-  #zoomHint{left:50%;bottom:calc(var(--sheet-h) + 48px)}
+  #zoomHint{left:10px;right:72px;top:118px;bottom:auto;transform:none;font-size:13px;white-space:normal;text-align:left}   /* under the Show button, clear of the area pins */
   #queueChip{left:50%;bottom:min(calc(var(--sheet-h) + 58px), calc(100% - 124px))}   /* above the status line, never over the top buttons */
   .leaflet-control-zoom{display:none}
   .pop{top:auto;bottom:calc(var(--sheet-h) + 8px);right:8px;left:8px;width:auto;max-height:calc(100% - var(--sheet-h) - 84px);z-index:1200}
@@ -306,6 +306,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
 }
 /* small phones (iPhone SE and narrower): keep every row inside the screen */
 @media (max-width:370px){
+  .own .btn{font-size:13px}
   .bigstats{gap:4px}
   .bigstats div{padding:5px 1px;min-width:0}
   .bigstats b{font-size:15px}
@@ -319,7 +320,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   #zoomHint{white-space:normal;text-align:center;max-width:calc(100% - 20px)}
 }
 /* start screen */
-#welcome{position:fixed;inset:0;z-index:2500;background:var(--paper);overflow-y:auto;-webkit-overflow-scrolling:touch}
+#welcome{position:fixed;inset:0;z-index:2500;background:var(--paper);overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
 .wl-inner{max-width:760px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px}
 .wl-hero{border:2px solid var(--ink);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);background:var(--card)}
 .wl-hero .poster{aspect-ratio:3/2}
@@ -397,7 +398,7 @@ html:not(.booting) #wlLoading{display:none}
 
   <div class="mapui" id="banner" hidden><span id="bannerText"></span><button class="btn" id="bannerMe" hidden>Use my location</button><button class="btn" id="bannerMove" hidden>✋ Move map</button><button class="btn" id="bannerUndo" hidden>↶ Undo</button><button class="btn" id="bannerDone" hidden>✓ Done</button><button class="btn" id="bannerCancel">Cancel</button></div>
   <div class="mapui" id="zoomHint" hidden>Green shading shows where the lanes are. Tap it to zoom in.</div>
-  <div id="status" hidden></div>
+  <div id="status" hidden role="status" aria-live="polite"></div>
   <div class="mapui" id="queueChip" hidden></div>
 
   <!-- map key and layers -->
@@ -424,9 +425,9 @@ html:not(.booting) #wlLoading{display:none}
     </div>
     <h3>Map style</h3>
     <div class="seg" id="baseSeg">
-      <button data-base="Map" aria-selected="true">Map</button>
-      <button data-base="Satellite" aria-selected="false">Satellite</button>
-      <button data-base="Topo" aria-selected="false">Contours</button>
+      <button data-base="Map" aria-pressed="true">Map</button>
+      <button data-base="Satellite" aria-pressed="false">Satellite</button>
+      <button data-base="Topo" aria-pressed="false">Contours</button>
     </div>
     <h3>Your own files</h3>
     <label class="btn quiet" for="file" tabindex="0">Add a GPX or KML file</label>
@@ -499,10 +500,10 @@ html:not(.booting) #wlLoading{display:none}
           <ul class="list" id="classicList"></ul>
         </details>
         <div class="field"><input id="laneQ" type="search" placeholder="Name or number, e.g. Ridgeway, BOAT 12" aria-label="Search lanes by name or number" autocomplete="off"></div>
-        <div class="seg" id="laneSort" role="tablist" aria-label="Which lanes">
-          <button data-sort="here" aria-selected="true">Longest here</button>
-          <button data-sort="all" aria-selected="false">Longest anywhere</button>
-          <button data-sort="near" aria-selected="false">Closest</button>
+        <div class="seg" id="laneSort" role="group" aria-label="Which lanes">
+          <button data-sort="here" aria-pressed="true">Longest here</button>
+          <button data-sort="all" aria-pressed="false">Longest anywhere</button>
+          <button data-sort="near" aria-pressed="false">Closest</button>
         </div>
         <label class="check"><input type="checkbox" id="laneBoatOnly"> Byways only (no unclassified roads)</label>
         <p class="small muted" id="laneCount"></p>
@@ -531,9 +532,9 @@ html:not(.booting) #wlLoading{display:none}
           <button class="btn quiet" id="changeStart">Change start</button>
         </div>
         <div id="drawCtl" class="view">
-          <div class="seg" id="shapeSeg" role="tablist" aria-label="Route shape">
-            <button data-shape="loop" aria-selected="true">⟲ Loop back to start</button>
-            <button data-shape="line" aria-selected="false">→ One way</button>
+          <div class="seg" id="shapeSeg" role="group" aria-label="Route shape">
+            <button data-shape="loop" aria-pressed="true">⟲ Loop back to start</button>
+            <button data-shape="line" aria-pressed="false">→ One way</button>
           </div>
           <div class="row3">
             <button class="btn quiet" id="drawMore">✎ Draw more</button>
@@ -542,7 +543,7 @@ html:not(.booting) #wlLoading{display:none}
           </div>
         </div>
         <div id="ideaList" style="display:flex;flex-direction:column;gap:10px"></div>
-        <p class="small muted" id="ideasNote"></p>
+        <p class="small muted" id="ideasNote" aria-live="polite"></p>
         <div id="settingsSlot">
         <div class="box" id="settings">
           <div class="setting-top" id="timeRow"><label>Ride time</label>
@@ -564,7 +565,7 @@ html:not(.booting) #wlLoading{display:none}
             <div class="ends"><span>Quickest</span><span>Twisty B-roads</span></div>
           </div>
           <div class="setting"><label><b>Lanes to use</b></label>
-            <div class="seg laneKind" role="tablist" aria-label="Lanes to use"><button data-k="all">Byways + unclassified</button><button data-k="boat">Byways only</button></div>
+            <div class="seg laneKind" role="group" aria-label="Lanes to use"><button data-k="all">Byways + unclassified</button><button data-k="boat">Byways only</button></div>
           </div>
         </div>
         </div>
@@ -627,7 +628,7 @@ html:not(.booting) #wlLoading{display:none}
           <button class="btn quiet" id="saveBtn" aria-label="Save the route"><span class="ic" aria-hidden="true">★</span>Save</button>
           <button class="btn quiet" id="newBtn" aria-label="New route"><span class="ic" aria-hidden="true">＋</span>New</button>
         </div>
-        <p class="small muted" id="routeStatus"></p>
+        <p class="small muted" id="routeStatus" aria-live="polite"></p>
         <div class="confirm" id="newConfirm" hidden role="alertdialog" aria-labelledby="newConfirmText">
           <p id="newConfirmText"><b>Start a new route?</b> This one will be cleared.</p>
           <div class="row3">
@@ -645,13 +646,13 @@ html:not(.booting) #wlLoading{display:none}
             <div class="ends"><span>Quickest</span><span>Twisty B-roads</span></div>
           </div>
           <div class="setting"><label><b>Lanes to use</b></label>
-            <div class="seg laneKind" role="tablist" aria-label="Lanes to use"><button data-k="all">Byways + unclassified</button><button data-k="boat">Byways only</button></div>
+            <div class="seg laneKind" role="group" aria-label="Lanes to use"><button data-k="all">Byways + unclassified</button><button data-k="boat">Byways only</button></div>
             <button class="btn quiet" id="dropUcr" hidden></button>
           </div>
         </details>
         <div class="seg" id="routeTabs">
-          <button data-rt="lanes" aria-selected="true">Lanes</button>
-          <button data-rt="stops" aria-selected="false">Stops</button>
+          <button data-rt="lanes" aria-pressed="true">Lanes</button>
+          <button data-rt="stops" aria-pressed="false">Stops</button>
         </div>
         <div id="rtLanes" class="view">
           <p class="small muted">Tap a lane to add it · drag ○ onto a lane to reroute</p>
@@ -671,7 +672,7 @@ html:not(.booting) #wlLoading{display:none}
 <div id="busy" hidden role="dialog" aria-modal="true" aria-labelledby="busyTitle">
   <div class="busy-card">
     <h3 id="busyTitle">Working…</h3>
-    <p id="busyText"></p>
+    <p id="busyText" aria-live="polite"></p>
     <div class="bar"><div id="busyBar"></div></div>
     <p class="small muted" id="busyQueue"></p>
     <button class="btn quiet" id="busyCancel">Cancel</button>
@@ -682,10 +683,10 @@ html:not(.booting) #wlLoading{display:none}
 <script src="data/council-flags.js?v=0caaf474" onerror="window.COUNCIL_FLAGS=null"></script>
 <script src="data/council-boats.js?v=d29ae6d4" onerror="window.COUNCIL_BOATS=null"></script>
 <script src="data/closures.js?v=613bc2dd" onerror="window.CLOSURES=null"></script>
-<script src="data/classics.js?v=a248a2b0" onerror="window.CLASSICS=[]"></script>
+<script src="data/classics.js?v=06d1a86d" onerror="window.CLASSICS=[]"></script>
 <script src="data/featured.js?v=1438cd20" onerror="window.FEATURED=null"></script>
 
 <script src="js/plan.js?v=89dd517b"></script>
-<script src="js/app.js?v=fe8ad3fd"></script>
+<script src="js/app.js?v=0a6dc0b8"></script>
 </body>
 </html>

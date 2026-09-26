@@ -67,6 +67,8 @@ const map = L.map("map", { preferCanvas: true, renderer: L.canvas({ tolerance: 1
 L.control.zoom({ position: "bottomright" }).addTo(map);
 map.createPane("route"); map.getPane("route").style.zIndex = 450; map.getPane("route").style.pointerEvents = "none";
 const routeRenderer = L.svg({ pane: "route" });
+// Map moves fly unless the rider has asked their phone for less motion
+const fly = (c, z) => matchMedia("(prefers-reduced-motion: reduce)").matches ? map.setView(c, z) : map.flyTo(c, z, { duration: 0.8 });
 const bases = {
   Map: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, crossOrigin: true, attribution: "Esri, HERE, Garmin, OS, © OpenStreetMap contributors" }),
   Satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, crossOrigin: true, attribution: "Esri, Maxar, Earthstar Geographics" }),
@@ -81,7 +83,7 @@ function setBase(name){
   // each base map has its own line colours (the --l-* variables in index.html), so lanes stay readable on all three
   document.documentElement.classList.toggle("sat", name === "Satellite"); document.documentElement.classList.toggle("topo", name === "Topo");
   restyleLanes?.(); restyleZones?.();
-  document.querySelectorAll("#baseSeg button").forEach(b => b.setAttribute("aria-selected", b.dataset.base === name));
+  document.querySelectorAll("#baseSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.base === name));
 }
 document.querySelectorAll("#baseSeg button").forEach(b => b.onclick = () => setBase(b.dataset.base));
 setBase(baseName);
@@ -255,6 +257,11 @@ function layerOf(w){
 }
 // While you look at a lane its whole length lights up, so you can see where it goes before adding it.
 const highlightLayer = L.layerGroup().addTo(map);
+function highlightMany(ws){   // gold under each lane for a few seconds, for "which line is it talking about?"
+  highlightLayer.clearLayers();
+  for (const w of ws) { L.polyline(w.coords, { color: "#ffd21f", weight: 12, opacity: .9, interactive: false, renderer: routeRenderer }).addTo(highlightLayer); L.polyline(w.coords, { color: css(CLASSES[w.cls].color.replace("--", "--l-")), weight: 4, interactive: false, renderer: routeRenderer }).addTo(highlightLayer); }
+  clearTimeout(highlightMany.t); highlightMany.t = setTimeout(() => highlightLayer.clearLayers(), 6000);
+}
 function highlightLane(w){
   highlightLayer.clearLayers();
   if (!w) return;
@@ -361,7 +368,7 @@ function drawZones(){
   const on = $("#tZones").checked && z <= 10 && browse;
   on ? zoneLayer.addTo(map) : map.removeLayer(zoneLayer);
   map.getPane("zones").style.opacity = z <= 8 ? 1 : z <= 9 ? .6 : .35;
-  (view === "plan" && map.getZoom() <= 8) ? regionPinLayer.addTo(map) : map.removeLayer(regionPinLayer);
+  if (view === "plan" && map.getZoom() <= 8) { if (typeof drawRegionPins === "function" && REGION_LIST.length) drawRegionPins(); regionPinLayer.addTo(map); } else map.removeLayer(regionPinLayer);
   $("#zoomHint").hidden = !(on && z <= 8 && view === "plan" && !drawing && !picking && !(phone() && sheet.dataset.state === "open"));
 }
 // Tapping a green patch when zoomed out takes you in to see its lanes.
@@ -569,7 +576,7 @@ function syncSettings(){
   $("#hVal").textContent = settings.hours + " h";
   $("#mix").value = settings.mix; $("#twisty").value = settings.twisty; $("#twisty2").value = settings.twisty;
   $("#width").value = settings.width; $("#widthVal").textContent = settings.width + " km";
-  document.querySelectorAll(".laneKind button").forEach(b => b.setAttribute("aria-selected", (b.dataset.k === "all") === settings.useUcr));
+  document.querySelectorAll(".laneKind button").forEach(b => b.setAttribute("aria-pressed", (b.dataset.k === "all") === settings.useUcr));
   $("#dhVal").textContent = settings.dayHours + " h"; $("#dVal").textContent = settings.days ? settings.days : "Auto";
 }
 syncSettings();
@@ -588,7 +595,12 @@ $("#width").onchange = e => { settings.width = +e.target.value; saveSettings(); 
 // Lanes to use: byways and unclassified roads, or byways only. Saved in this browser like every setting.
 document.querySelectorAll(".laneKind button").forEach(b => b.onclick = () => {
   settings.useUcr = b.dataset.k === "all"; saveSettings(); syncSettings();
-  if (view === "route") { renderRoute(); buildSoon(300); } else replanSoon();
+  if (view === "route") {
+    renderRoute(); buildSoon(300);
+    // on a route, this setting governs lanes you add from now on and the joins between lanes; say so if nothing changes
+    const amber = trip.items.filter(it => it.cls === "ucr" || it.cls === "tro").length;
+    if (!settings.useUcr) status(amber ? `This route has ${amber} unclassified road${amber > 1 ? "s" : ""}: use the button below to take ${amber > 1 ? "them" : "it"} out.` : "This route already uses byways only. New lanes and joins will be byways too.", 4000);
+  } else replanSoon();
 });
 for (const id of ["twisty", "twisty2"]) $("#" + id).onchange = e => { settings.twisty = +e.target.value; saveSettings(); syncSettings(); if (view === "route") buildSoon(); else replanSoon(); };
 
@@ -611,7 +623,7 @@ function setSheet(state){
   document.documentElement.style.setProperty("--sheet-ctl", state === "open" ? "0px" : h);
   if (typeof drawZones === "function" && view) drawZones();
   $("#handleText").textContent = state === "open" ? "▼ Show the map" : state === "min" ? "▲ " + minLabel() : "▲ Pull up for more";
-  $("#sheetHandle").setAttribute("aria-label", state === "open" ? "Show the map" : "Show more");
+  $("#sheetHandle").setAttribute("aria-label", $("#handleText").textContent.replace(/^[▲▼]\s*/, ""));
 }
 // What the collapsed bar says, so it reads as something to open rather than a clipped panel.
 function minLabel(){
@@ -632,7 +644,7 @@ $("#sheetHandle").addEventListener("pointerdown", e => { handleY = e.clientY; $(
 $("#sheetHandle").addEventListener("pointerup", e => {
   if (handleY == null) return; const dy = e.clientY - handleY; handleY = null;
   if (dy < -25) stepSheet(1); else if (dy > 25) stepSheet(-1);
-  else sheet.dataset.state === "open" ? setSheet(previewState()) : stepSheet(1);
+  else sheet.dataset.state === "open" ? setSheet("min") : stepSheet(1);   // a tap: up a step, or from full height down to the bar
 });
 // Moving the map on a phone tucks the panel away so the map gets the screen.
 map.on("dragstart", () => { if (phone() && !drawing && !picking && sheet.dataset.state !== "min") setSheet("min"); });
@@ -642,7 +654,7 @@ const TAB_OF = { plan: "explore", region: "explore", start: "plan", saved: "save
 const TAB_VIEW = { explore: "plan", plan: "start", saved: "saved", help: "help" };
 document.querySelectorAll("#tabbar button").forEach(b => b.onclick = () => {
   const v = TAB_VIEW[b.dataset.tab]; stopModes();
-  if (v === "plan" && view === "region") map.flyTo([52.6, -2.3], 7, { duration: 0.8 });
+  if (v === "plan" && view === "region") fly([52.6, -2.3], 7);
   showView(v, v === "plan" ? "peek" : "mid");
 });
 function showView(v, sheetState){
@@ -864,7 +876,7 @@ function setIdeasUi(){
   $("#loopCtl").hidden = !loop; $("#drawCtl").hidden = loop;
   $("#startText").textContent = loopStart ? `✓ Start: ${loopStartName || "set"}` : "Tap the map to set your start";
   const shape = drawnShape();
-  document.querySelectorAll("#shapeSeg button").forEach(b => b.setAttribute("aria-selected", b.dataset.shape === shape));
+  document.querySelectorAll("#shapeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.shape === shape));
   $("#undoStroke").disabled = !strokes.length; $("#clearStrokes").disabled = !strokes.length;
   $("#drawMore").textContent = strokes.length ? "✎ Draw more" : "✎ Draw";
   if (lastKind === "draw" && strokes.length && !ideas.length) $("#ideasNote").textContent = drawing ? "Press Done when you've finished drawing." : "";
@@ -953,14 +965,14 @@ function renderIdeas(msg){
   ideas.forEach((it, i) => {
     const roadM = it.roadM * twistF(), tot = it.laneM + roadM, boats = it.chain.filter(n => n.w.cls === "boat").length;
     const card = document.createElement("div"); card.className = "card"; card.style.setProperty("--c", it.color);
-    card.setAttribute("role", "button"); card.tabIndex = 0; card.setAttribute("aria-pressed", i === picked);
+    card.setAttribute("aria-current", i === picked ? "true" : "false");
     card.innerHTML = `<div class="top"><h3><span class="inum">${i + 1}</span>${esc(it.name)}${i === picked ? `<span class="onmap">On the map</span>` : ""}</h3></div>
       <div class="stats"><span><b>${hm(hoursOf(it.laneM, roadM))}</b> riding</span><span><b>${km(tot)}</b> km</span><span><b>${Math.round(100 * it.laneM / tot)}%</b> lanes (${km(it.laneM)} km)</span><span><b>${it.chain.length}</b> lanes${boats === it.chain.length ? ", all byways" : boats ? `, ${boats} byways` : ""}</span></div>`;
     const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Ride this";
     go.onclick = ev => { ev.stopPropagation(); useIdea(i); };
     card.querySelector(".top").append(go);
     const pick = () => { picked = i; renderIdeas(msg); fitTo(it); };
-    card.onclick = pick; card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+    card.onclick = pick;
     box.append(card);
   });
   // on a phone the cards are a side-swipe row: keep the chosen one in view after redrawing
@@ -1235,7 +1247,7 @@ function bendiness(lines){
 }
 const bendLabel = b => !b ? "–" : b < 90 ? "Straight" : b < 160 ? "Bendy" : "Twisty";
 function drawBuilt(layer, t, b, bold, numbers = bold, col = "#c2185b"){
-  const R = routeRenderer, op = bold ? 1 : .45;
+  const R = routeRenderer, op = bold ? 1 : .45, numPlaced = [];
   if (b) for (const s of b.segs) if (s.type === "road") {
     if (s.lanes) { if (bold) L.polyline(s.coords, { color: "#fff", weight: 9, interactive: false, renderer: R }).addTo(layer); L.polyline(s.coords, { color: col, weight: bold ? 5 : 3, opacity: op, interactive: false, renderer: R }).addTo(layer); }
     else L.polyline(s.coords, { color: col, weight: bold ? 4 : 2.5, opacity: bold ? .9 : .4, dashArray: s.ok === false ? "2 7" : "9 6", interactive: false, renderer: R }).addTo(layer);
@@ -1244,7 +1256,10 @@ function drawBuilt(layer, t, b, bold, numbers = bold, col = "#c2185b"){
     if (it.via) return;
     if (bold) L.polyline(it.coords, { color: "#fff", weight: 11, opacity: 1, interactive: false, renderer: R }).addTo(layer);
     L.polyline(it.coords, { color: col, weight: bold ? 6 : 4, opacity: op, interactive: false, renderer: R }).addTo(layer);
-    if (numbers) L.marker(it.coords[0], { interactive: false, icon: L.divIcon({ className: "", html: `<span class="lane-num">${i + 1}</span>`, iconSize: [0, 0] }) }).addTo(layer);
+    if (numbers) {   // a number that would sit on another is left off until you zoom in
+      const p = map.latLngToContainerPoint(it.coords[0]);
+      if (!numPlaced.some(q => Math.abs(q.x - p.x) < 24 && Math.abs(q.y - p.y) < 22)) { numPlaced.push(p); L.marker(it.coords[0], { interactive: false, icon: L.divIcon({ className: "", html: `<span class="lane-num">${i + 1}</span>`, iconSize: [0, 0] }) }).addTo(layer); }
+    }
   });
 }
 function drawRoute(){
@@ -1350,7 +1365,7 @@ $("#newCancel").onclick = () => { $("#newConfirm").hidden = true; $("#newBtn").f
 $("#newClear").onclick = clearRoute;
 $("#newSaveFirst").onclick = () => { saveItem({ name: trip.name, trip, summary: built ? `${km(built.total)} km, ${hm(built.hours)}` : "" }); clearRoute(); };
 document.querySelectorAll("#routeTabs button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("#routeTabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  document.querySelectorAll("#routeTabs button").forEach(x => x.setAttribute("aria-pressed", x === b));
   $("#rtLanes").hidden = b.dataset.rt !== "lanes"; $("#rtStops").hidden = b.dataset.rt !== "stops";
   if (b.dataset.rt === "stops" && !stops) loadStops().then(findRouteStops); else renderStops();
 });
@@ -1415,7 +1430,7 @@ function renderStops(){
     const s = stops[r.i];
     const li = document.createElement("li");
     const planned = trip.items.findIndex(it => it.stop && hav(it.coords[0], [s.lat, s.lng]) < 5);
-    li.innerHTML = `${poiBadge(s.code)}<span class="grow" role="button" tabindex="0"><span class="t">${esc(stopName(s))}</span><br><span class="s">${esc(CODE[s.code].one)} · ${km(r.along)} km in · ${r.off < 60 ? "on the route" : Math.round(r.off / 10) * 10 + " m off"}</span></span>`;
+    li.innerHTML = `${poiBadge(s.code)}<span class="grow" role="button" tabindex="0"><span class="t">${esc(stopName(s))}</span><br><span class="s">${esc(CODE[s.code].one)} · ${km(r.along)} km${built?.total && r.along > 1000 ? ", about " + hm(built.hours * r.along / built.total) : ""} in · ${r.off < 60 ? "on the route" : Math.round(r.off / 10) * 10 + " m off"}</span></span>`;
     // tap the row to see the place on the map; the button makes it a planned stop the route goes through (or takes it out)
     li.querySelector(".grow").onclick = () => {
       if (phone()) setSheet("min");
@@ -1860,9 +1875,18 @@ function renderExplore(){
   }
   $("#tourBlock").hidden = !tb.children.length;
   // posters on the map when zoomed out
-  regionPinLayer.clearLayers();
-  for (const r of REGION_LIST) L.marker(r.centre, { keyboard: true, title: r.name, icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<div class="rpin"><span class="dot">${posterHtml(r)}</span><b>${esc(r.name)}</b></div>` }) })
-    .on("click", () => openRegion(r.slug)).addTo(regionPinLayer);
+  drawRegionPins();
+}
+// Area pins when zoomed out: the areas with most lanes first, and any pin that would overlap one already placed waits
+// until you zoom in (the same areas are in the list below the map, so nothing is lost)
+function drawRegionPins(){
+  regionPinLayer.clearLayers(); const placed = [];
+  for (const r of [...REGION_LIST].sort((a, b) => regionLaneKm(b) - regionLaneKm(a))) {
+    const p = map.latLngToContainerPoint(r.centre);
+    if (placed.some(q => Math.abs(q.x - p.x) < 88 && Math.abs(q.y - p.y) < 64)) continue; placed.push(p);
+    L.marker(r.centre, { keyboard: false, title: r.name, icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<div class="rpin"><span class="dot">${posterHtml(r)}</span><b>${esc(r.name)}</b></div>` }) })
+      .on("click", () => openRegion(r.slug)).addTo(regionPinLayer);
+  }
 }
 // Ready-made rides on an area page: each in its own colour with a numbered badge matching its card.
 // Tapping a card (or badge) draws that ride bold and fades the others.
@@ -1909,11 +1933,11 @@ function openRegion(slug){
     c.onclick = e => { if (e.target !== go) pickRegionRide(i); };
     box.append(c);
   });
-  map.flyTo(r.centre, r.zoom, { duration: 0.8 });
+  fly(r.centre, r.zoom);
   $("#regionLoop").onclick = () => { loopStart = r.starts[0].at; loopStartName = r.starts[0].name; lastKind = "loop"; ideas = []; picked = -1; ideaRun++; openIdeas(); runIdeas(); };
   $("#regionDraw").onclick = () => { map.setView(r.centre, r.zoom); lastKind = "draw"; strokes = []; shapeChoice = null; ideas = []; picked = -1; ideaRun++; openIdeas(); startDrawing(); };
 }
-$("#regionBack").onclick = () => { showView("plan", "peek"); map.flyTo([52.6, -2.3], 7, { duration: 0.8 }); };
+$("#regionBack").onclick = () => { showView("plan", "peek"); fly([52.6, -2.3], 7); };
 // Opening a ready-made ride or tour replaces the current one, so anything the rider planned goes to Saved first.
 const featNames = () => new Set([...(feat()?.rides || []).map(r => r.name), ...(feat()?.tours || []).map(t => t.name)]);
 function keepCurrent(){
@@ -1942,16 +1966,20 @@ function whereIs(w){   // "Salisbury Plain" if it's in one of the riding areas, 
 }
 function renderLaneFinder(){
   if (view !== "lanes") return;
-  const q = $("#laneQ").value.trim().toLowerCase(), boatOnly = $("#laneBoatOnly").checked;
+  let q = $("#laneQ").value.trim().toLowerCase(), boatOnly = $("#laneBoatOnly").checked, onlyUcr = false;
+  // words that name a type of lane filter by type rather than matching reference numbers that happen to contain them
+  if (/^(boat|boats|byway|byways)$/.test(q)) { boatOnly = true; q = ""; }
+  else if (/^(ucr|ucrs|unclassified)$/.test(q)) { onlyUcr = true; q = ""; }
   const b = map.getBounds(), c = map.getCenter(), cc = [c.lat, c.lng];
   let list = [];
   for (const w of osmWays.values()) {
-    if (!CLASSES[w.cls].ride || (boatOnly && w.cls !== "boat") || w.len < 100) continue;   // scraps under 100 m are mapping leftovers
+    if (!CLASSES[w.cls].ride || (boatOnly && w.cls !== "boat") || (onlyUcr && w.cls === "boat") || w.len < 100) continue;   // scraps under 100 m are mapping leftovers
     if (q && !(w.search ? w.search.includes(q) : [w.tags.name, w.tags.prow_ref, w.tags.ref].some(t => t && t.toLowerCase().includes(q)))) continue;   // every piece's name and number counts
     if (laneSort === "here" && !q && !b.intersects(L.latLngBounds([w.bbox[0], w.bbox[1]], [w.bbox[2], w.bbox[3]]))) continue;
     list.push(w);
   }
-  if (laneSort === "near") { for (const w of list) w._d = hav(cc, laneMid(w)); list.sort((a, b) => a._d - b._d); }
+  // closest first when sorting by nearness, or when searching a name (the Ridgeway near you before one 280 km away)
+  if (laneSort === "near" || (q && laneSort === "here")) { for (const w of list) w._d = hav(cc, laneMid(w)); list.sort((a, b) => a._d - b._d); }
   else list.sort((a, b) => b.len - a.len);
   const total = list.length; list = list.slice(0, 40);
   $("#laneCount").textContent = !total ? (laneSort === "here" && !q ? "No lanes on the map here. Move the map, or try Longest anywhere." : "Nothing matches.")
@@ -1984,7 +2012,13 @@ function renderClassics(){
   for (const c of window.CLASSICS || []) {
     const li = document.createElement("li");
     li.innerHTML = `<span class="grow" role="button" tabindex="0"><span class="t">${esc(c.name)}</span><span class="s"><span class="stat-chip stat-${c.status}">${word[c.status]}</span>${esc(c.text)} <a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.source)}</a></span></span>`;
-    li.querySelector(".grow").onclick = e => { if (e.target.tagName === "A") return; if (phone()) setSheet("min"); map.setView(c.at, c.zoom); };
+    li.querySelector(".grow").onclick = e => {
+      if (e.target.tagName === "A") return; if (phone()) setSheet("min");
+      // light up the lane itself: every piece near the spot whose name, number or closing order matches (closed ones too)
+      const hits = c.match ? [...osmWays.values()].filter(w => hav(c.at, laneMid(w)) < 15000 && ((w.search || [w.tags.name, w.tags.prow_ref].join(" ").toLowerCase()).includes(c.match) || (w.closure?.order || "").toLowerCase().includes(c.match))) : [];
+      if (hits.length) { fitMap(L.latLngBounds(hits.flatMap(w => [w.coords[0], w.coords.at(-1)])).pad(0.3), { maxZoom: 14 }); highlightMany(hits); }
+      else map.setView(c.at, c.zoom);
+    };
     ul.append(li);
   }
   $("#classicBox").hidden = !ul.children.length;
@@ -1994,7 +2028,7 @@ $("#lanesBack").onclick = () => goBack();
 $("#laneQ").oninput = () => renderLaneFinder();
 $("#laneBoatOnly").onchange = () => renderLaneFinder();
 document.querySelectorAll("#laneSort button").forEach(bt => bt.onclick = () => {
-  laneSort = bt.dataset.sort; document.querySelectorAll("#laneSort button").forEach(x => x.setAttribute("aria-selected", x === bt)); renderLaneFinder();
+  laneSort = bt.dataset.sort; document.querySelectorAll("#laneSort button").forEach(x => x.setAttribute("aria-pressed", x === bt)); renderLaneFinder();
 });
 // "Longest here" and "Closest" follow the map, except straight after jumping to a lane from the list
 map.on("moveend", () => { if (view !== "lanes") return; if (laneJump) { laneJump = false; return; } if (laneSort !== "all") renderLaneFinder(); });
@@ -2054,6 +2088,7 @@ for (const id of ["tLanes", "tUcr", "tZones", "tClosed", "tNotes"]) {
 }
 document.addEventListener("keydown", e => { if (e.key === "Escape") { stopModes(); $("#layersPop").hidden = true; } });
 let moveTimer;
+map.on("zoomend", () => { if (view === "route" && trip.items.length) drawRoute(); });   // lane numbers re-spread at the new zoom
 map.on("moveend", () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => { drawLanes(); drawZones(); drawStops(); drawRouteStops(); }, 120); });
 
 // boot: carry on where you left off
@@ -2092,6 +2127,7 @@ $("#wlLanes").onclick = () => { closeWelcome(); openLanes(); };
 $("#helpHome").onclick = () => showWelcome();
 let welcomed = false; try { welcomed = !!sessionStorage.getItem("glp:welcomed"); } catch (e) {}
 if (!welcomed) showWelcome(); else $("#welcome").hidden = true;
+if (innerWidth < 360) $("#q").placeholder = "Town or postcode";
 document.documentElement.classList.remove("booting");   // the start screen's buttons work from here
 // Keep the app, its data and the map tiles you've looked at on the phone, so it opens and exports GPX with no signal
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1"))
