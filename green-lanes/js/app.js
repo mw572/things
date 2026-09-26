@@ -1427,7 +1427,7 @@ const REGION_LIST = window.REGIONS || [];
 const feat = () => window.FEATURED || null;
 const regionBySlug = slug => REGION_LIST.find(r => r.slug === slug);
 const featuredIn = slug => (feat()?.rides || []).filter(r => r.region === slug);
-const posterHtml = r => `<img src="img/regions/${r.slug}.jpg" alt="Poster of ${esc(r.name)}" loading="lazy" onerror="this.remove()">`;
+const posterHtml = (r, lazy = true) => `<img src="img/regions/${r.slug}.jpg" alt="Poster of ${esc(r.name)}" loading="${lazy ? "lazy" : "eager"}" onerror="this.remove()">`;
 const laneKmCache = new Map();
 function regionLaneKm(r){   // lane km within 25 km of the area's centre
   if (laneKmCache.has(r.slug)) return laneKmCache.get(r.slug);
@@ -1478,7 +1478,7 @@ function renderExplore(){
 function openRegion(slug){
   const r = regionBySlug(slug); if (!r) return;
   showView("region", "open");
-  $("#regionPoster").innerHTML = posterHtml(r);
+  $("#regionPoster").innerHTML = posterHtml(r, false);   // lazy loading missed it as the panel opened
   $("#regionName").textContent = r.name + (r.sub ? " " + r.sub : "");
   $("#regionLine").textContent = r.line;
   const rides = featuredIn(slug);
