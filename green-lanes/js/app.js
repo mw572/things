@@ -223,6 +223,15 @@ function drawLanes(){
 }
 function setFade(on){ if (fadeLanes === on) return; fadeLanes = on; for (const id of shown) osmWays.get(id).layer.setStyle(laneStyle(osmWays.get(id))); }
 const inRoute = id => trip.items.some(it => it.ids.some(i => i === id || laneOf.get(i) === id));
+// Street View links from each end of a lane, facing up it, labelled by compass side so "north end" means something.
+function endViews(c){
+  const brg = (a, b) => { const r = Math.PI / 180, y = Math.sin((b[1] - a[1]) * r) * Math.cos(b[0] * r), x = Math.cos(a[0] * r) * Math.sin(b[0] * r) - Math.sin(a[0] * r) * Math.cos(b[0] * r) * Math.cos((b[1] - a[1]) * r); return (Math.atan2(y, x) / r + 360) % 360; };
+  const into = (end, pts) => { let d = 0, p = pts[1] || end; for (let i = 1; i < pts.length && d < 120; i++) { d += hav(pts[i - 1], pts[i]); p = pts[i]; } return brg(end, p); };
+  const a = c[0], b = c.at(-1), rev = c.slice().reverse(), ns = Math.abs(a[0] - b[0]) * 1.6 > Math.abs(a[1] - b[1]);
+  const side = (p, q) => ns ? (p[0] > q[0] ? "north" : "south") : (p[1] > q[1] ? "east" : "west");
+  const url = (p, h) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${p[0].toFixed(6)},${p[1].toFixed(6)}&heading=${Math.round(h)}&pitch=0&fov=80`;
+  return [{ side: side(a, b), url: url(a, into(a, c)) }, { side: side(b, a), url: url(b, into(b, rev)) }];
+}
 function lanePopup(w){
   const t = w.tags, c = CLASSES[w.cls], mid = w.coords[Math.floor(w.coords.length / 2)];
   const div = document.createElement("div");
@@ -239,10 +248,19 @@ function lanePopup(w){
     b.onclick = () => { map.closePopup(); inRoute(w.id) ? removeLane(w.id) : addLane(w); };
     acts.append(b); div.append(acts);
   }
+  // Google has no Street View along most lanes, so a link to the middle of one opens a black screen. Instead:
+  // Geograph's photos nearest the middle (volunteers photograph tracks), Street View from the road at each end
+  // looking up the lane, and the satellite map here.
+  const [e1, e2] = endViews(w.coords);
   div.insertAdjacentHTML("beforeend", `<div class="pop-links">
-    <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${mid[0].toFixed(6)},${mid[1].toFixed(6)}" target="_blank" rel="noopener">Street View</a>
+    <a href="https://www.geograph.org.uk/near/${mid[0].toFixed(5)},${mid[1].toFixed(5)}" target="_blank" rel="noopener">Photos near here</a>
+    <a href="#" class="aerial">${baseName === "Satellite" ? "Normal map" : "Aerial view"}</a>
+    <a href="${e1.url}" target="_blank" rel="noopener">Street View, ${e1.side} end</a>
+    <a href="${e2.url}" target="_blank" rel="noopener">Street View, ${e2.side} end</a>
     <a href="#" class="whole">Show the whole lane</a></div>`);
-  div.querySelector(".whole").onclick = e => { e.preventDefault(); map.fitBounds(L.latLngBounds(w.coords).pad(0.4), { maxZoom: 16, paddingBottomRight: phone() ? [0, 200] : [0, 0] }); };
+  const fitLane = () => map.fitBounds(L.latLngBounds(w.coords).pad(0.4), { maxZoom: 16, paddingBottomRight: phone() ? [0, 200] : [0, 0] });
+  div.querySelector(".whole").onclick = e => { e.preventDefault(); fitLane(); };
+  div.querySelector(".aerial").onclick = e => { e.preventDefault(); map.closePopup(); setBase(baseName === "Satellite" ? "Map" : "Satellite"); if (baseName === "Satellite") { fitLane(); highlightLane(w); setTimeout(() => highlightLane(null), 4000); } };
   return div;
 }
 
