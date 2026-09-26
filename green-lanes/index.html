@@ -119,12 +119,16 @@ ul.list li .s{font-size:13px;color:var(--muted)}
 .tool .ic{font-size:19px;line-height:1}
 #banner{top:72px;left:calc((100% - 400px)/2);transform:translateX(-50%);background:var(--ink);color:var(--paper);border-radius:8px;padding:8px 10px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 440px);box-shadow:var(--shadow);font-weight:600}
 #banner .btn{min-height:36px;padding:4px 10px;box-shadow:none;border-color:var(--paper)}
+body.banner-on #poiWrap,body.banner-on #tools{display:none}
+.leaflet-tooltip.stop-label{background:var(--card);border:1.5px solid var(--ink);border-radius:4px;padding:1px 5px;font:600 12px Barlow,sans-serif;color:var(--ink);box-shadow:none}
+.leaflet-tooltip.stop-label::before{display:none}
+#banner{z-index:1100}
 #zoomHint{bottom:28px;left:calc((100% - 400px)/2);transform:translateX(-50%);background:var(--card);border:2px solid var(--ink);border-radius:20px;padding:6px 14px;font-weight:600;font-size:14px;pointer-events:none;white-space:nowrap}
 #status{position:absolute;left:12px;bottom:28px;z-index:999;background:rgba(255,253,246,.94);border:1.5px solid var(--ink);border-radius:6px;padding:4px 8px;font-size:13px;max-width:calc(100% - 440px)}
 
 /* the Show menu under the search box: which stops to show on the map */
 #poiWrap{position:relative;margin-top:8px;align-self:flex-start}
-#searchWrap{z-index:1001}
+#searchWrap{z-index:1150}
 #poiBtn{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--ink);border-radius:18px;background:var(--card);padding:4px 10px;font:15px Barlow,sans-serif;cursor:pointer;color:var(--ink);box-shadow:var(--shadow);min-height:38px}
 #poiIcons{display:inline-flex;gap:3px}
 #poiIcons .poi{width:20px;height:20px}
@@ -437,6 +441,8 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
             <button class="btn quiet" id="clearStrokes">✕ Clear</button>
           </div>
         </div>
+        <div id="ideaList" style="display:flex;flex-direction:column;gap:10px"></div>
+        <p class="small muted" id="ideasNote"></p>
         <div id="settingsSlot">
         <div class="box" id="settings">
           <div class="setting-top" id="timeRow"><label>Ride time</label>
@@ -462,8 +468,6 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
           </div>
         </div>
         </div>
-        <p class="small muted" id="ideasNote"></p>
-        <div id="ideaList" style="display:flex;flex-direction:column;gap:10px"></div>
       </div>
 
       <div id="vTour" class="view" hidden>
@@ -596,6 +600,6 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   </div>
 </section>
 <script src="js/plan.js?v=89dd517b"></script>
-<script src="js/app.js?v=eb963207"></script>
+<script src="js/app.js?v=0d7d7b88"></script>
 </body>
 </html>
