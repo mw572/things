@@ -30,7 +30,7 @@ const phone = () => innerWidth <= 820;
    OSRM's demo server, BRouter and Nominatim are free and ask users to keep requests modest
    (Nominatim and OSRM: about one a second). Each server gets its own queue with a gap between
    requests, and every answer is cached. The queue length shows on screen so waiting is never silent. */
-const SERVERS = { osrm: { gap: 1000, lanes: 1 }, brouter: { gap: 300, lanes: 2 }, nominatim: { gap: 1100, lanes: 1 } };
+const SERVERS = { osrm: { gap: 1000, lanes: 1 }, brouter: { gap: 700, lanes: 2 }, nominatim: { gap: 1100, lanes: 1 } };
 for (const k in SERVERS) Object.assign(SERVERS[k], { next: 0, pending: 0, q: Array.from({ length: SERVERS[k].lanes }, () => ({ last: 0, chain: Promise.resolve() })) });
 const reqCache = new Map();
 function queueChanged(){
@@ -94,12 +94,34 @@ const CLASSES = {
   closed: { color: "--closed", weight: 2,   dash: "2 6", say: "Recorded as closed to motor vehicles.", ride: false },
   rb:     { color: "--closed", weight: 2,   dash: "2 6", say: "Restricted byway: no motor vehicles.", ride: false }
 };
+// Time rules in OpenStreetMap, e.g. "no @ (Oct 01-Apr 30)": closed for part of the year. Rules that only stop
+// vehicles with more than two wheels don't apply to motorbikes. Returns null when there's no rule it can read.
+const MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+const MONTH_NAME = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function seasonOf(t, today = window.PLAN_DATE ? new Date(window.PLAN_DATE) : new Date()){   // PLAN_DATE: generate ready-made routes as if in winter
+  const c = t["motorcycle:conditional"] || t["motor_vehicle:conditional"]; if (!c) return null;
+  if (/wheels\s*>\s*2|4x4|width|weight|length/i.test(c)) return { bikesOk: true };
+  const m = c.match(/(\d{1,2})?\s*([A-Za-z]{3})[a-z]*\.?\s*(\d{1,2})?\s*-\s*(\d{1,2})?\s*([A-Za-z]{3})[a-z]*\.?\s*(\d{1,2})?/);
+  if (!m || !(m[2].toLowerCase() in MON) || !(m[5].toLowerCase() in MON)) return null;
+  const mb = MON[m[5].toLowerCase()], a = [MON[m[2].toLowerCase()], +(m[1] || m[3] || 1)], b = [mb, +(m[4] || m[6] || new Date(2001, mb + 1, 0).getDate())];
+  const v = today.getMonth() * 100 + today.getDate(), va = a[0] * 100 + a[1], vb = b[0] * 100 + b[1];
+  const openOnly = /^\s*yes\b/i.test(c);   // "yes @ (May-Sep)" means open only in that window
+  let inside = va <= vb ? v >= va && v <= vb : v >= va || v <= vb;
+  if (openOnly) inside = !inside;
+  const ahead = new Date(today); ahead.setDate(ahead.getDate() + 14);
+  const soon = !inside && seasonOf({ "motor_vehicle:conditional": c }, ahead)?.closedNow;
+  const after = new Date(2001, b[0], b[1] + 1);
+  return { closedNow: inside, soon, openOnly, text: `${a[1]} ${MONTH_NAME[a[0]]} to ${b[1]} ${MONTH_NAME[b[0]]}`,
+    from: openOnly ? `${after.getDate()} ${MONTH_NAME[after.getMonth()]}` : `${a[1]} ${MONTH_NAME[a[0]]}` };
+}
 function classify(t){
   const no = v => ["no", "private", "forestry", "agricultural", "delivery", "permit"].includes(v);
   if (t.designation === "restricted_byway") return "rb";
   if (no(t.motor_vehicle) || no(t.motorcycle) || (no(t.access) && !t.motor_vehicle && !t.motorcycle)) return "closed";
-  const txt = [t.note, t.description].join(" ").toLowerCase();
-  if (t["motor_vehicle:conditional"] || t["motorcycle:conditional"] || /\btro\b|traffic regulation/.test(txt) || t.seasonal) return "tro";
+  const txt = [t.note, t.description].join(" ").toLowerCase(), season = seasonOf(t);
+  if (season?.closedNow) return "closed";
+  const cond = (t["motor_vehicle:conditional"] || t["motorcycle:conditional"]) && !season?.bikesOk;
+  if (cond || /\btro\b|traffic regulation/.test(txt) || t.seasonal) return "tro";
   return t.designation === "byway_open_to_all_traffic" ? "boat" : "ucr";
 }
 const laneName = t => t.name || t.prow_ref || t.ref || (t.designation === "byway_open_to_all_traffic" ? "Unnamed byway" : "Unnamed lane");
@@ -114,7 +136,9 @@ function putWay(id, tags, coords){
   let a = 90, b = 180, c = -90, d = -180;
   for (const [la, lo] of coords) { if (la < a) a = la; if (lo < b) b = lo; if (la > c) c = la; if (lo > d) d = lo; }
   const council = window.COUNCIL_FLAGS?.ways?.[id] || null;   // the council's own record says it isn't a byway
-  const w = { id, tags, coords, cls: council ? "closed" : classify(tags), council, bbox: [a, b, c, d], len: lineLen(coords) };
+  let closure = window.CLOSURES?.ways?.[id] || null;            // an authority's list of traffic orders closes it
+  if (closure?.season) { tags = { ...tags, "motor_vehicle:conditional": `no @ (${closure.season})` }; closure = null; }   // a winter order: seasonal, not shut
+  const w = { id, tags, coords, cls: council || closure ? "closed" : classify(tags), council, closure, season: seasonOf(tags), bbox: [a, b, c, d], len: lineLen(coords) };
   osmWays.set(id, w);
   for (const k of cells(w.bbox)) { if (!grid.has(k)) grid.set(k, new Set()); grid.get(k).add(id); }
 }
@@ -205,7 +229,7 @@ const osmPieces = osmWays.size - councilAdded, laneOf = new Map();
     let a = 90, b = 180, c = -90, d = -180;
     for (const [la, lo] of coords) { if (la < a) a = la; if (lo < b) b = lo; if (la > c) c = la; if (lo > d) d = lo; }
     const search = [...new Set(ws.flatMap(w => [w.tags.name, w.tags.prow_ref, w.tags.ref]).filter(Boolean))].join(" | ").toLowerCase();
-    osmWays.set(seq[0], { id: seq[0], members: seq, search, tags, coords, cls: longest.cls, council: ws.find(w => w.council)?.council || null, bbox: [a, b, c, d], len: lineLen(coords) });
+    osmWays.set(seq[0], { id: seq[0], members: seq, search, tags, coords, cls: longest.cls, council: ws.find(w => w.council)?.council || null, closure: ws.find(w => w.closure)?.closure || null, season: ws.find(w => w.season && !w.season.bikesOk)?.season || null, bbox: [a, b, c, d], len: lineLen(coords) });
   }
   grid.clear();
   for (const w of osmWays.values()) for (const k of cells(w.bbox)) { if (!grid.has(k)) grid.set(k, new Set()); grid.get(k).add(w.id); }
@@ -276,7 +300,9 @@ function lanePopup(w){
   const surface = [t.surface, t.tracktype && t.tracktype.replace("grade", "grade ")].filter(Boolean).join(", ");
   div.innerHTML = `<h3>${esc(laneName(t))}</h3>
     <div><span class="chip" style="background:${css(c.color)}">${esc(DESIG[t.designation] || "Byway")}</span> ${km(w.len)} km${surface ? " · " + esc(surface) : ""}</div>
-    <p style="margin-top:6px">${esc(w.tags.source === "council" ? `From ${w.tags.council} Council's rights-of-way record, where it's a byway open to all traffic. It isn't in OpenStreetMap yet, so the line on the map may be rough.` : w.council ? `OpenStreetMap calls this a byway, but ${w.council.council} Council's rights-of-way record calls it a ${w.council.calls} (${w.council.ref.split("|").slice(1).join(" ")}). Treated as not open to motor vehicles.` : c.say + (t.partCouncil ? ` Part of it is only in ${t.partCouncil} Council's rights-of-way record, so that stretch of line may be rough.` : ""))}</p>`;
+    <p style="margin-top:6px">${esc(w.tags.source === "council" ? `From ${w.tags.council} Council's rights-of-way record, where it's a byway open to all traffic. It isn't in OpenStreetMap yet, so the line on the map may be rough.` : w.council ? `OpenStreetMap calls this a byway, but ${w.council.council} Council's rights-of-way record calls it a ${w.council.calls} (${w.council.ref.split("|").slice(1).join(" ")}). Treated as not open to motor vehicles.` : w.closure ? `Closed to ${w.closure.what} by a traffic regulation order${w.closure.since ? " since " + w.closure.since : ""} (${w.closure.order}). OpenStreetMap doesn't show this yet.`
+      : w.season && !w.season.bikesOk ? `${w.season.openOnly ? `Open to motor vehicles only from ${w.season.text} each year` : `Closed to motor vehicles from ${w.season.text} each year`}${w.season.closedNow ? ", so it's closed now." : w.season.soon ? `. It closes on ${w.season.from}, within the next fortnight.` : ". Open now."}`
+      : c.say + (t.partCouncil ? ` Part of it is only in ${t.partCouncil} Council's rights-of-way record, so that stretch of line may be rough.` : ""))}</p>${w.closure ? `<p class="small"><a href="${esc(w.closure.url)}" target="_blank" rel="noopener">Source: ${esc(w.closure.source)}</a></p>` : ""}`;
   const away = view === "route" && !inRoute(w.id) ? distFromRoute(w) : null;
   if (away != null) div.insertAdjacentHTML("beforeend", `<p class="small muted">${away < 150 ? "Right next to your route." : `About ${km(away)} km from your route.`}</p>`);
   if (c.ride && view !== "tour") {
@@ -1055,14 +1081,20 @@ async function brouterProfile(fresh){
 }
 // One road link, lane end to next lane start. Answers are cached, so edits only re-route the links that changed.
 async function brLink(a, b){
-  for (let attempt = 0; attempt < 2; attempt++) {
-    let pid; try { pid = await brouterProfile(attempt > 0); } catch { return null; }
+  let freshProfile = false;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    let pid; try { pid = await brouterProfile(freshProfile); } catch { return null; }
     const url = `https://brouter.de/brouter?lonlats=${a[1].toFixed(6)},${a[0].toFixed(6)}|${b[1].toFixed(6)},${b[0].toFixed(6)}&profile=${pid}&alternativeidx=0&format=geojson&profile:twisty=${tw().toFixed(2)}`;
     const r = await polite("brouter", url, {}, { timeout: 45000 });
-    if (!r.ok) { if (attempt === 0 && /profile/i.test(r.text)) continue; return null; }
+    if (!r.ok) {
+      // the free server says "Please, retry later!" when it's busy: wait a little longer each time before giving up
+      if (/retry later/i.test(r.text) && attempt < 3) { await sleep(3000 * (attempt + 1)); continue; }
+      if (!freshProfile && /profile/i.test(r.text)) { freshProfile = true; continue; }
+      return null;
+    }
     try {
       const c = JSON.parse(r.text).features[0].geometry.coordinates.map(([x, y]) => [y, x]);
-      return { coords: [a, ...c, b], ok: true, jump: Math.max(hav(a, c[0]), hav(c.at(-1), b)), via: "BRouter" };
+      return { coords: [a, ...c, b], ok: true, jumpA: hav(a, c[0]), jumpB: hav(c.at(-1), b), via: "BRouter" };
     } catch { return null; }
   }
   return null;
@@ -1070,8 +1102,8 @@ async function brLink(a, b){
 async function osrmLink(a, b){
   const r = await polite("osrm", `https://router.project-osrm.org/route/v1/driving/${a[1].toFixed(6)},${a[0].toFixed(6)};${b[1].toFixed(6)},${b[0].toFixed(6)}?overview=full&geometries=geojson`);
   try { const d = JSON.parse(r.text); if (d.code !== "Ok") throw 0;
-    return { coords: [a, ...d.routes[0].geometry.coordinates.map(([x, y]) => [y, x]), b], ok: true, jump: Math.max(d.waypoints[0].distance, d.waypoints[1].distance), via: "OSRM" };
-  } catch { return { coords: [a, b], ok: false, jump: hav(a, b), via: "none" }; }
+    return { coords: [a, ...d.routes[0].geometry.coordinates.map(([x, y]) => [y, x]), b], ok: true, jumpA: d.waypoints[0].distance, jumpB: d.waypoints[1].distance, via: "OSRM" };
+  } catch { return { coords: [a, b], ok: false, jumpA: hav(a, b), jumpB: 0, via: "none" }; }
 }
 const tripLinks = t => {
   const end = t.finish || (t.loop && t.start ? t.start : null), links = []; let prev = t.start;
@@ -1083,14 +1115,20 @@ const tripLinks = t => {
 // hills it's the only option; otherwise BRouter, then OSRM.
 async function routeTrip(t, alive, onLink){
   orientTrip(t);
-  const roads = await Promise.all(tripLinks(t).map(async l => {
+  const roads = await Promise.all(tripLinks(t).map(async (l, k) => {
     if (!l) return null;
+    // a link's ends are lane ends, or points (the start, the finish, a via or a stop)
+    const aPoint = k === 0 || !!t.items[k - 1]?.via, bPoint = k === t.items.length || !!t.items[k]?.via;
     const straight = hav(l[0], l[1]);
     const lp = straight < 15000 ? laneGraphPath(l[0], l[1], settings.useUcr, straight * 3 + 3000) : null;
     let r;
     if (lp && lp.len <= straight * 1.6 + 1000) r = { coords: lp.coords, ok: true, jump: 0, via: "lanes", lanes: true };
     else {
-      r = (await brLink(l[0], l[1])) || (await osrmLink(l[0], l[1]));
+      r = { ...((await brLink(l[0], l[1])) || (await osrmLink(l[0], l[1]))) };
+      // A point off the road (a town centre, a pass, a pub) is reached by the road nearest it: drop the straight
+      // line out to it, which would put a spike in the GPX. A lane end off the road keeps its line, and counts as a gap.
+      if (r.ok) { if (aPoint && r.jumpA > 25) r.coords = r.coords.slice(1); if (bPoint && r.jumpB > 25) r.coords = r.coords.slice(0, -1); }
+      r.jump = r.ok ? Math.max(aPoint ? 0 : r.jumpA, bPoint ? 0 : r.jumpB) : r.jumpA;
       if (lp && (r.jump > 100 || !r.ok)) r = { coords: lp.coords, ok: true, jump: 0, via: "lanes", lanes: true };
     }
     onLink?.();
@@ -1176,7 +1214,11 @@ function routeWarnings(b, t = trip){
   const warn = [];
   const flagged = t.items.filter(it => it.ids?.some(id => window.COUNCIL_FLAGS?.ways?.[id]));
   if (flagged.length) warn.push(`The council says ${flagged.length > 1 ? `${flagged.length} of these lanes aren't` : `${flagged[0].name} isn't`} open to motors. Take ${flagged.length > 1 ? "them" : "it"} out.`);
+  const closing = t.items.filter(it => it.ids?.some(id => { const w = osmWays.get(laneOf.get(id) ?? id); return w?.season?.soon; }));
+  if (closing.length) warn.push(`${closing.length > 1 ? `${closing.length} lanes close` : `${closing[0].name} closes`} to motor vehicles for the winter within the next fortnight. Check the dates before you ride.`);
   if (b?.jumps) warn.push(`${b.jumps} gap${b.jumps > 1 ? "s" : ""} over 100 m from a road: the GPX draws a straight line there.`);
+  const fallback = b?.segs?.filter(sg => sg.type === "road" && sg.via === "OSRM").length || 0;
+  if (fallback && t === trip) warn.push(`The twisty-roads server was busy, so ${fallback} road stretch${fallback > 1 ? "es use" : " uses"} the quickest roads instead. <a href="#" data-retry>Try again</a>`);
   if (b?.failed) warn.push(`${b.failed} road link${b.failed > 1 ? "s" : ""} couldn't be routed.`);
   return warn;
 }
@@ -1197,8 +1239,9 @@ function renderRoute(){
   $("#dropUcr").textContent = `Take out the ${amber} unclassified road${amber === 1 ? "" : "s"} already in this route`;
   $("#routeStatus").textContent = built?.provisional ? "Rough figures on the quickest roads. Finding the twisty roads…" : built ? `${nLanes} lane${nLanes !== 1 ? "s" : ""} · ${km(built.off)} km off-road` : "Finding roads between the lanes…";
   $("#routeStatus").title = built ? `Includes ${km(built.joinM || 0)} km of connecting lanes. Roads by ${built.via}.` : "";
-  const warn = routeWarnings(built).map(esc);
-  $("#routeWarn").innerHTML = warn.join("<br>"); $("#routeWarn").hidden = !warn.length;
+  const warn = routeWarnings(built).map(w => w.includes("data-retry") ? esc(w.split(" <a")[0]) + " <a" + w.split(" <a")[1] : esc(w));
+  $("#routeWarn").innerHTML = warn.join("<br>");
+  const retry = $("#routeWarn [data-retry]"); if (retry) retry.onclick = e => { e.preventDefault(); built = null; renderRoute(); build(); }; $("#routeWarn").hidden = !warn.length;
   const ul = $("#laneList"); ul.innerHTML = "";
   trip.items.forEach((it, i) => {
     const li = document.createElement("li");
@@ -1336,7 +1379,7 @@ function gpxText(title, parts){
     if (n === 0 && p.trip.start) w.push(`<wpt lat="${f(p.trip.start[0])}" lon="${f(p.trip.start[1])}"><name>Start</name><sym>Flag, Blue</sym></wpt>`);
     let laneNo = 0;   // lanes numbered L1, L2… on their own, so a stop in between doesn't leave a gap
     p.trip.items.forEach((it, i) => { if (!it.via) laneNo++; const ln = laneNo; w.push(it.stop ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}${it.kind}: ${it.name}`.replace(`${it.kind}: ${it.kind}`, it.kind).slice(0, 40))}</name><sym>${CODE[it.stop.code]?.sym || "Waypoint"}</sym></wpt>`
-      : it.via ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}Via ${i + 1}`)}</name><sym>Waypoint</sym></wpt>`
+      : it.via ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}${it.name && it.name !== "Via point" ? it.name : "Via " + (i + 1)}`.slice(0, 40))}</name><sym>Waypoint</sym></wpt>`
       : `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}L${ln} ${it.name}`.slice(0, 40))}</name><desc>${x(`${it.kind}, ${km(lineLen(it.coords))} km`)}</desc><sym>Flag, Green</sym></wpt>`); });
     // stops along the way: planned stops are already in, and the rest are thinned to one of each kind every 5 km,
     // or a sat nav screen fills with every café in the one town the route passes through
@@ -1567,6 +1610,10 @@ function renderTour(){
   if (!tour) return;
   $("#tourName").value = tour.name;
   const tot = tour.days.reduce((a, d) => a + (d.built?.total || 0), 0), off = tour.days.reduce((a, d) => a + (d.built?.off || 0), 0), hrs = tour.days.reduce((a, d) => a + (d.built?.hours || 0), 0);
+  // a ready-made trip carries a one-line description and what to know before going (seasonal passes, closures)
+  $("#tourLine").hidden = !tour.line2; $("#tourLine").textContent = tour.line2 || "";
+  $("#tourNotes").hidden = !tour.notes?.length; $("#tourNotes").innerHTML = (tour.notes || []).map(esc).join("<br>");
+  $("#tourReplan").hidden = !!tour.featured;
   $("#tsDays").textContent = tour.days.length; $("#tsKm").textContent = km(tot); $("#tsLane").textContent = tot ? Math.round(100 * off / tot) + "%" : "–"; $("#tsHours").textContent = hm(hrs);
   const box = $("#dayList"); box.innerHTML = "";
   tour.days.forEach((d, i) => {
@@ -1574,7 +1621,7 @@ function renderTour(){
     card.className = "day"; card.setAttribute("aria-pressed", tourPick === i); card.tabIndex = 0; card.setAttribute("role", "button");
     const warn = routeWarnings(b, d.trip);
     card.innerHTML = `<div class="top"><h3>${esc(d.trip.name || dayName(i))}</h3></div>
-      <div class="stats"><span><b>${b ? hm(b.hours) : "–"}</b> riding</span><span><b>${b ? km(b.total) : "–"}</b> km</span><span><b>${b && b.total ? Math.round(100 * b.off / b.total) : 0}%</b> lanes</span><span><b>${d.trip.items.length}</b> lanes</span>${b?.fuelGap ? `<span>fuel gap <b>${km(b.fuelGap)}</b> km</span>` : ""}</div>
+      <div class="stats"><span><b>${b ? hm(b.hours) : "–"}</b> riding</span><span><b>${b ? km(b.total) : "–"}</b> km</span><span><b>${b && b.total ? Math.round(100 * b.off / b.total) : 0}%</b> lanes</span><span><b>${d.trip.items.filter(it => !it.via).length}</b> lanes</span>${b?.fuelGap ? `<span>fuel gap <b>${km(b.fuelGap)}</b> km</span>` : ""}</div>${b?.noStops ? `<p class="small muted">Fuel, food and places to stay aren't loaded for Scotland, so plan those yourself.</p>` : ""}
       ${b && b.hours > tour.dayHours * 1.3 ? `<div class="small" style="color:#b45309">Longer than your ${tour.dayHours} h a day.</div>` : ""}
       ${warn.length ? `<div class="small muted">${esc(warn[0])}</div>` : ""}
       <div class="acts"></div>`;
@@ -1676,7 +1723,8 @@ function renderExplore(){
   if (feats.length) for (const t of feats) {
     const tot = t.tour.days.reduce((a, d) => a + (d.built?.total || 0), 0), off = t.tour.days.reduce((a, d) => a + (d.built?.off || 0), 0);
     const c = document.createElement("div"); c.className = "card tcard";
-    c.innerHTML = `<div><h3>${esc(t.name)}</h3><div class="stats"><span><b>${t.tour.days.length}</b> days</span><span><b>${km(tot)}</b> km</span><span><b>${tot ? Math.round(100 * off / tot) : 0}%</b> lanes</span></div></div>`;
+    const road = t.kind === "road", nd = t.tour.days.length;
+    c.innerHTML = `<div><h3>${esc(t.name)}</h3><div class="stats"><span><b>${nd}</b> day${nd > 1 ? "s" : ""}</span><span><b>${km(tot)}</b> km</span>${road ? `<span>road trip${t.country && t.country !== "England" ? ", " + esc(t.country) : ""}</span>` : `<span><b>${tot ? Math.round(100 * off / tot) : 0}%</b> lanes</span>`}</div>${t.line ? `<p class="small muted" style="margin-top:4px">${esc(t.line)}</p>` : ""}</div>`;
     const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Open"; go.setAttribute("aria-label", "Open " + t.name);
     go.onclick = e => { e.stopPropagation(); loadFeaturedTour(t); };
     c.onclick = () => loadFeaturedTour(t);
@@ -1760,7 +1808,8 @@ function loadFeaturedRide(rd){
 }
 function loadFeaturedTour(t){
   if (tour?.days?.length && !featNames().has(tour.name)) saveItem({ name: tour.name || "My tour", tour, summary: `${tour.days.length} days` });
-  tour = clone(t.tour); tourPick = -1; saveTour(); openTour(); }
+  tour = clone(t.tour); tour.featured = true; tour.line2 = t.line || ""; tour.notes = t.notes || [];
+  tourPick = -1; saveTour(); openTour(); }
 
 /* ---------- finding lanes: by name or number, the longest here or anywhere, or the closest ---------- */
 let laneSort = "here";
@@ -1806,7 +1855,19 @@ function showLane(w){
 }
 let laneJump = false;
 map.on("popupclose", () => { if (view === "lanes") highlightLane(null); });
-function openLanes(){ showView("lanes", "mid"); renderLaneFinder(); }
+function openLanes(){ showView("lanes", "mid"); renderLaneFinder(); renderClassics(); }
+// Lanes riders ask about by name, with whether they're open and where that comes from (data/classics.js)
+function renderClassics(){
+  const ul = $("#classicList"); if (ul.children.length) return;
+  const word = { open: "Open", check: "Check first", closed: "Closed" };
+  for (const c of window.CLASSICS || []) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="grow" role="button" tabindex="0"><span class="t">${esc(c.name)}</span><span class="s"><span class="stat-chip stat-${c.status}">${word[c.status]}</span>${esc(c.text)} <a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.source)}</a></span></span>`;
+    li.querySelector(".grow").onclick = e => { if (e.target.tagName === "A") return; if (phone()) setSheet("min"); map.setView(c.at, c.zoom); };
+    ul.append(li);
+  }
+  $("#classicBox").hidden = !ul.children.length;
+}
 $("#goLanes").onclick = openLanes;
 $("#lanesBack").onclick = () => showView("plan", "peek");
 $("#laneQ").oninput = () => renderLaneFinder();
