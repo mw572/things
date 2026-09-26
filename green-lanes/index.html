@@ -164,7 +164,8 @@ body.sat .leaflet-tile-pane{filter:saturate(.4) brightness(.72)}
 .poster{background:linear-gradient(135deg,#dfe8d6,#b9cfa9 55%,#8fae84);position:relative;overflow:hidden}
 .poster img{width:100%;height:100%;object-fit:cover;display:block}
 .poster.big{aspect-ratio:3/2;border:2px solid var(--ink);border-radius:10px;box-shadow:var(--shadow)}
-.own{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.own{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.own .btn{white-space:normal;text-align:center;line-height:1.1}
 .own .btn{flex-direction:column;min-height:64px;gap:2px;padding:6px 4px}
 .own .ic{font-size:20px;line-height:1}
 .acts4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
@@ -352,6 +353,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
     <ol class="steps">
       <li><b>Pick an area</b> on Explore and ride a ready-made route, or plan your own.</li>
       <li><b>Plan your own:</b> <i>Loop</i> from a start, <i>Draw</i> roughly where you want to go, or a multi-day <i>Tour</i>.</li>
+      <li><b>Find lanes</b> by name or number, or list the longest on the map, the longest anywhere, or the closest.</li>
       <li><b>Change it:</b> tap a green lane to add it, tap a pink one to take it out, or drag ○ onto a lane. To stop somewhere, tap its icon and choose Add to route, or drag ○ onto the icon.</li>
       <li><b>Show</b> (under the search box) puts tea, food, toilets, fuel, beauty spots and places to stay on the map and in the GPX.</li>
       <li><b>Download the GPX</b> for your sat nav or phone.</li>
@@ -376,6 +378,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
           <button class="btn" id="goLoop"><span class="ic" aria-hidden="true">⟲</span>Loop</button>
           <button class="btn" id="goDraw"><span class="ic" aria-hidden="true">✎</span>Draw</button>
           <button class="btn" id="goTour"><span class="ic" aria-hidden="true">⛺</span>Tour</button>
+          <button class="btn" id="goLanes"><span class="ic" aria-hidden="true">⌕</span>Find lanes</button>
         </div>
         <div id="tourBlock" class="view" hidden>
           <h3>Multi-day tours</h3>
@@ -385,6 +388,20 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
           <h3>Your saved routes</h3>
           <ul class="list" id="savedList"></ul>
         </div>
+      </div>
+
+      <div id="vLanes" class="view" hidden>
+        <button class="btn quiet back" id="lanesBack">← Back</button>
+        <h2>Find lanes</h2>
+        <div class="field"><input id="laneQ" type="search" placeholder="Name or number, e.g. Ridgeway, BOAT 12" aria-label="Search lanes by name or number" autocomplete="off"></div>
+        <div class="seg" id="laneSort" role="tablist" aria-label="Which lanes">
+          <button data-sort="here" aria-selected="true">Longest here</button>
+          <button data-sort="all" aria-selected="false">Longest anywhere</button>
+          <button data-sort="near" aria-selected="false">Closest</button>
+        </div>
+        <label class="check"><input type="checkbox" id="laneBoatOnly"> Byways only (no unclassified roads)</label>
+        <p class="small muted" id="laneCount"></p>
+        <ul class="list" id="laneResults"></ul>
       </div>
 
       <div id="vRegion" class="view" hidden>
@@ -570,6 +587,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
       <button class="btn" id="wlLoop"><span class="ic" aria-hidden="true">⟲</span>Loop</button>
       <button class="btn" id="wlDraw"><span class="ic" aria-hidden="true">✎</span>Draw</button>
       <button class="btn" id="wlTour"><span class="ic" aria-hidden="true">⛺</span>Tour</button>
+      <button class="btn" id="wlLanes"><span class="ic" aria-hidden="true">⌕</span>Find lanes</button>
     </div>
     <h2>Or pick an area</h2>
     <div class="wl-grid" id="wlGrid" role="list" aria-label="Riding areas"></div>

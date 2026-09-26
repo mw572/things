@@ -523,7 +523,7 @@ for (const id of ["twisty", "twisty2"]) $("#" + id).onchange = e => { settings.t
 /* ---------- views and the phone sheet ---------- */
 let view = "plan";
 const sheet = $("#sheet");
-const PEEK = { plan: 300, region: 250, ideas: 176, route: 206, tour: 206 };
+const PEEK = { plan: 300, region: 250, ideas: 176, route: 206, tour: 206, lanes: 250 };
 // On a phone the panel has three positions: a collapsed bar, a preview, and full height.
 // The preview is the short peek on Explore and the area page, and half height on the working screens.
 const previewState = () => ["plan", "region"].includes(view) ? "peek" : "mid";
@@ -543,6 +543,7 @@ function setSheet(state){
 function minLabel(){
   if (view === "region") return $("#regionName").textContent || "Area";
   if (view === "ideas") return "Route ideas";
+  if (view === "lanes") return "Find lanes";
   if (view === "route") return (trip.name || "Your route") + (built ? ` · ${km(built.total)} km` : "");
   if (view === "tour") return tour?.name || "Tour";
   return "Where to ride";
@@ -560,7 +561,7 @@ $("#sheetHandle").addEventListener("pointerup", e => {
 map.on("dragstart", () => { if (phone() && !drawing && !picking && sheet.dataset.state !== "min") setSheet("min"); });
 function showView(v, sheetState){
   view = v;
-  for (const [id, name] of [["vPlan", "plan"], ["vRegion", "region"], ["vIdeas", "ideas"], ["vRoute", "route"], ["vTour", "tour"]]) $("#" + id).hidden = v !== name;
+  for (const [id, name] of [["vPlan", "plan"], ["vLanes", "lanes"], ["vRegion", "region"], ["vIdeas", "ideas"], ["vRoute", "route"], ["vTour", "tour"]]) $("#" + id).hidden = v !== name;
   if (v !== "region") regionRideLayer.clearLayers();
   $("#newConfirm").hidden = true;
   document.documentElement.style.setProperty("--sheet-peek", PEEK[v] + "px");
@@ -1665,6 +1666,61 @@ function loadFeaturedTour(t){
   if (tour?.days?.length && !featNames().has(tour.name)) saveItem({ name: tour.name || "My tour", tour, summary: `${tour.days.length} days` });
   tour = clone(t.tour); tourPick = -1; saveTour(); openTour(); }
 
+/* ---------- finding lanes: by name or number, the longest here or anywhere, or the closest ---------- */
+let laneSort = "here";
+const laneMid = w => w.coords[Math.floor(w.coords.length / 2)];
+function whereIs(w){   // "Salisbury Plain" if it's in one of the riding areas, otherwise how far from the middle of the map
+  const m = laneMid(w), r = REGION_LIST.map(r => [r, hav(m, r.centre)]).sort((a, b) => a[1] - b[1])[0];
+  if (r && r[1] < 40000) return r[0].name;
+  const c = map.getCenter(); return `${km(hav(m, [c.lat, c.lng]))} km from the map centre`;
+}
+function renderLaneFinder(){
+  if (view !== "lanes") return;
+  const q = $("#laneQ").value.trim().toLowerCase(), boatOnly = $("#laneBoatOnly").checked;
+  const b = map.getBounds(), c = map.getCenter(), cc = [c.lat, c.lng];
+  let list = [];
+  for (const w of osmWays.values()) {
+    if (!CLASSES[w.cls].ride || (boatOnly && w.cls !== "boat") || w.len < 100) continue;   // scraps under 100 m are mapping leftovers
+    if (q && ![w.tags.name, w.tags.prow_ref, w.tags.ref].some(t => t && t.toLowerCase().includes(q))) continue;
+    if (laneSort === "here" && !q && !b.intersects(L.latLngBounds([w.bbox[0], w.bbox[1]], [w.bbox[2], w.bbox[3]]))) continue;
+    list.push(w);
+  }
+  if (laneSort === "near") { for (const w of list) w._d = hav(cc, laneMid(w)); list.sort((a, b) => a._d - b._d); }
+  else list.sort((a, b) => b.len - a.len);
+  const total = list.length; list = list.slice(0, 40);
+  $("#laneCount").textContent = !total ? (laneSort === "here" && !q ? "No lanes on the map here. Move the map, or try Longest anywhere." : "Nothing matches.")
+    : `${total.toLocaleString()} lane${total > 1 ? "s" : ""}${laneSort === "here" && !q ? " on the map" : ""}${total > 40 ? ", showing the first 40" : ""}. Tap one to see it.`;
+  const ul = $("#laneResults"); ul.innerHTML = "";
+  for (const w of list) {
+    const t = w.tags, c2 = CLASSES[w.cls], surf = [t.surface, t.tracktype && t.tracktype.replace("grade", "grade ")].filter(Boolean).join(", ");
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="grow" role="button" tabindex="0"><span class="t">${esc(laneName(t))}</span><br><span class="s"><span class="chip" style="background:${css(c2.color)}">${esc(DESIG[t.designation] || "Byway")}</span> <b>${km(w.len)} km</b>${inRoute(w.id) ? " · in your route" : ""} · ${esc(whereIs(w))}${surf ? " · " + esc(surf) : ""}</span></span>`;
+    const go = () => showLane(w);
+    li.querySelector(".grow").onclick = go; li.querySelector(".grow").onkeydown = e => { if (e.key === "Enter") go(); };
+    ul.append(li);
+  }
+}
+function showLane(w){
+  laneJump = true;
+  // on a phone the list drops to the bottom bar so the lane gets the screen; the bar says "Find lanes" to go back
+  if (phone()) setSheet("min");
+  map.fitBounds(L.latLngBounds(w.coords).pad(0.2), { maxZoom: 16, paddingTopLeft: [0, phone() ? 190 : 0], paddingBottomRight: [0, phone() ? 70 : 0], animate: false });
+  const m = laneMid(w);
+  setTimeout(() => { L.popup({ maxWidth: 300 }).setLatLng(m).setContent(lanePopup(w)).openOn(map); highlightLane(w); }, 50);
+}
+let laneJump = false;
+map.on("popupclose", () => { if (view === "lanes") highlightLane(null); });
+function openLanes(){ showView("lanes", "mid"); renderLaneFinder(); }
+$("#goLanes").onclick = openLanes;
+$("#lanesBack").onclick = () => showView("plan", "peek");
+$("#laneQ").oninput = () => renderLaneFinder();
+$("#laneBoatOnly").onchange = () => renderLaneFinder();
+document.querySelectorAll("#laneSort button").forEach(bt => bt.onclick = () => {
+  laneSort = bt.dataset.sort; document.querySelectorAll("#laneSort button").forEach(x => x.setAttribute("aria-selected", x === bt)); renderLaneFinder();
+});
+// "Longest here" and "Closest" follow the map, except straight after jumping to a lane from the list
+map.on("moveend", () => { if (view !== "lanes") return; if (laneJump) { laneJump = false; return; } if (laneSort !== "all") renderLaneFinder(); });
+
 /* ---------- search ---------- */
 $("#searchForm").onsubmit = async e => {
   e.preventDefault(); const q = $("#q").value.trim(); if (!q) return;
@@ -1689,11 +1745,9 @@ map.on("click", () => { if (!picking) { $("#layersPop").hidden = true; $("#helpP
 // On a phone, a popup must not open underneath the bottom sheet: drop the sheet and move the map to clear it.
 map.on("popupopen", e => {
   if (!phone()) return;
-  if (sheet.dataset.state !== "peek") setSheet("peek");
-  setTimeout(() => {
-    const peek = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sheet-peek")) || 180;
-    map.panInside(e.popup.getLatLng(), { paddingTopLeft: [20, 300], paddingBottomRight: [20, peek + 30] });
-  }, 300);
+  // screens whose preview is a small strip drop to it; the half-height ones (route, ideas, tour, lanes) drop to the bar
+  if (sheet.dataset.state !== "min") setSheet(previewState() === "peek" ? "peek" : "min");
+  setTimeout(() => map.panInside(e.popup.getLatLng(), { paddingTopLeft: [20, 300], paddingBottomRight: [20, sheet.getBoundingClientRect().height + 30] }), 300);
 });
 const toggles = store.get("toggles", {});
 for (const id of ["tLanes", "tUcr", "tZones", "tClosed", "tNotes"]) {
@@ -1740,6 +1794,7 @@ $("#wlMap").onclick = () => { closeWelcome(); showView("plan", phone() ? "min" :
 $("#wlLoop").onclick = () => { closeWelcome(); $("#goLoop").click(); };
 $("#wlDraw").onclick = () => { closeWelcome(); $("#goDraw").click(); };
 $("#wlTour").onclick = () => { closeWelcome(); $("#goTour").click(); };
+$("#wlLanes").onclick = () => { closeWelcome(); openLanes(); };
 $("#helpHome").onclick = () => { $("#helpPop").hidden = true; showWelcome(); };
 let welcomed = false; try { welcomed = !!sessionStorage.getItem("glp:welcomed"); } catch (e) {}
 if (!welcomed) showWelcome();
