@@ -74,6 +74,9 @@ input[type=range]{width:100%;height:32px;accent-color:var(--green);margin:0}
 .stat-chip{display:inline-block;font:700 11px Barlow,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:#fff;padding:1px 6px;border-radius:3px;margin-right:6px}
 .stat-open{background:var(--boat)}.stat-check{background:var(--ucr)}.stat-closed{background:var(--closed)}
 #classicList li{align-items:flex-start}
+.bigstats.rough b{opacity:.55}
+.bigstats.rough b::before{content:"≈ ";font-weight:600}
+.tgroup{margin:4px 0 -2px;font:700 12px Barlow,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 #classicList .s{display:block;margin-top:2px}
 #ideaList .card[aria-pressed="false"]:hover{opacity:.9}
 .inum{display:inline-grid;place-items:center;width:24px;height:24px;margin-right:7px;border-radius:50%;background:var(--c,var(--ink));color:#fff;font:700 14px Barlow,sans-serif;vertical-align:2px}
@@ -124,6 +127,7 @@ ul.list li .s{font-size:13px;color:var(--muted)}
 #banner{top:72px;left:calc((100% - 400px)/2);transform:translateX(-50%);background:var(--ink);color:var(--paper);border-radius:8px;padding:8px 10px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 440px);box-shadow:var(--shadow);font-weight:600}
 #banner .btn{min-height:36px;padding:4px 10px;box-shadow:none;border-color:var(--paper)}
 body.banner-on #poiWrap,body.banner-on #tools{display:none}
+.leaflet-popup-content{max-height:calc(100dvh - 220px);overflow:auto}
 .leaflet-tooltip.stop-label{background:var(--card);border:1.5px solid var(--ink);border-radius:4px;padding:1px 5px;font:600 12px Barlow,sans-serif;color:var(--ink);box-shadow:none}
 .leaflet-tooltip.stop-label::before{display:none}
 #banner{z-index:1100}
@@ -254,12 +258,13 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   #searchWrap{right:72px;width:auto;min-width:0;left:10px;top:10px}
   #tools{right:10px;top:10px}
   .tool{width:50px;height:50px}
-  #banner{left:10px;right:10px;transform:none;max-width:none;top:66px}
-  #status{left:10px;bottom:calc(var(--sheet-h) + 10px);max-width:calc(100% - 20px)}
+  #banner{left:10px;right:10px;transform:none;max-width:none;top:66px;padding:6px 8px;gap:6px;font-size:14px;line-height:1.25}
+  #bannerText{flex:1 1 100%;text-align:center}
+  #status{left:10px;bottom:min(calc(var(--sheet-h) + 10px), calc(100% - 170px));max-width:calc(100% - 20px)}
   #zoomHint{left:50%;bottom:calc(var(--sheet-h) + 48px)}
-  #queueChip{left:50%;bottom:calc(var(--sheet-h) + 12px)}
+  #queueChip{left:50%;bottom:min(calc(var(--sheet-h) + 58px), calc(100% - 124px))}   /* above the status line, never over the top buttons */
   .leaflet-control-zoom{display:none}
-  .pop{top:auto;bottom:calc(var(--sheet-h) + 8px);right:8px;left:8px;width:auto;max-height:66vh}
+  .pop{top:auto;bottom:calc(var(--sheet-h) + 8px);right:8px;left:8px;width:auto;max-height:calc(100% - var(--sheet-h) - 84px);z-index:1200}
   .leaflet-bottom{bottom:var(--sheet-ctl)}
 }
 /* small phones (iPhone SE and narrower): keep every row inside the screen */
@@ -339,7 +344,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
       <label><input type="checkbox" id="tLanes" checked> Byways (green)</label>
       <label><input type="checkbox" id="tUcr" checked> Unclassified roads (amber)</label>
       <label><input type="checkbox" id="tZones" checked> Lane areas, when zoomed out</label>
-      <label><input type="checkbox" id="tClosed"> Closed and restricted lanes</label>
+      <label><input type="checkbox" id="tClosed" checked> Closed and restricted lanes</label>
       <label><input type="checkbox" id="tNotes"> Old lane notes (2012, south of England only)</label>
     </div>
     <h3>Map style</h3>
@@ -390,7 +395,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
           <button class="btn" id="goLanes"><span class="ic" aria-hidden="true">⌕</span>Find lanes</button>
         </div>
         <div id="tourBlock" class="view" hidden>
-          <h3>Multi-day tours</h3>
+          <h3>Tours and trips</h3>
           <div id="tourCards" class="stack"></div>
         </div>
         <div id="savedBlock" class="view" hidden>
@@ -500,6 +505,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
           </div>
           <div id="tourSettingsSlot"></div>
           <button class="btn primary wide" id="tourGo">Plan my tour</button>
+          <p class="small muted" id="tourEst"></p>
         </div>
         <div id="tourResult" class="view" hidden>
           <input class="namebox" id="tourName" aria-label="Tour name">
@@ -591,7 +597,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
 <script src="data/closures.js?v=613bc2dd" onerror="window.CLOSURES=null"></script>
 <script src="data/classics.js?v=a248a2b0" onerror="window.CLASSICS=[]"></script>
 <script src="data/regions.js?v=d1a0b3f7" onerror="window.REGIONS=[];window.TOUR_PRESETS=[]"></script>
-<script src="data/featured.js?v=aa80791f" onerror="window.FEATURED=null"></script>
+<script src="data/featured.js?v=1438cd20" onerror="window.FEATURED=null"></script>
 <section id="welcome" aria-label="Start" hidden>
   <div class="wl-inner">
     <div class="wl-hero"><div class="poster" id="wlHero"></div><div class="wl-title"><h1>Green Lanes</h1><p>Plan motorbike rides on legal byways in England and Wales, then take the GPX with you.</p></div></div>
@@ -612,6 +618,6 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   </div>
 </section>
 <script src="js/plan.js?v=89dd517b"></script>
-<script src="js/app.js?v=83571ede"></script>
+<script src="js/app.js?v=bc8dc542"></script>
 </body>
 </html>
