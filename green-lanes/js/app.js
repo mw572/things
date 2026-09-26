@@ -68,9 +68,9 @@ L.control.zoom({ position: "bottomright" }).addTo(map);
 map.createPane("route"); map.getPane("route").style.zIndex = 450; map.getPane("route").style.pointerEvents = "none";
 const routeRenderer = L.svg({ pane: "route" });
 const bases = {
-  Map: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Esri, HERE, Garmin, OS, © OpenStreetMap contributors" }),
-  Satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Esri, Maxar, Earthstar Geographics" }),
-  Topo: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", { maxZoom: 17, attribution: "OpenTopoMap (CC-BY-SA), © OpenStreetMap contributors" })
+  Map: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, crossOrigin: true, attribution: "Esri, HERE, Garmin, OS, © OpenStreetMap contributors" }),
+  Satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, crossOrigin: true, attribution: "Esri, Maxar, Earthstar Geographics" }),
+  Topo: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", { maxZoom: 17, crossOrigin: true, attribution: "OpenTopoMap (CC-BY-SA), © OpenStreetMap contributors" })
 };
 let baseName = store.get("base", "Map"); if (!bases[baseName]) baseName = "Map";
 bases[baseName].addTo(map);
@@ -78,7 +78,9 @@ let restyleLanes = null;   // set once the lanes exist
 function setBase(name){
   map.removeLayer(bases[baseName]); baseName = name; bases[name].addTo(map); bases[name].bringToBack(); store.set("base", name);
   // on the aerial photo the lanes are drawn brighter and the photo is toned down, or green lanes vanish into green fields
-  document.body.classList.toggle("sat", name === "Satellite"); restyleLanes?.();
+  // each base map has its own line colours (the --l-* variables in index.html), so lanes stay readable on all three
+  document.documentElement.classList.toggle("sat", name === "Satellite"); document.documentElement.classList.toggle("topo", name === "Topo");
+  restyleLanes?.(); restyleZones?.();
   document.querySelectorAll("#baseSeg button").forEach(b => b.setAttribute("aria-selected", b.dataset.base === name));
 }
 document.querySelectorAll("#baseSeg button").forEach(b => b.onclick = () => setBase(b.dataset.base));
@@ -91,8 +93,8 @@ const CLASSES = {
   boat:   { color: "--boat",   weight: 3,   dash: null,  say: "Open to all traffic. Motorbikes allowed.", ride: true },
   ucr:    { color: "--ucr",    weight: 2.5, dash: null,  say: "Unclassified road. Usually open to motorbikes; check the TRF map.", ride: true },
   tro:    { color: "--ucr",    weight: 2.5, dash: "6 5", say: "OpenStreetMap notes a seasonal or part-time restriction. Check before riding.", ride: true },
-  closed: { color: "--closed", weight: 2,   dash: "2 6", say: "Recorded as closed to motor vehicles.", ride: false },
-  rb:     { color: "--closed", weight: 2,   dash: "2 6", say: "Restricted byway: no motor vehicles.", ride: false }
+  closed: { color: "--closed", weight: 2.5, dash: "2 6", say: "Recorded as closed to motor vehicles.", ride: false },
+  rb:     { color: "--rb",     weight: 2,   dash: "2 6", say: "Restricted byway: no motor vehicles.", ride: false }
 };
 // Time rules in OpenStreetMap, e.g. "no @ (Oct 01-Apr 30)": closed for part of the year. Rules that only stop
 // vehicles with more than two wheels don't apply to motorbikes. Returns null when there's no rule it can read.
@@ -238,11 +240,13 @@ $("#dataNote").textContent = `Lanes: ${osmPieces.toLocaleString()} pieces from O
 const laneLayer = L.layerGroup().addTo(map);
 const shown = new Set();
 let fadeLanes = false;
-const SAT_COLOR = { "--boat": "#52ff85", "--ucr": "#ffc629", "--closed": "#ff6a5c" };
+// Lines use the base map's own colours (--l-boat etc.), strong enough to read in sun; closed lanes a little quieter.
+// When a route or ideas are on screen the network steps back so they stand out.
 function laneStyle(w){
-  const c = CLASSES[w.cls], z = map.getZoom(), sat = baseName === "Satellite";
-  return { color: sat ? SAT_COLOR[c.color] : css(c.color), weight: c.weight + (z >= 13 ? 1 : 0) + (sat ? 1.5 : 0), dashArray: w.tags.source === "council" ? "10 4" : c.dash,
-    opacity: fadeLanes ? (sat ? .45 : .22) : (sat ? .95 : .5) };
+  const c = CLASSES[w.cls], z = map.getZoom(), sat = baseName === "Satellite", shut = !c.ride;
+  return { color: css(c.color.replace("--", "--l-")), weight: c.weight + (z >= 13 ? 1 : 0) + (sat ? 1.5 : 0) + (w.tags.source === "council" ? .5 : 0),
+    dashArray: w.tags.source === "council" ? "12 6" : c.dash,
+    opacity: fadeLanes ? (sat ? .4 : .25) : shut ? .65 : sat ? .95 : .8 };
 }
 function layerOf(w){
   if (!w.layer) w.layer = L.polyline(w.coords, laneStyle(w)).bindPopup(() => lanePopup(w), { maxWidth: 300 })
@@ -347,10 +351,11 @@ const regionPinLayer = L.layerGroup(), regionRideLayer = L.layerGroup().addTo(ma
   for (const [k, s] of zoneSum) {
     if (s < 3000) continue;
     const [i, j] = k.split(",").map(Number), rich = Math.min(1, s / 25000);
-    L.circle([(i + .5) * CELL, (j + .5) * CELL], { radius: 6000 + 3000 * rich, stroke: false, fillColor: "#236b3a", fillOpacity: .10 + .28 * rich, interactive: false, renderer: zoneRenderer }).addTo(zoneLayer);
+    L.circle([(i + .5) * CELL, (j + .5) * CELL], { radius: 6000 + 3000 * rich, stroke: false, fillColor: css("--l-zone") || "#236b3a", fillOpacity: .10 + .28 * rich, interactive: false, renderer: zoneRenderer }).addTo(zoneLayer);
   }
 })();
 // The shading stays on while the lane lines are still too thin to read (to zoom 10), fading as they take over.
+var restyleZones = () => { const c = css("--l-zone"); zoneLayer.eachLayer(l => l.setStyle({ fillColor: c })); };   // shading colour follows the base map
 function drawZones(){
   const z = map.getZoom(), browse = ["plan", "region", "lanes"].includes(view) || (view === "ideas" && lastKind === "draw");
   const on = $("#tZones").checked && z <= 10 && browse;
@@ -599,7 +604,8 @@ function setSheet(state){
   if (state === "peek" || state === "mid") state = previewState();
   if (phone() && state !== "min" && state !== sheet.dataset.state) map.closePopup();   // a popup has no room once the panel comes up
   sheet.dataset.state = state;
-  const h = { min: "54px", peek: (PEEK[view] || 176) + "px", mid: "50vh", open: "82vh" }[state];
+  const base = { min: "54px", peek: (PEEK[view] || 176) + "px", mid: "50vh", open: "78vh" }[state];
+  const h = `calc(${base} + var(--tabbar-h, 0px))`;   // everything on the map sits above the panel and the tab bar under it
   document.documentElement.style.setProperty("--sheet-h", h);
   // map credits and the zoom hint tuck behind the panel when it's fully open, instead of floating near the top
   document.documentElement.style.setProperty("--sheet-ctl", state === "open" ? "0px" : h);
@@ -612,6 +618,9 @@ function minLabel(){
   if (view === "region") return $("#regionName").textContent || "Area";
   if (view === "ideas") return "Route ideas";
   if (view === "lanes") return "Find lanes";
+  if (view === "start") return "Plan a ride";
+  if (view === "saved") return "Saved";
+  if (view === "help") return "Help";
   if (view === "route") return (trip.name || "Your route") + (built ? ` · ${km(built.total)} km` : "");
   if (view === "tour") return tour?.name || "Tour";
   return "Where to ride";
@@ -627,9 +636,22 @@ $("#sheetHandle").addEventListener("pointerup", e => {
 });
 // Moving the map on a phone tucks the panel away so the map gets the screen.
 map.on("dragstart", () => { if (phone() && !drawing && !picking && sheet.dataset.state !== "min") setSheet("min"); });
+let lastBrowse = "plan";   // the tab screen you were on before a doing screen, where its back arrow returns
+function goBack(){ if (lastBrowse === "region" && regionOpen) openRegion(regionOpen); else showView(lastBrowse, lastBrowse === "plan" ? "peek" : "mid"); }
+const TAB_OF = { plan: "explore", region: "explore", start: "plan", saved: "saved", help: "help" };
+const TAB_VIEW = { explore: "plan", plan: "start", saved: "saved", help: "help" };
+document.querySelectorAll("#tabbar button").forEach(b => b.onclick = () => {
+  const v = TAB_VIEW[b.dataset.tab]; stopModes();
+  if (v === "plan" && view === "region") map.flyTo([52.6, -2.3], 7, { duration: 0.8 });
+  showView(v, v === "plan" ? "peek" : "mid");
+});
 function showView(v, sheetState){
   view = v;
-  for (const [id, name] of [["vPlan", "plan"], ["vLanes", "lanes"], ["vRegion", "region"], ["vIdeas", "ideas"], ["vRoute", "route"], ["vTour", "tour"]]) $("#" + id).hidden = v !== name;
+  // browsing screens show the tab bar; doing screens (ideas, route, tour, lanes) have their own back arrow instead
+  const tab = TAB_OF[v]; if (tab) lastBrowse = v;
+  document.documentElement.classList.toggle("tabs-on", !!tab);
+  document.querySelectorAll("#tabbar button").forEach(b => b.dataset.tab === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  for (const [id, name] of [["vPlan", "plan"], ["vStart", "start"], ["vSaved", "saved"], ["vHelp", "help"], ["vLanes", "lanes"], ["vRegion", "region"], ["vIdeas", "ideas"], ["vRoute", "route"], ["vTour", "tour"]]) $("#" + id).hidden = v !== name;
   if (v !== "region") regionRideLayer.clearLayers();
   $("#newConfirm").hidden = true;
   document.documentElement.style.setProperty("--sheet-peek", PEEK[v] + "px");
@@ -639,7 +661,8 @@ function showView(v, sheetState){
   if (v === "route") { drawRoute(); } else routeLayer.clearLayers();
   setSheet(sheetState || sheet.dataset.state || previewState());
   $("#sheetBody").scrollTop = 0;
-  if (v === "plan") { renderSaved(); renderExplore(); }
+  if (v === "plan") renderExplore();
+  if (v === "saved") renderSaved();
   drawRouteStops(); drawStops(); drawZones();
 }
 
@@ -893,10 +916,14 @@ async function runIdeas(){
 // top, the Map/Me/Help buttons down the right, and the panel at the bottom at whatever height it is now.
 function fitMap(b, o = {}){
   if (!phone()) return map.fitBounds(b, o);
-  const h = { min: 54, peek: PEEK[view] || 176, mid: innerHeight * .5, open: innerHeight * .82 }[sheet.dataset.state] || 176;
+  const h = ({ min: 54, peek: PEEK[view] || 176, mid: innerHeight * .5, open: innerHeight * .78 }[sheet.dataset.state] || 176) + (document.documentElement.classList.contains("tabs-on") ? 58 : 0);
   map.fitBounds(b, { ...o, paddingTopLeft: [14, 118], paddingBottomRight: [66, h + 14] });
 }
-function fitTo(idea){ fitMap(L.latLngBounds(idea.sketch.concat(idea.chain.flatMap(n => [n.a, n.b]), ...(idea.roadGeom || []))).pad(0.05), {}); }
+function fitTo(idea){   // the loop itself (its lanes, its roads and the start), not the wider circle it was searched in
+  const pts = [idea.sketch[0], ...idea.chain.flatMap(n => [n.a, n.b]), ...(idea.roadGeom || []).flat()];
+  if (lastKind === "draw") pts.push(...idea.sketch);
+  fitMap(L.latLngBounds(pts).pad(0.05), {});
+}
 function drawChain(layer, it, on, color){
   // the chosen idea is drawn bold with a dark outline; the others drop right back so it's obvious which one you're looking at
   const R = routeRenderer, line = (c, o) => L.polyline(c, { interactive: false, renderer: R, ...o }).addTo(layer);
@@ -936,8 +963,21 @@ function renderIdeas(msg){
     card.onclick = pick; card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
     box.append(card);
   });
+  // on a phone the cards are a side-swipe row: keep the chosen one in view after redrawing
+  if (phone() && picked >= 0 && box.children[picked]) { ideaScrollQuiet = true; box.scrollLeft = box.children[picked].offsetLeft - (box.clientWidth - box.children[picked].offsetWidth) / 2; setTimeout(() => ideaScrollQuiet = false, 80); }
 }
-$("#ideasBack").onclick = () => { ideaRun++; stopModes(); sketchLayer.clearLayers(); showView("plan", "peek"); };
+// Swiping to a card makes it the one on the map
+var ideaScrollQuiet = false, ideaScrollTimer;
+$("#ideaList").addEventListener("scroll", () => {
+  if (!phone() || ideaScrollQuiet) return;
+  clearTimeout(ideaScrollTimer);
+  ideaScrollTimer = setTimeout(() => {
+    const box = $("#ideaList"), mid = box.scrollLeft + box.clientWidth / 2;
+    let best = -1, bd = Infinity; [...box.children].forEach((c, k) => { const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid); if (d < bd) { bd = d; best = k; } });
+    if (best >= 0 && best !== picked && ideas[best]) { picked = best; renderIdeas(); fitTo(ideas[best]); }
+  }, 140);
+}, { passive: true });
+$("#ideasBack").onclick = () => { ideaRun++; stopModes(); sketchLayer.clearLayers(); goBack(); };
 
 /* ---------- a route: a list of lanes plus optional start and finish ---------- */
 const newTrip = () => ({ name: "My route", start: null, finish: null, loop: false, items: [] });
@@ -1045,7 +1085,7 @@ let routeFrom = { kind: "plan" };
 $("#routeBack").onclick = () => {
   if (lastKind && ideas.length) { showView("ideas", "mid"); setIdeasUi(); drawSketch(); renderIdeas(); if (picked >= 0 && ideas[picked]) fitTo(ideas[picked]); return; }
   if (routeFrom.kind === "region" && regionBySlug(routeFrom.slug)) { openRegion(routeFrom.slug); return; }
-  showView("plan", "peek");
+  goBack();
 };
 function useIdea(i){
   const it = ideas[i], sk = it.sketch, loop = isLoop(sk);
@@ -1251,7 +1291,7 @@ function renderRoute(){
   $("#routeName").value = trip.name;
   $("#editingBar").hidden = editingDay == null;
   $("#routeBack").hidden = editingDay != null;
-  $("#routeBack").textContent = lastKind && ideas.length ? "← Change the plan" : routeFrom.kind === "region" && regionBySlug(routeFrom.slug) ? `← ${regionBySlug(routeFrom.slug).name}` : "← Where to ride";
+  $("#routeBack").textContent = lastKind && ideas.length ? "← Change the plan" : routeFrom.kind === "region" && regionBySlug(routeFrom.slug) ? `← ${regionBySlug(routeFrom.slug).name}` : `← ${{ plan: "Explore", start: "Plan", saved: "Saved", help: "Help", region: "Back" }[lastBrowse] || "Back"}`;
   if (editingDay != null) $("#editingText").textContent = `Editing day ${editingDay + 1} of your tour`;
   const off = trip.items.reduce((t, it) => t + lineLen(it.coords), 0);
   $("#stTime").textContent = built ? hm(built.hours) : "…";
@@ -1436,11 +1476,19 @@ ${trks.join("\n")}
 </gpx>
 `;
 }
+// On a phone the GPX goes through the share sheet, straight into OsmAnd, Locus, Files or AirDrop; an iPhone can
+// open a plain download as raw text. Elsewhere, or if sharing isn't offered or is cancelled, it downloads.
 function download(name, text){
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text], { type: "application/gpx+xml" }));
-  a.download = (name.replace(/[^\w\- ]+/g, "").trim() || "route").replace(/\s+/g, "-") + ".gpx";
-  document.body.append(a); a.click(); a.remove(); status(`Saved ${a.download}`);
+  const fname = (name.replace(/[^\w\- ]+/g, "").trim() || "route").replace(/\s+/g, "-") + ".gpx";
+  const save = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "application/gpx+xml" })); a.download = fname;
+    document.body.append(a); a.click(); a.remove(); status(`Saved ${fname}`);
+  };
+  let file = null; try { file = new File([text], fname, { type: "application/gpx+xml" }); } catch {}
+  if (phone() && file && navigator.canShare?.({ files: [file] })) {
+    navigator.share({ files: [file], title: name }).then(() => status(`Sent ${fname}`)).catch(err => { if (err?.name !== "AbortError") save(); });
+  } else save();
   return text;
 }
 $("#gpxBtn").onclick = () => built && download(trip.name, gpxText(trip.name, [{ name: trip.name, trip, built, stops: routeStops, prefix: "" }]));
@@ -1448,7 +1496,14 @@ $("#gpxBtn").onclick = () => built && download(trip.name, gpxText(trip.name, [{ 
 /* ---------- saved routes and tours ---------- */
 function renderSaved(){
   const saved = store.get("saved", []);
-  $("#savedBlock").hidden = !saved.length;
+  // what's open now comes first, so it's one tap back after reopening the app
+  const now = $("#openNow"); now.innerHTML = "";
+  const openCard = (title, sub, go) => { const c = document.createElement("div"); c.className = "card"; c.innerHTML = `<div class="top"><h3>${esc(title)}</h3></div><div class="small muted">${esc(sub)}</div>`;
+    const b = document.createElement("button"); b.className = "btn primary"; b.textContent = "Open"; b.onclick = e => { e.stopPropagation(); go(); }; c.querySelector(".top").append(b); c.onclick = go; now.append(c); };
+  if (trip.items.length) openCard(trip.name || "Your route", `Open now · ${built ? `${km(built.total)} km, ${hm(built.hours)}` : `${trip.items.length} lanes`}`, () => {
+    showView("route", "mid"); renderRoute(); fitMap(L.latLngBounds(trip.items.flatMap(it => it.coords)).pad(0.1)); if (!built) build(); });
+  if (tour?.days?.length) openCard(tour.name || "Your tour", `Open now · ${tour.days.length} day${tour.days.length > 1 ? "s" : ""}`, () => openTour());
+  $("#savedHead").hidden = !saved.length; $("#savedEmpty").hidden = !!saved.length;
   const ul = $("#savedList"); ul.innerHTML = "";
   saved.forEach((s, i) => {
     const li = document.createElement("li");
@@ -1544,7 +1599,7 @@ function openTour(){
   else renderTourSetup();
 }
 $("#goTour").onclick = () => { if (tour?.days?.length && !featNames().has(tour.name)) saveItem({ name: tour.name || "My tour", tour, summary: `${tour.days.length} days` }); tour = null; tourPick = -1; openTour(); };
-$("#tourBack").onclick = () => { tourRun++; tourLayer.clearLayers(); showView(trip.items.length ? "route" : "plan", "peek"); };
+$("#tourBack").onclick = () => { tourRun++; tourLayer.clearLayers(); goBack(); };
 // A rough size for the tour before the long wait. Planned tours so far come out at about 2.1 times the straight
 // distance and average about 29 km/h including the lanes, so this is a guide, not a promise.
 function tourEstimate(){
@@ -1759,7 +1814,8 @@ const regionBySlug = slug => REGION_LIST.find(r => r.slug === slug);
 const featuredIn = slug => (feat()?.rides || []).filter(r => r.region === slug);
 const posterHtml = (r, lazy = true) => `<img src="img/regions/${r.slug}.jpg" alt="Poster of ${esc(r.name)}" loading="${lazy ? "lazy" : "eager"}" onerror="this.remove()">`;
 const laneKmCache = new Map();
-function regionLaneKm(r){   // lane km within 25 km of the area's centre
+function regionLaneKm(r){   // lane km within 25 km of the area's centre (worked out at build time, see tools/build_featured.py)
+  if (window.REGION_STATS?.[r.slug]) return REGION_STATS[r.slug].laneKm * 1000;
   if (laneKmCache.has(r.slug)) return laneKmCache.get(r.slug);
   const c = r.centre, bb = [c[0] - 0.25, c[1] - 0.4, c[0] + 0.25, c[1] + 0.4], seen = new Set(); let m = 0;
   for (const k of cells(bb)) for (const id of grid.get(k) || []) {
@@ -1934,7 +1990,7 @@ function renderClassics(){
   $("#classicBox").hidden = !ul.children.length;
 }
 $("#goLanes").onclick = openLanes;
-$("#lanesBack").onclick = () => showView("plan", "peek");
+$("#lanesBack").onclick = () => goBack();
 $("#laneQ").oninput = () => renderLaneFinder();
 $("#laneBoatOnly").onchange = () => renderLaneFinder();
 document.querySelectorAll("#laneSort button").forEach(bt => bt.onclick = () => {
@@ -1968,13 +2024,12 @@ $("#searchForm").onsubmit = async e => {
 function togglePop(id){
   const opening = $("#" + id).hidden;
   if (opening && phone()) setSheet("min");   // on a phone the panel goes down so the whole box, and its close button, fits
-  for (const p of ["layersPop", "helpPop"]) $("#" + p).hidden = p !== id || !opening;
+  for (const p of ["layersPop"]) $("#" + p).hidden = p !== id || !opening;
 }
 $("#btnLayers").onclick = () => togglePop("layersPop");
-$("#btnHelp").onclick = () => togglePop("helpPop");
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => $("#" + b.dataset.close).hidden = true);
 map.on("movestart", () => { $("#results").hidden = true; });
-map.on("click", () => { if (!picking) { $("#layersPop").hidden = true; $("#helpPop").hidden = true; } });
+map.on("click", () => { if (!picking) $("#layersPop").hidden = true; });
 // On a phone, a popup must not open underneath the bottom sheet: drop the sheet and move the map to clear it.
 map.on("popupopen", e => {
   // screens whose preview is a small strip drop to it; the half-height ones (route, ideas, tour, lanes) drop to the bar
@@ -1997,7 +2052,7 @@ for (const id of ["tLanes", "tUcr", "tZones", "tClosed", "tNotes"]) {
     if (id === "tNotes") showNotes(e.target.checked); else { drawLanes(); drawZones(); }
   };
 }
-document.addEventListener("keydown", e => { if (e.key === "Escape") { stopModes(); $("#layersPop").hidden = true; $("#helpPop").hidden = true; } });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { stopModes(); $("#layersPop").hidden = true; } });
 let moveTimer;
 map.on("moveend", () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => { drawLanes(); drawZones(); drawStops(); drawRouteStops(); }, 120); });
 
@@ -2013,7 +2068,7 @@ addEventListener("pagehide", () => store.set("lastView", view));
 /* ---------- start screen: shown once per visit ---------- */
 function showWelcome(){
   const pick = REGION_LIST[Math.floor(Math.random() * REGION_LIST.length)];
-  $("#wlHero").innerHTML = pick ? posterHtml(pick, false) : "";
+  if (!$("#wlHero img")) $("#wlHero").innerHTML = pick ? posterHtml(pick, false) : "";   // keep the poster shown while loading
   const g = $("#wlGrid"); g.innerHTML = "";
   for (const r of REGION_LIST) {
     const n = featuredIn(r.slug).length, b = document.createElement("button");
@@ -2026,7 +2081,6 @@ function showWelcome(){
   $("#wlCarry").hidden = !carry; $("#wlMap").hidden = !!carry;
   if (carry) $("#wlCarry").textContent = "Carry on: " + carry;
   $("#welcome").hidden = false; $("#welcome").scrollTop = 0;
-  (carry ? $("#wlCarry") : $("#wlMap")).focus();
 }
 function closeWelcome(){ $("#welcome").hidden = true; try { sessionStorage.setItem("glp:welcomed", "1"); } catch (e) {} map.invalidateSize(); }
 $("#wlCarry").onclick = closeWelcome;
@@ -2035,9 +2089,13 @@ $("#wlLoop").onclick = () => { closeWelcome(); $("#goLoop").click(); };
 $("#wlDraw").onclick = () => { closeWelcome(); $("#goDraw").click(); };
 $("#wlTour").onclick = () => { closeWelcome(); $("#goTour").click(); };
 $("#wlLanes").onclick = () => { closeWelcome(); openLanes(); };
-$("#helpHome").onclick = () => { $("#helpPop").hidden = true; showWelcome(); };
+$("#helpHome").onclick = () => showWelcome();
 let welcomed = false; try { welcomed = !!sessionStorage.getItem("glp:welcomed"); } catch (e) {}
-if (!welcomed) showWelcome();
+if (!welcomed) showWelcome(); else $("#welcome").hidden = true;
+document.documentElement.classList.remove("booting");   // the start screen's buttons work from here
+// Keep the app, its data and the map tiles you've looked at on the phone, so it opens and exports GPX with no signal
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1"))
+  navigator.serviceWorker.register("sw.js").catch(() => {});
 // The 2012 notes are kept out of the public copy (they're someone else's writing); hide the switch when absent.
 fetch("data/qwerf-lanes.js", { method: "HEAD" }).then(r => { if (!r.ok) { $("#tNotes").closest("label").hidden = true; $("#tNotes").checked = false; } else if ($("#tNotes").checked) showNotes(true); }).catch(() => { $("#tNotes").closest("label").hidden = true; });
 drawLanes(); drawZones(); drawStops();

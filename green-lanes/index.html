@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f4efe1">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="img/icons/favicon.png">
+<link rel="apple-touch-icon" href="img/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Green Lanes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Green Lanes Planner</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,6 +22,8 @@
   --green:#1e5631; --green-ink:#fff; --boat:#1f7a3a; --ucr:#d98e04; --closed:#c0392b; --rb:#8a8f98;
   --route:#c2185b; --warn:#fff1c7; --warn-ink:#5b4300;
   --shadow:2px 2px 0 var(--ink);
+  /* map line colours, per base map: Map (below), Satellite and Topo (html.sat / html.topo) */
+  --l-boat:#1f7a3a; --l-ucr:#c77f00; --l-closed:#c0392b; --l-rb:#6b6f76; --l-zone:#236b3a;
   --sheet-peek:172px; --sheet-h:172px; --sheet-ctl:172px;
   color-scheme:light;
 }
@@ -70,12 +79,32 @@ input[type=range]{width:100%;height:32px;accent-color:var(--green);margin:0}
 .card{background:var(--card);border:2px solid var(--ink);border-left:10px solid var(--c,var(--ink));border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;cursor:pointer}
 .card[aria-pressed="true"]{box-shadow:4px 4px 0 var(--ink);background:color-mix(in srgb,var(--c,var(--ink)) 16%,var(--card));border-width:3px;border-left-width:14px}
 #ideaList .card[aria-pressed="false"]{opacity:.62}
+@media (max-width:820px){
+  #ideaList{flex-direction:row!important;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px!important;margin:0 -14px;padding:2px 14px 8px;scrollbar-width:none}
+  #ideaList::-webkit-scrollbar{display:none}
+  #ideaList .card{flex:0 0 84%;scroll-snap-align:center}
+  #ideaList .card{padding:8px 10px;gap:4px}
+  #ideaList .card .top{flex-wrap:nowrap;align-items:flex-start}
+  #ideaList .card h3{font-size:16px;min-width:0}
+  #ideaList .card .btn{min-height:44px;padding:6px 12px;flex:0 0 auto}
+  #ideaList .onmap{display:none}
+  #ideaList .stats{font-size:13px;gap:2px 10px}
+}
 #regionRides .card{border-left-color:var(--c)}
 .stat-chip{display:inline-block;font:700 11px Barlow,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:#fff;padding:1px 6px;border-radius:3px;margin-right:6px}
 .stat-open{background:var(--boat)}.stat-check{background:var(--ucr)}.stat-closed{background:var(--closed)}
 #classicList li{align-items:flex-start}
 .bigstats.rough b{opacity:.55}
 .bigstats.rough b::before{content:"≈ ";font-weight:600}
+
+/* tab bar: a row at the top of the side panel on wide screens, fixed along the bottom on phones */
+#tabbar{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid var(--ink);background:var(--card);flex:0 0 auto}
+#tabbar button{border:0;background:none;padding:8px 2px 7px;font:600 13px Barlow,sans-serif;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;min-height:52px}
+#tabbar .ti{font-size:19px;line-height:1.1}
+#tabbar button[aria-current="page"]{color:var(--green);box-shadow:inset 0 -3px 0 var(--green)}
+html:not(.tabs-on) #tabbar{display:none}
+.planpick .btn{justify-content:flex-start;text-align:left;white-space:normal;gap:12px;padding:10px 14px;min-height:64px}
+.planpick .ic{font-size:24px;width:30px;text-align:center;flex:0 0 auto}
 .tgroup{margin:4px 0 -2px;font:700 12px Barlow,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 #classicList .s{display:block;margin-top:2px}
 #ideaList .card[aria-pressed="false"]:hover{opacity:.9}
@@ -148,7 +177,9 @@ body.banner-on #poiWrap,body.banner-on #tools{display:none}
 .poi{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;border:1.5px solid #fff;box-shadow:0 0 0 1.5px var(--ink);flex:0 0 auto}
 .poi svg{width:15px;height:15px;display:block}
 .poi-pin{transform:translate(-50%,-50%)}
-body.sat .leaflet-tile-pane{filter:saturate(.4) brightness(.72)}
+html.sat .leaflet-tile-pane{filter:saturate(.4) brightness(.72)}
+html.sat{--l-boat:#52ff85;--l-ucr:#ffc629;--l-closed:#ff6a5c;--l-rb:#d5d8de;--l-zone:#ffd21f}
+html.topo{--l-boat:#0b57d0;--l-ucr:#e8590c;--l-closed:#b3001b;--l-rb:#555a61;--l-zone:#0b57d0}
 .poi-pin .poi{width:26px;height:26px}
 .poi-pin.small .poi{width:20px;height:20px}
 .poi-pin.small .poi svg{width:12px;height:12px}
@@ -247,6 +278,12 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   #map{position:fixed;inset:0}
   #sheet{position:fixed;left:0;right:0;bottom:0;z-index:1200;height:var(--sheet-peek);border-left:0;border-top:2px solid var(--ink);border-radius:14px 14px 0 0;box-shadow:0 -3px 0 rgba(0,0,0,.08);transition:height .25s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
   #sheet[data-state="min"]{height:calc(54px + env(safe-area-inset-bottom,0px))}
+  :root{--tabbar-h:0px}
+  html.tabs-on{--tabbar-h:calc(58px + env(safe-area-inset-bottom,0px))}
+  html.tabs-on #sheet{bottom:var(--tabbar-h);padding-bottom:0}
+  html.tabs-on #sheet[data-state="min"]{height:54px}
+  #tabbar{position:fixed;left:0;right:0;bottom:0;z-index:1250;border-bottom:0;border-top:2px solid var(--ink);padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 0 rgba(0,0,0,.05)}
+  #tabbar button[aria-current="page"]{box-shadow:inset 0 3px 0 var(--green)}
   #sheet[data-state="min"] .sheet-body{display:none}
   #sheet[data-state="min"] #sheetHandle{color:var(--ink);font-size:15px;font-weight:700;padding-top:7px;cursor:pointer}
   #sheet[data-state="mid"]{height:50vh}
@@ -291,6 +328,10 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
 .wl-title p{margin-top:4px;color:var(--muted)}
 .wl-go{display:flex;flex-direction:column;gap:10px}
 .wl-go .btn{min-height:54px;font-size:17px;white-space:normal}
+html.booting #welcome .btn{opacity:.55;pointer-events:none}
+#wlLoading{margin:-4px 0 -6px;text-align:center}
+html:not(.booting) #wlLoading{display:none}
+@media (min-width:1000px){.wl-inner{max-width:1120px}.wl-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-hero{display:grid;grid-template-columns:3fr 2fr}.wl-hero .poster{aspect-ratio:auto;min-height:320px}.wl-title{border-top:0;border-left:2px solid var(--ink);display:flex;flex-direction:column;justify-content:center;padding:24px}.wl-title h1{font-size:48px}}
 .wl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .wl-grid .rcard{flex:none;width:auto}
 .wl-grid .rcard .cap b{font-size:15px}
@@ -300,6 +341,40 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
 </style>
 </head>
 <body>
+<section id="welcome" aria-label="Start">
+  <div class="wl-inner">
+    <div class="wl-hero"><div class="poster" id="wlHero"></div><div class="wl-title"><h1>Green Lanes</h1><p>Plan motorbike rides on legal byways in England and Wales, then take the GPX with you.</p></div></div>
+    <p class="small muted" id="wlLoading">Loading the lane map…</p>
+    <div class="wl-go">
+      <button class="btn primary" id="wlCarry" hidden></button>
+      <button class="btn primary" id="wlMap">▦ Open the map</button>
+    </div>
+    <h2>Plan your own</h2>
+    <div class="own">
+      <button class="btn" id="wlLoop"><span class="ic" aria-hidden="true">⟲</span>Loop</button>
+      <button class="btn" id="wlDraw"><span class="ic" aria-hidden="true">✎</span>Draw</button>
+      <button class="btn" id="wlTour"><span class="ic" aria-hidden="true">⛺</span>Tour</button>
+      <button class="btn" id="wlLanes"><span class="ic" aria-hidden="true">⌕</span>Find lanes</button>
+    </div>
+    <h2>Or pick an area</h2>
+    <div class="wl-grid" id="wlGrid" role="list" aria-label="Riding areas"></div>
+    <p class="small"><a href="about.html">How it works and where the data comes from</a></p>
+  </div>
+</section>
+<!-- The start screen shows first, from the small area files, while the lane data (several MB) loads behind it. -->
+<script src="data/regions.js?v=d1a0b3f7" onerror="window.REGIONS=[];window.TOUR_PRESETS=[]"></script>
+<script src="data/region-stats.js?v=ef91d757" onerror="window.REGION_STATS=null"></script>
+<script>
+(function(){
+  document.documentElement.classList.add("booting");
+  var R = window.REGIONS || [], S = window.REGION_STATS || {}, e = function(t){ return String(t).replace(/[&<>"]/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var img = function(r, lazy){ return '<img src="img/regions/' + r.slug + '.jpg" alt="Poster of ' + e(r.name) + '" loading="' + (lazy ? "lazy" : "eager") + '" onerror="this.remove()">'; };
+  var pick = R[Math.floor(Math.random() * R.length)];
+  if (pick) document.getElementById("wlHero").innerHTML = img(pick, false);
+  document.getElementById("wlGrid").innerHTML = R.map(function(r){ var n = (S[r.slug] || {}).rides || 0;
+    return '<button class="rcard" role="listitem" data-slug="' + r.slug + '"><div class="poster">' + img(r, true) + '</div><div class="cap"><b>' + e(r.name) + '</b><span>' + (n ? n + " ride" + (n > 1 ? "s" : "") : "Plan your own") + '</span></div></button>'; }).join("");
+})();
+</script>
 <div id="app">
   <div id="map" aria-label="Map"></div>
 
@@ -318,7 +393,6 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   <div class="mapui" id="tools">
     <button class="tool" id="btnLayers" aria-label="Map key and layers"><span class="ic">▤</span>Map</button>
     <button class="tool" id="btnLocate" aria-label="Show where I am"><span class="ic">◎</span>Me</button>
-    <button class="tool" id="btnHelp" aria-label="How to use"><span class="ic">?</span>Help</button>
   </div>
 
   <div class="mapui" id="banner" hidden><span id="bannerText"></span><button class="btn" id="bannerMe" hidden>Use my location</button><button class="btn" id="bannerMove" hidden>✋ Move map</button><button class="btn" id="bannerUndo" hidden>↶ Undo</button><button class="btn" id="bannerDone" hidden>✓ Done</button><button class="btn" id="bannerCancel">Cancel</button></div>
@@ -331,10 +405,11 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
     <button class="btn quiet close" data-close="layersPop" aria-label="Close">✕</button>
     <h3>Map key</h3>
     <div class="key">
-      <div class="sw" style="background:var(--boat)"></div><span><b>Byway open to all traffic.</b> Motorbikes allowed.</span>
-      <div class="sw" style="background:var(--ucr)"></div><span><b>Unclassified road.</b> Usually allowed, check before riding.</span>
-      <div class="sw dash" style="color:var(--boat);background:repeating-linear-gradient(90deg,var(--boat) 0 10px,transparent 10px 14px)"></div><span><b>Byway from the council's record</b> that isn't in OpenStreetMap yet. The line may be rough.</span>
-      <div class="sw dot" style="color:var(--closed)"></div><span><b>Closed to motors,</b> or restricted byway.</span>
+      <div class="sw" style="background:var(--l-boat)"></div><span><b>Byway open to all traffic.</b> Motorbikes allowed.</span>
+      <div class="sw" style="background:var(--l-ucr)"></div><span><b>Unclassified road.</b> Usually allowed, check before riding.</span>
+      <div class="sw dash" style="color:var(--l-boat);background:repeating-linear-gradient(90deg,var(--l-boat) 0 12px,transparent 12px 18px)"></div><span><b>Byway from the council's record</b> that isn't in OpenStreetMap yet. The line may be rough.</span>
+      <div class="sw dot" style="color:var(--l-closed)"></div><span><b>Closed to motors,</b> by an order, the council, or for the season.</span>
+      <div class="sw dot" style="color:var(--l-rb)"></div><span><b>Restricted byway:</b> walkers, riders and cyclists only.</span>
       <div class="sw" style="background:var(--route)"></div><span><b>Your route.</b> Dashed pink is the road between lanes.</span>
       <div class="sw zone" style="background:rgba(30,86,49,.55)"></div><span><b>Lane areas</b> when zoomed out. Darker green means more lanes.</span>
     </div>
@@ -361,46 +436,58 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   </section>
 
   <!-- help -->
-  <section class="pop" id="helpPop" hidden aria-label="How to use">
-    <button class="btn quiet close" data-close="helpPop" aria-label="Close">✕</button>
-    <h3>How to use it</h3>
-    <ol class="steps">
-      <li><b>Pick an area</b> on Explore and ride a ready-made route, or plan your own.</li>
-      <li><b>Plan your own:</b> <i>Loop</i> from a start, <i>Draw</i> roughly where you want to go, or a multi-day <i>Tour</i>.</li>
-      <li><b>Find lanes</b> by name or number, or list the longest on the map, the longest anywhere, or the closest.</li>
-      <li><b>Change it:</b> tap a green lane to add it, tap a pink one to take it out, or drag ○ onto a lane. To stop somewhere, tap its icon and choose Add to route, or drag ○ onto the icon.</li>
-      <li><b>Show</b> (under the search box) puts tea, food, toilets, fuel, beauty spots and places to stay on the map and in the GPX.</li>
-      <li><b>Download the GPX</b> for your sat nav or phone.</li>
-    </ol>
-    <p class="small">Green: byway, open to motorbikes. Amber: unclassified road, usually open. Dashed green: byway from the council's record.</p>
-    <div class="note"><b>Before you ride:</b> lanes close for repairs and for the winter. Check each lane on the <a href="https://www.greenroadmap.org.uk/" target="_blank" rel="noopener">TRF Green Road Map</a> or <a href="https://www.trailwise2.co.uk/" target="_blank" rel="noopener">TrailWise</a>, and obey signs on the ground.</div>
-    <p><button class="btn" id="helpHome">⌂ Start screen</button></p>
-    <p><a href="about.html">How it works, where the data comes from, and how complete it is</a></p>
-    <p class="small muted">Lanes, stops and places come from OpenStreetMap, which volunteers keep up to date, so it has gaps. Roads come from the free BRouter and OSRM servers, which ask users to keep requests modest, so planning takes a few seconds.</p>
-  </section>
 
   <!-- the sheet: one view at a time -->
   <section id="sheet" data-state="peek" aria-label="Planner">
+    <nav id="tabbar" aria-label="Sections">
+      <button data-tab="explore" aria-current="page"><span class="ti" aria-hidden="true">◈</span>Explore</button>
+      <button data-tab="plan"><span class="ti" aria-hidden="true">✎</span>Plan</button>
+      <button data-tab="saved"><span class="ti" aria-hidden="true">★</span>Saved</button>
+      <button data-tab="help"><span class="ti" aria-hidden="true">?</span>Help</button>
+    </nav>
     <button id="sheetHandle" aria-label="Show more"><span id="handleText">Pull up for settings</span></button>
     <div class="sheet-body" id="sheetBody">
+
+      <div id="vStart" class="view" hidden>
+        <h2>Plan a ride</h2>
+        <div class="stack planpick">
+          <button class="btn" id="goLoop"><span class="ic" aria-hidden="true">⟲</span><span><b>Loop from a place</b><br><span class="small muted">From your start and back, fitted to the time you have.</span></span></button>
+          <button class="btn" id="goDraw"><span class="ic" aria-hidden="true">✎</span><span><b>Draw a route</b><br><span class="small muted">Draw roughly where you want to go; it finds lanes along it.</span></span></button>
+          <button class="btn" id="goTour"><span class="ic" aria-hidden="true">⛺</span><span><b>Multi-day tour</b><br><span class="small muted">Start to finish over several days, with a bed each night.</span></span></button>
+          <button class="btn" id="goLanes"><span class="ic" aria-hidden="true">⌕</span><span><b>Find lanes</b><br><span class="small muted">By name or number, or the longest and closest.</span></span></button>
+        </div>
+      </div>
+
+      <div id="vSaved" class="view" hidden>
+        <h2>Saved</h2>
+        <div id="openNow" class="stack"></div>
+        <h3 id="savedHead">Your saved routes and tours</h3>
+        <ul class="list" id="savedList"></ul>
+        <p class="small muted" id="savedEmpty">Nothing saved yet. Press ★ Save on a route or tour to keep it here, on this phone.</p>
+      </div>
+
+      <div id="vHelp" class="view" hidden>
+        <h2>How to use it</h2>
+        <ol class="steps">
+          <li><b>Explore</b> the riding areas and ride a ready-made route or trip.</li>
+          <li><b>Plan</b> your own: a <i>Loop</i> from a start, <i>Draw</i> roughly where you want to go, a multi-day <i>Tour</i>, or <i>Find lanes</i>.</li>
+                <li><b>Change it:</b> tap a green lane to add it, tap a pink one to take it out, or drag ○ onto a lane. To stop somewhere, tap its icon and choose Add to route, or drag ○ onto the icon.</li>
+          <li><b>Show</b> (under the search box) puts tea, food, toilets, fuel, beauty spots and places to stay on the map and in the GPX.</li>
+          <li><b>GPX</b> sends the route to your sat nav or phone app. <b>Saved</b> keeps what you have open and what you save.</li>
+        </ol>
+        <p class="small">On the normal map: green is a byway, open to motorbikes; amber is an unclassified road, usually open; dashed green is a byway from the council's record; red dots are closed; grey dots are restricted byways, with no motorbikes. Satellite and Topo use their own colours, shown in the Map key.</p>
+        <div class="note"><b>Before you ride:</b> lanes close for repairs and for the winter. Check each lane on the <a href="https://www.greenroadmap.org.uk/" target="_blank" rel="noopener">TRF Green Road Map</a> or <a href="https://www.trailwise2.co.uk/" target="_blank" rel="noopener">TrailWise</a>, and obey signs on the ground.</div>
+        <p><button class="btn" id="helpHome">⌂ Start screen</button></p>
+        <p><a href="about.html">How it works, where the data comes from, and how complete it is</a></p>
+        <p class="small muted">Lanes, stops and places come from OpenStreetMap, which volunteers keep up to date, so it has gaps. Roads come from the free BRouter and OSRM servers, which ask users to keep requests modest, so planning takes a few seconds.</p>
+      </div>
 
       <div id="vPlan" class="view">
         <h2>Where to ride?</h2>
         <div class="carousel" id="regionCards" role="list" aria-label="Riding areas"></div>
-        <h3>Plan your own</h3>
-        <div class="own">
-          <button class="btn" id="goLoop"><span class="ic" aria-hidden="true">⟲</span>Loop</button>
-          <button class="btn" id="goDraw"><span class="ic" aria-hidden="true">✎</span>Draw</button>
-          <button class="btn" id="goTour"><span class="ic" aria-hidden="true">⛺</span>Tour</button>
-          <button class="btn" id="goLanes"><span class="ic" aria-hidden="true">⌕</span>Find lanes</button>
-        </div>
         <div id="tourBlock" class="view" hidden>
           <h3>Tours and trips</h3>
           <div id="tourCards" class="stack"></div>
-        </div>
-        <div id="savedBlock" class="view" hidden>
-          <h3>Your saved routes</h3>
-          <ul class="list" id="savedList"></ul>
         </div>
       </div>
 
@@ -596,28 +683,9 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
 <script src="data/council-boats.js?v=d29ae6d4" onerror="window.COUNCIL_BOATS=null"></script>
 <script src="data/closures.js?v=613bc2dd" onerror="window.CLOSURES=null"></script>
 <script src="data/classics.js?v=a248a2b0" onerror="window.CLASSICS=[]"></script>
-<script src="data/regions.js?v=d1a0b3f7" onerror="window.REGIONS=[];window.TOUR_PRESETS=[]"></script>
 <script src="data/featured.js?v=1438cd20" onerror="window.FEATURED=null"></script>
-<section id="welcome" aria-label="Start" hidden>
-  <div class="wl-inner">
-    <div class="wl-hero"><div class="poster" id="wlHero"></div><div class="wl-title"><h1>Green Lanes</h1><p>Plan motorbike rides on legal byways in England and Wales, then take the GPX with you.</p></div></div>
-    <div class="wl-go">
-      <button class="btn primary" id="wlCarry" hidden></button>
-      <button class="btn primary" id="wlMap">▦ Open the map</button>
-    </div>
-    <h2>Plan your own</h2>
-    <div class="own">
-      <button class="btn" id="wlLoop"><span class="ic" aria-hidden="true">⟲</span>Loop</button>
-      <button class="btn" id="wlDraw"><span class="ic" aria-hidden="true">✎</span>Draw</button>
-      <button class="btn" id="wlTour"><span class="ic" aria-hidden="true">⛺</span>Tour</button>
-      <button class="btn" id="wlLanes"><span class="ic" aria-hidden="true">⌕</span>Find lanes</button>
-    </div>
-    <h2>Or pick an area</h2>
-    <div class="wl-grid" id="wlGrid" role="list" aria-label="Riding areas"></div>
-    <p class="small"><a href="about.html">How it works and where the data comes from</a></p>
-  </div>
-</section>
+
 <script src="js/plan.js?v=89dd517b"></script>
-<script src="js/app.js?v=bc8dc542"></script>
+<script src="js/app.js?v=fe8ad3fd"></script>
 </body>
 </html>
