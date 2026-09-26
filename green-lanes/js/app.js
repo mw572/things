@@ -147,6 +147,34 @@ const osmPieces = osmWays.size - councilAdded, laneOf = new Map();
     if (a.cls !== b.cls || (a.tags.name && b.tags.name && a.tags.name !== b.tags.name)) continue;
     link(a.id, b.id); link(b.id, a.id);
   }
+  // Ends that nearly meet: council lines are traced from different maps, so they stop a few metres short of the
+  // OpenStreetMap lane they continue, often across a road. Join free ends of the same kind within 40 m when a council
+  // piece is involved (12 m between two OpenStreetMap pieces), if each is the other's nearest.
+  const isCouncil = w => w.tags.source === "council", G = 0.0006, gk = c => Math.floor(c[0] / G) + "," + Math.floor(c[1] / (G * 1.6));
+  const free = [], buckets = new Map();
+  for (const [k, ids] of ends) {
+    if (ids.length !== 1 || inner.has(k)) continue;
+    const w = osmWays.get(ids[0]); if (!CLASSES[w.cls].ride) continue;
+    const c = key(w.coords[0]) === k ? w.coords[0] : w.coords.at(-1), f = { w, c, i: free.length };
+    free.push(f); const g = gk(c); if (!buckets.has(g)) buckets.set(g, []); buckets.get(g).push(f);
+  }
+  const nearest = f => {
+    const [gi, gj] = gk(f.c).split(",").map(Number); let best = null, bd = Infinity;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const g of buckets.get((gi + a) + "," + (gj + b)) || []) {
+      if (g.w === f.w || g.w.cls !== f.w.cls) continue;
+      const d = hav(f.c, g.c), tol = isCouncil(f.w) || isCouncil(g.w) ? 40 : 12;
+      if (d > tol || d >= bd) continue;
+      if (!isCouncil(f.w) && !isCouncil(g.w) && f.w.tags.name && g.w.tags.name && f.w.tags.name !== g.w.tags.name) continue;
+      best = g; bd = d;
+    }
+    return best;
+  };
+  const nearOf = free.map(nearest);
+  for (const f of free) {
+    const g = nearOf[f.i]; if (!g || nearOf[g.i] !== f || f.i > g.i) continue;
+    if ((nb.get(f.w.id) || []).includes(g.w.id)) continue;
+    link(f.w.id, g.w.id); link(g.w.id, f.w.id);
+  }
   const done = new Set();
   for (const id0 of [...nb.keys()]) {
     if (done.has(id0)) continue;
@@ -158,27 +186,30 @@ const osmPieces = osmWays.size - councilAdded, laneOf = new Map();
     seq.forEach(id => done.add(id));
     if (seq.length < 2) continue;
     const ws = seq.map(id => osmWays.get(id));
+    // join by nearest ends; a gap (from a near-miss join) is bridged with a straight line
     let coords = ws[0].coords.slice();
-    const k1 = ws[1].coords;
-    if (key(coords[0]) === key(k1[0]) || key(coords[0]) === key(k1.at(-1))) coords.reverse();
+    const k1 = ws[1].coords, dEnd = p => Math.min(hav(p, k1[0]), hav(p, k1.at(-1)));
+    if (dEnd(coords[0]) < dEnd(coords.at(-1))) coords.reverse();
     for (const w of ws.slice(1)) {
-      const c = key(w.coords[0]) === key(coords.at(-1)) ? w.coords : w.coords.slice().reverse();
-      coords = coords.concat(c.slice(1));
+      const last = coords.at(-1), c = hav(last, w.coords[0]) <= hav(last, w.coords.at(-1)) ? w.coords : w.coords.slice().reverse();
+      coords = coords.concat(key(c[0]) === key(last) ? c.slice(1) : c);
     }
-    const longest = ws.reduce((a, b) => b.len > a.len ? b : a), tags = { ...longest.tags };
-    tags.name = tags.name || ws.find(w => w.tags.name)?.tags.name;
+    const osm = ws.filter(w => !isCouncil(w)), pick = osm.length ? osm : ws;
+    const longest = pick.reduce((a, b) => b.len > a.len ? b : a), tags = { ...longest.tags };
+    tags.name = tags.name || pick.find(w => w.tags.name)?.tags.name;
     if (!tags.name) delete tags.name;
+    if (osm.length && osm.length < ws.length) tags.partCouncil = ws.find(isCouncil).tags.council;   // some of it only in the council's record
     const surf = [...new Set(ws.map(w => w.tags.surface).filter(Boolean))];
     if (surf.length) tags.surface = surf.slice(0, 3).join(", ");
     for (const id of seq) { osmWays.delete(id); laneOf.set(id, seq[0]); }
     let a = 90, b = 180, c = -90, d = -180;
     for (const [la, lo] of coords) { if (la < a) a = la; if (lo < b) b = lo; if (la > c) c = la; if (lo > d) d = lo; }
-    osmWays.set(seq[0], { id: seq[0], members: seq, tags, coords, cls: longest.cls, council: ws.find(w => w.council)?.council || null, bbox: [a, b, c, d], len: ws.reduce((t, w) => t + w.len, 0) });
+    osmWays.set(seq[0], { id: seq[0], members: seq, tags, coords, cls: longest.cls, council: ws.find(w => w.council)?.council || null, bbox: [a, b, c, d], len: lineLen(coords) });
   }
   grid.clear();
   for (const w of osmWays.values()) for (const k of cells(w.bbox)) { if (!grid.has(k)) grid.set(k, new Set()); grid.get(k).add(w.id); }
 })();
-$("#dataNote").textContent = `Lanes: ${osmPieces.toLocaleString()} pieces from OpenStreetMap joined into ${(osmWays.size - councilAdded).toLocaleString()} lanes, ${window.OSM_LANES?.built || "date unknown"}` + (councilAdded ? `, plus ${councilAdded.toLocaleString()} byway stretches from council records.` : ".");
+$("#dataNote").textContent = `Lanes: ${osmPieces.toLocaleString()} pieces from OpenStreetMap (${window.OSM_LANES?.built || "date unknown"})` + (councilAdded ? ` and ${councilAdded.toLocaleString()} from council records` : "") + `, joined into ${osmWays.size.toLocaleString()} lanes.`;
 const laneLayer = L.layerGroup().addTo(map);
 const shown = new Set();
 let fadeLanes = false;
@@ -244,7 +275,7 @@ function lanePopup(w){
   const surface = [t.surface, t.tracktype && t.tracktype.replace("grade", "grade ")].filter(Boolean).join(", ");
   div.innerHTML = `<h3>${esc(laneName(t))}</h3>
     <div><span class="chip" style="background:${css(c.color)}">${esc(DESIG[t.designation] || "Byway")}</span> ${km(w.len)} km${surface ? " · " + esc(surface) : ""}</div>
-    <p style="margin-top:6px">${esc(w.tags.source === "council" ? `From ${w.tags.council} Council's rights-of-way record, where it's a byway open to all traffic. It isn't in OpenStreetMap yet, so the line on the map may be rough.` : w.council ? `OpenStreetMap calls this a byway, but ${w.council.council} Council's rights-of-way record calls it a ${w.council.calls} (${w.council.ref.split("|").slice(1).join(" ")}). Treated as not open to motor vehicles.` : c.say)}</p>`;
+    <p style="margin-top:6px">${esc(w.tags.source === "council" ? `From ${w.tags.council} Council's rights-of-way record, where it's a byway open to all traffic. It isn't in OpenStreetMap yet, so the line on the map may be rough.` : w.council ? `OpenStreetMap calls this a byway, but ${w.council.council} Council's rights-of-way record calls it a ${w.council.calls} (${w.council.ref.split("|").slice(1).join(" ")}). Treated as not open to motor vehicles.` : c.say + (t.partCouncil ? ` Part of it is only in ${t.partCouncil} Council's rights-of-way record, so that stretch of line may be rough.` : ""))}</p>`;
   const away = view === "route" && !inRoute(w.id) ? distFromRoute(w) : null;
   if (away != null) div.insertAdjacentHTML("beforeend", `<p class="small muted">${away < 150 ? "Right next to your route." : `About ${km(away)} km from your route.`}</p>`);
   if (c.ride && view !== "tour") {
@@ -1075,16 +1106,16 @@ function bendiness(lines){
   return len > 500 ? turn / (len / 1000) : 0;
 }
 const bendLabel = b => !b ? "–" : b < 90 ? "Straight" : b < 160 ? "Bendy" : "Twisty";
-function drawBuilt(layer, t, b, bold, numbers = bold){
+function drawBuilt(layer, t, b, bold, numbers = bold, col = "#c2185b"){
   const R = routeRenderer, op = bold ? 1 : .45;
   if (b) for (const s of b.segs) if (s.type === "road") {
-    if (s.lanes) { if (bold) L.polyline(s.coords, { color: "#fff", weight: 9, interactive: false, renderer: R }).addTo(layer); L.polyline(s.coords, { color: "#c2185b", weight: bold ? 5 : 3, opacity: op, interactive: false, renderer: R }).addTo(layer); }
-    else L.polyline(s.coords, { color: "#c2185b", weight: bold ? 4 : 2.5, opacity: bold ? .9 : .4, dashArray: s.ok === false ? "2 7" : "9 6", interactive: false, renderer: R }).addTo(layer);
+    if (s.lanes) { if (bold) L.polyline(s.coords, { color: "#fff", weight: 9, interactive: false, renderer: R }).addTo(layer); L.polyline(s.coords, { color: col, weight: bold ? 5 : 3, opacity: op, interactive: false, renderer: R }).addTo(layer); }
+    else L.polyline(s.coords, { color: col, weight: bold ? 4 : 2.5, opacity: bold ? .9 : .4, dashArray: s.ok === false ? "2 7" : "9 6", interactive: false, renderer: R }).addTo(layer);
   }
   t.items.forEach((it, i) => {
     if (it.via) return;
     if (bold) L.polyline(it.coords, { color: "#fff", weight: 11, opacity: 1, interactive: false, renderer: R }).addTo(layer);
-    L.polyline(it.coords, { color: "#c2185b", weight: bold ? 6 : 4, opacity: op, interactive: false, renderer: R }).addTo(layer);
+    L.polyline(it.coords, { color: col, weight: bold ? 6 : 4, opacity: op, interactive: false, renderer: R }).addTo(layer);
     if (numbers) L.marker(it.coords[0], { interactive: false, icon: L.divIcon({ className: "", html: `<span class="lane-num">${i + 1}</span>`, iconSize: [0, 0] }) }).addTo(layer);
   });
 }
@@ -1622,6 +1653,26 @@ function renderExplore(){
   for (const r of REGION_LIST) L.marker(r.centre, { keyboard: true, title: r.name, icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<div class="rpin"><span class="dot">${posterHtml(r)}</span><b>${esc(r.name)}</b></div>` }) })
     .on("click", () => openRegion(r.slug)).addTo(regionPinLayer);
 }
+// Ready-made rides on an area page: each in its own colour with a numbered badge matching its card.
+// Tapping a card (or badge) draws that ride bold and fades the others.
+let regionRidesNow = [], regionPick = -1;
+function drawRegionRides(){
+  regionRideLayer.clearLayers();
+  const order = regionRidesNow.map((_, i) => i).filter(i => i !== regionPick); if (regionPick >= 0) order.push(regionPick);
+  for (const i of order) {
+    const rd = regionRidesNow[i], col = IDEA_COLORS[i % IDEA_COLORS.length], on = i === regionPick;
+    drawBuilt(regionRideLayer, rd.trip, rd.built, on || regionPick < 0, false, col);   // none picked yet: all drawn clearly, each in its colour
+    const lanes = rd.built.segs.filter(sg => sg.type === "lane"), sg = lanes[Math.floor(lanes.length / 2)] || rd.built.segs[0];
+    L.marker(sg.coords[Math.floor(sg.coords.length / 2)], { zIndexOffset: on ? 1000 : 0, title: rd.name, icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<span class="ibadge${on ? " on" : ""}" style="--c:${col}">${i + 1}</span>` }) })
+      .on("click", () => pickRegionRide(i)).addTo(regionRideLayer);
+  }
+  document.querySelectorAll("#regionRides .card").forEach((c, i) => c.setAttribute("aria-pressed", i === regionPick));
+}
+function pickRegionRide(i){
+  regionPick = i; drawRegionRides();
+  if (phone()) setSheet("min");
+  map.fitBounds(L.latLngBounds(regionRidesNow[i].built.segs.flatMap(sg => sg.coords)).pad(0.05), { paddingTopLeft: [0, phone() ? 130 : 0], paddingBottomRight: [0, phone() ? 70 : 0] });
+}
 function openRegion(slug){
   const r = regionBySlug(slug); if (!r) return;
   showView("region", "open");
@@ -1631,20 +1682,20 @@ function openRegion(slug){
   const rides = featuredIn(slug);
   $("#regionStats").innerHTML = `<div><b>${Math.round(regionLaneKm(r) / 1000)}</b><span>km of lanes</span></div><div><b>${rides.length}</b><span>rides</span></div><div><b>${esc(r.starts[0].name)}</b><span>start</span></div>`;
   const box = $("#regionRides"); box.innerHTML = rides.length ? "" : `<p class="small muted">No ready-made rides here yet. Plan your own below.</p>`;
-  regionRideLayer.clearLayers();
-  for (const rd of rides) {
-    drawBuilt(regionRideLayer, rd.trip, rd.built, false, false);
+  regionRidesNow = rides; regionPick = -1; drawRegionRides();
+  rides.forEach((rd, i) => {
     const b = rd.built, pct = b.total ? Math.round(100 * b.off / b.total) : 0;
-    const c = document.createElement("div"); c.className = "card";
-    c.innerHTML = `<div class="top"><h3>${esc(rd.name)}</h3></div>
+    const c = document.createElement("div"); c.className = "card"; c.style.setProperty("--c", IDEA_COLORS[i % IDEA_COLORS.length]);
+    c.setAttribute("aria-pressed", "false");
+    c.innerHTML = `<div class="top"><h3><span class="inum">${i + 1}</span>${esc(rd.name)}</h3></div>
       <div class="stats"><span><b>${hm(b.hours)}</b> riding</span><span><b>${km(b.total)}</b> km</span><span><b>${pct}%</b> lanes</span></div>
       <div>${rd.byways ? `<span class="chip" style="background:var(--boat)">Byways only</span>` : `<span class="chip" style="background:var(--ucr)">Includes unclassified roads</span>`} <span class="small muted">from ${esc(rd.startName)}</span></div>`;
     const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Ride this"; go.setAttribute("aria-label", "Ride " + rd.name);
     go.onclick = () => loadFeaturedRide(rd);
     c.querySelector(".top").append(go);
-    c.onclick = e => { if (e.target !== go) map.fitBounds(L.latLngBounds(rd.built.segs.flatMap(sg => sg.coords)).pad(0.05), { paddingBottomRight: phone() ? [0, innerHeight * 0.45] : [0, 0] }); };
+    c.onclick = e => { if (e.target !== go) pickRegionRide(i); };
     box.append(c);
-  }
+  });
   map.flyTo(r.centre, r.zoom, { duration: 0.8 });
   $("#regionLoop").onclick = () => { loopStart = r.starts[0].at; lastKind = "loop"; ideas = []; picked = -1; ideaRun++; openIdeas(); runIdeas(); };
   $("#regionDraw").onclick = () => { map.setView(r.centre, r.zoom); lastKind = "draw"; strokes = []; shapeChoice = null; ideas = []; picked = -1; ideaRun++; openIdeas(); startDrawing(); };

@@ -70,6 +70,7 @@ input[type=range]{width:100%;height:32px;accent-color:var(--green);margin:0}
 .card{background:var(--card);border:2px solid var(--ink);border-left:10px solid var(--c,var(--ink));border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;cursor:pointer}
 .card[aria-pressed="true"]{box-shadow:4px 4px 0 var(--ink);background:color-mix(in srgb,var(--c,var(--ink)) 16%,var(--card));border-width:3px;border-left-width:14px}
 #ideaList .card[aria-pressed="false"]{opacity:.62}
+#regionRides .card{border-left-color:var(--c)}
 #ideaList .card[aria-pressed="false"]:hover{opacity:.9}
 .inum{display:inline-grid;place-items:center;width:24px;height:24px;margin-right:7px;border-radius:50%;background:var(--c,var(--ink));color:#fff;font:700 14px Barlow,sans-serif;vertical-align:2px}
 .ibadge{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--c);color:#fff;border:2px solid #fff;box-shadow:0 0 0 2px var(--ink);font:700 14px Barlow,sans-serif;opacity:.8;cursor:pointer}
@@ -570,11 +571,11 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="data/osm-lanes.js"></script>
-<script src="data/council-flags.js" onerror="window.COUNCIL_FLAGS=null"></script>
-<script src="data/council-boats.js" onerror="window.COUNCIL_BOATS=null"></script>
-<script src="data/regions.js" onerror="window.REGIONS=[];window.TOUR_PRESETS=[]"></script>
-<script src="data/featured.js" onerror="window.FEATURED=null"></script>
+<script src="data/osm-lanes.js?v=a10797ab"></script>
+<script src="data/council-flags.js?v=0caaf474" onerror="window.COUNCIL_FLAGS=null"></script>
+<script src="data/council-boats.js?v=d29ae6d4" onerror="window.COUNCIL_BOATS=null"></script>
+<script src="data/regions.js?v=d1a0b3f7" onerror="window.REGIONS=[];window.TOUR_PRESETS=[]"></script>
+<script src="data/featured.js?v=8fda4a3c" onerror="window.FEATURED=null"></script>
 <section id="welcome" aria-label="Start" hidden>
   <div class="wl-inner">
     <div class="wl-hero"><div class="poster" id="wlHero"></div><div class="wl-title"><h1>Green Lanes</h1><p>Plan motorbike rides on legal byways in England and Wales, then take the GPX with you.</p></div></div>
@@ -594,7 +595,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
     <p class="small"><a href="about.html">How it works and where the data comes from</a></p>
   </div>
 </section>
-<script src="js/plan.js"></script>
-<script src="js/app.js"></script>
+<script src="js/plan.js?v=89dd517b"></script>
+<script src="js/app.js?v=ac7937c8"></script>
 </body>
 </html>
