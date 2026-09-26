@@ -432,13 +432,21 @@ const SHEET_ORDER = () => ["min", previewState(), "open"];
 function setSheet(state){
   if (state === "peek" || state === "mid") state = previewState();
   sheet.dataset.state = state;
-  const h = { min: "76px", peek: (PEEK[view] || 176) + "px", mid: "50vh", open: "82vh" }[state];
+  const h = { min: "54px", peek: (PEEK[view] || 176) + "px", mid: "50vh", open: "82vh" }[state];
   document.documentElement.style.setProperty("--sheet-h", h);
   // map credits and the zoom hint tuck behind the panel when it's fully open, instead of floating near the top
   document.documentElement.style.setProperty("--sheet-ctl", state === "open" ? "0px" : h);
   if (typeof drawZones === "function" && view) drawZones();
-  $("#handleText").textContent = state === "open" ? "▼ Show the map" : "▲ Pull up for more";
+  $("#handleText").textContent = state === "open" ? "▼ Show the map" : state === "min" ? "▲ " + minLabel() : "▲ Pull up for more";
   $("#sheetHandle").setAttribute("aria-label", state === "open" ? "Show the map" : "Show more");
+}
+// What the collapsed bar says, so it reads as something to open rather than a clipped panel.
+function minLabel(){
+  if (view === "region") return $("#regionName").textContent || "Area";
+  if (view === "ideas") return "Route ideas";
+  if (view === "route") return (trip.name || "Your route") + (built ? ` · ${km(built.total)} km` : "");
+  if (view === "tour") return tour?.name || "Tour";
+  return "Where to ride";
 }
 function stepSheet(dir){ const o = SHEET_ORDER(), i = Math.max(0, o.indexOf(sheet.dataset.state)); setSheet(o[Math.min(o.length - 1, Math.max(0, i + dir))]); }
 // Swipe the handle up or down to move between positions; a tap moves up one, or back to the preview from full.
@@ -559,10 +567,17 @@ function drawSketch(){
   }
   if (lastKind === "loop" && loopStart) flag(loopStart, "START").addTo(sketchLayer);
 }
+const meLayer = L.layerGroup().addTo(map);
 function locate(then){
   if (!navigator.geolocation) { status("This browser can't share your location"); return; }
   status("Finding you…", 0);
-  navigator.geolocation.getCurrentPosition(p => { const at = [p.coords.latitude, p.coords.longitude]; map.setView(at, Math.max(map.getZoom(), 12)); status(""); then?.(at); },
+  navigator.geolocation.getCurrentPosition(p => {
+    const at = [p.coords.latitude, p.coords.longitude];
+    meLayer.clearLayers();
+    if (p.coords.accuracy < 3000) L.circle(at, { radius: p.coords.accuracy, color: "#1a73e8", weight: 1, fillOpacity: .1, interactive: false }).addTo(meLayer);
+    L.marker(at, { interactive: false, keyboard: false, icon: L.divIcon({ className: "", iconSize: [0, 0], html: '<div class="me-dot"></div>' }) }).addTo(meLayer);
+    map.setView(at, Math.max(map.getZoom(), 12)); status(""); then?.(at);
+  },
     () => status("Couldn't get your location. Search for a place instead."), { enableHighAccuracy: false, timeout: 10000 });
 }
 $("#btnLocate").onclick = () => locate();
@@ -1234,7 +1249,7 @@ function openTour(){
   if (tour) { renderTour(); if (tour.days.length) map.fitBounds(L.latLngBounds(tour.days.flatMap(d => d.trip.items.flatMap(it => it.coords)).concat([tour.start, tour.end])).pad(0.05)); }
   else renderTourSetup();
 }
-$("#goTour").onclick = () => { tour = null; tourPick = -1; openTour(); };
+$("#goTour").onclick = () => { if (tour?.days?.length && !featNames().has(tour.name)) saveItem({ name: tour.name || "My tour", tour, summary: `${tour.days.length} days` }); tour = null; tourPick = -1; openTour(); };
 $("#tourBack").onclick = () => { tourRun++; tourLayer.clearLayers(); showView(trip.items.length ? "route" : "plan", "peek"); };
 function renderTourSetup(){
   $("#tStartPicked").textContent = tourPlaces.start ? "✓ Set" : "";
@@ -1569,6 +1584,34 @@ else if (trip.items.length) {
   if (!built || built.twisty !== settings.twisty) build(); else findRouteStops();
 } else showView("plan", "peek");
 addEventListener("pagehide", () => store.set("lastView", view));
+
+/* ---------- start screen: shown once per visit ---------- */
+function showWelcome(){
+  const pick = REGION_LIST[Math.floor(Math.random() * REGION_LIST.length)];
+  $("#wlHero").innerHTML = pick ? posterHtml(pick, false) : "";
+  const g = $("#wlGrid"); g.innerHTML = "";
+  for (const r of REGION_LIST) {
+    const n = featuredIn(r.slug).length, b = document.createElement("button");
+    b.className = "rcard"; b.setAttribute("role", "listitem");
+    b.innerHTML = `<div class="poster">${posterHtml(r)}</div><div class="cap"><b>${esc(r.name)}</b><span>${n ? `${n} ride${n > 1 ? "s" : ""}` : "Plan your own"}</span></div>`;
+    b.onclick = () => { closeWelcome(); openRegion(r.slug); };
+    g.append(b);
+  }
+  const carry = view === "tour" && tour ? tour.name || "your tour" : view === "route" && trip.items.length ? trip.name || "your route" : null;
+  $("#wlCarry").hidden = !carry; $("#wlMap").hidden = !!carry;
+  if (carry) $("#wlCarry").textContent = "Carry on: " + carry;
+  $("#welcome").hidden = false; $("#welcome").scrollTop = 0;
+  (carry ? $("#wlCarry") : $("#wlMap")).focus();
+}
+function closeWelcome(){ $("#welcome").hidden = true; try { sessionStorage.setItem("glp:welcomed", "1"); } catch (e) {} map.invalidateSize(); }
+$("#wlCarry").onclick = closeWelcome;
+$("#wlMap").onclick = () => { closeWelcome(); showView("plan", phone() ? "min" : "peek"); map.setView([52.6, -2.3], 7); };
+$("#wlLoop").onclick = () => { closeWelcome(); $("#goLoop").click(); };
+$("#wlDraw").onclick = () => { closeWelcome(); $("#goDraw").click(); };
+$("#wlTour").onclick = () => { closeWelcome(); $("#goTour").click(); };
+$("#helpHome").onclick = () => { $("#helpPop").hidden = true; showWelcome(); };
+let welcomed = false; try { welcomed = !!sessionStorage.getItem("glp:welcomed"); } catch (e) {}
+if (!welcomed) showWelcome();
 // The 2012 notes are kept out of the public copy (they're someone else's writing); hide the switch when absent.
 fetch("data/qwerf-lanes.js", { method: "HEAD" }).then(r => { if (!r.ok) { $("#tNotes").closest("label").hidden = true; $("#tNotes").checked = false; } else if ($("#tNotes").checked) showNotes(true); }).catch(() => { $("#tNotes").closest("label").hidden = true; });
 drawLanes(); drawZones(); drawStops();
