@@ -332,8 +332,30 @@ const stopName = s => s.name || CODE[s.code].one;
 function stopPopup(s){
   const web = CODE[s.code].g === "stay" && /^https?:\/\//.test(s.extra) ? `<a href="${esc(s.extra)}" target="_blank" rel="noopener">Website</a>` : "";
   const info = CODE[s.code].g === "stay" ? "" : s.extra;
-  return `<h3 style="display:flex;gap:8px;align-items:center">${poiBadge(s.code)} ${esc(stopName(s))}</h3><div class="muted">${esc(CODE[s.code].one)}${info ? " · " + esc(info) : ""}</div>
+  const div = document.createElement("div");
+  div.innerHTML = `<h3 style="display:flex;gap:8px;align-items:center">${poiBadge(s.code)} ${esc(stopName(s))}</h3><div class="muted">${esc(CODE[s.code].one)}${info ? " · " + esc(info) : ""}</div>
     <div class="pop-links">${web}<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((s.name ? s.name + " " : "") )}${s.lat.toFixed(5)},${s.lng.toFixed(5)}" target="_blank" rel="noopener">Google Maps: reviews and hours</a></div>`;
+  // a stop can go into the route you're building: the road is sent through it, and it becomes a waypoint in the GPX
+  if (trip.items.length && view !== "tour" && view !== "ideas") {
+    const here = trip.items.some(it => it.stop && hav(it.coords[0], [s.lat, s.lng]) < 5);
+    const b = document.createElement("button"); b.className = "btn " + (here ? "" : "primary"); b.style.marginTop = "8px"; b.style.width = "100%";
+    b.textContent = here ? "− Take out of route" : "+ Add to route";
+    b.onclick = () => { map.closePopup(); here ? removeItem(trip.items.findIndex(it => it.stop && hav(it.coords[0], [s.lat, s.lng]) < 5)) : addStop(s); if (view !== "route") showView("route", "peek"); };
+    div.insertBefore(b, div.querySelector(".pop-links"));
+  }
+  return div;
+}
+const itemStop = s => ({ via: true, stop: { code: s.code }, ids: [], name: stopName(s), kind: CODE[s.code].one, cls: "via", coords: [[s.lat, s.lng]] });
+// Put a stop where it adds the least riding: between the two points of the route it sits closest to.
+function addStop(s){
+  const p = [s.lat, s.lng], n = trip.items.length; let best = n, bc = Infinity;
+  for (let pos = 0; pos <= n; pos++) {
+    const prev = pos === 0 ? trip.start : trip.items[pos - 1].coords.at(-1);
+    const next = pos === n ? (trip.finish || (trip.loop ? trip.start : null)) : trip.items[pos].coords[0];
+    const c = prev && next ? hav(prev, p) + hav(p, next) - hav(prev, next) : prev ? hav(prev, p) : next ? hav(p, next) : 0;
+    if (c < bc) { bc = c; best = pos; }
+  }
+  insertAt(best, itemStop(s)); status(`Added ${stopName(s)} to the route`);
 }
 const pinIcon = (code, small) => L.divIcon({ className: "", html: `<div class="poi-pin${small ? " small" : ""}">${poiBadge(code)}</div>`, iconSize: [0, 0] });
 const stopLayer = L.layerGroup().addTo(map), routeStopLayer = L.layerGroup().addTo(map);
@@ -352,7 +374,7 @@ function drawGrouped(layer, idxs, pickRep){
   const order = Object.keys(GROUPS);
   for (const m of groups.values()) {
     const rep = pickRep ? pickRep(m) : m[Math.floor(m.length / 2)], s = stops[rep];
-    if (m.length === 1) { L.marker([s.lat, s.lng], { icon: pinIcon(s.code, z < 13), keyboard: false }).bindPopup(stopPopup(s)).addTo(layer); continue; }
+    if (m.length === 1) { L.marker([s.lat, s.lng], { icon: pinIcon(s.code, z < 13), keyboard: false }).bindPopup(() => stopPopup(s)).addTo(layer); continue; }
     const tally = {}; for (const i of m) { const g = CODE[stops[i].code].g; tally[g] = (tally[g] || 0) + 1; }
     const kinds = Object.keys(tally).sort((a, b) => tally[b] - tally[a] || order.indexOf(a) - order.indexOf(b));
     const lat = m.reduce((t, i) => t + stops[i].lat, 0) / m.length, lng = m.reduce((t, i) => t + stops[i].lng, 0) / m.length;
@@ -868,11 +890,25 @@ function laneNear(ll, px = 28){
   }
   return best;
 }
-function dragMarker(at, cls, onDrop){
+// The stop icon under a point on screen (only kinds switched on under Show, or already found along the route).
+function stopNear(ll, px = 24){
+  if (!stops) return null;
+  const p = map.latLngToContainerPoint(ll); let best = null, bd = px;
+  for (const i of stopsNear([ll.lat, ll.lng])) {
+    const st = stops[i]; if (!groupOn(st.code) && !routeStopIdx.has(i)) continue;
+    const q = map.latLngToContainerPoint([st.lat, st.lng]), d = Math.hypot(p.x - q.x, p.y - q.y);
+    if (d < bd) { bd = d; best = st; }
+  }
+  return best;
+}
+function highlightStop(st){ if (!st) return; L.circleMarker([st.lat, st.lng], { radius: 20, color: "#ffd21f", weight: 5, fill: false, interactive: false }).addTo(highlightLayer); }
+function dragMarker(at, cls, onDrop, html){
   const m = L.marker(at, { draggable: true, autoPan: true, keyboard: false, zIndexOffset: 500,
-    icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<div class="handle ${cls}"></div>` }), title: "Drag onto a green lane" });
-  m.on("drag", e => { const w = laneNear(e.target.getLatLng()); w ? highlightLane(w) : highlightLane(null); });
-  m.on("dragend", e => { highlightLane(null); const ll = e.target.getLatLng(); onDrop(laneNear(ll), [ll.lat, ll.lng]); });
+    icon: L.divIcon({ className: "", iconSize: [0, 0], html: html || `<div class="handle ${cls}"></div>` }), title: "Drag onto a green lane or a stop" });
+  // a stop icon wins over a lane, because it's the smaller target and you aimed at it
+  const target = ll => { const st = stopNear(ll); return st ? { st } : { w: laneNear(ll) }; };
+  m.on("drag", e => { const t = target(e.target.getLatLng()); highlightLane(t.w || null); highlightStop(t.st); });
+  m.on("dragend", e => { highlightLane(null); const ll = e.target.getLatLng(), t = target(ll); onDrop(t.w || null, [ll.lat, ll.lng], t.st || null); });
   return m;
 }
 function removeLane(id){ const i = trip.items.findIndex(it => it.ids.some(x => x === id || laneOf.get(x) === id)); if (i >= 0) removeItem(i); }
@@ -1033,9 +1069,16 @@ function drawRoute(){
     if (s.type !== "road" || lineLen(s.coords) < 300) continue;
     let half = lineLen(s.coords) / 2, at = s.coords[0];
     for (let i = 1; i < s.coords.length; i++) { const d = hav(s.coords[i - 1], s.coords[i]); if (d >= half) { const f = half / d; at = [s.coords[i-1][0] + (s.coords[i][0] - s.coords[i-1][0]) * f, s.coords[i-1][1] + (s.coords[i][1] - s.coords[i-1][1]) * f]; break; } half -= d; }
-    dragMarker(at, "", (w, p) => { w ? insertAt(s.link, itemFromWay(w)) : insertAt(s.link, itemVia(p)); status(w ? `Added ${laneName(w.tags)}` : "Added a via point"); }).addTo(routeLayer);
+    dragMarker(at, "", (w, p, st) => { st ? insertAt(s.link, itemStop(st)) : w ? insertAt(s.link, itemFromWay(w)) : insertAt(s.link, itemVia(p)); status(st ? `Added ${stopName(st)}` : w ? `Added ${laneName(w.tags)}` : "Added a via point"); }).addTo(routeLayer);
   }
-  trip.items.forEach((it, i) => { if (it.via) dragMarker(it.coords[0], "via", (w, p) => { w ? insertAt(i, itemFromWay(w), true) : (it.coords = [p], built = null, saveTrip(), drawRoute(), build()); }).addTo(routeLayer); });
+  trip.items.forEach((it, i) => {
+    if (!it.via) return;
+    dragMarker(it.coords[0], "via", (w, p, st) => {
+      if (st) insertAt(i, itemStop(st), true);
+      else if (w) insertAt(i, itemFromWay(w), true);
+      else { Object.assign(it, itemVia(p)); delete it.stop; built = null; saveTrip(); renderRoute(); drawRoute(); build(); }
+    }, it.stop ? `<div class="poi-pin via-stop">${poiBadge(it.stop.code)}</div>` : null).addTo(routeLayer);
+  });
 }
 function routeWarnings(b, t = trip){
   const warn = [];
@@ -1067,8 +1110,8 @@ function renderRoute(){
   const ul = $("#laneList"); ul.innerHTML = "";
   trip.items.forEach((it, i) => {
     const li = document.createElement("li");
-    const col = it.cls === "file" ? "#0e7490" : it.via ? "#5d5848" : css(CLASSES[it.cls]?.color || "--ucr");
-    li.innerHTML = `<span class="num">${i + 1}</span><span class="grow"><span class="t">${esc(it.name)}</span><br><span class="s"><span class="chip" style="background:${col}">${esc(it.kind)}</span> ${it.via ? "the road passes through here" : km(lineLen(it.coords)) + " km"}${it.surface ? " · " + esc(it.surface) : ""}</span></span>`;
+    const col = it.cls === "file" ? "#0e7490" : it.stop ? GROUPS[CODE[it.stop.code]?.g]?.color || "#5d5848" : it.via ? "#5d5848" : css(CLASSES[it.cls]?.color || "--ucr");
+    li.innerHTML = `<span class="num">${i + 1}</span><span class="grow"><span class="t">${esc(it.name)}</span><br><span class="s"><span class="chip" style="background:${col}">${esc(it.kind)}</span> ${it.stop ? "stop on the way" : it.via ? "the road passes through here" : km(lineLen(it.coords)) + " km"}${it.surface ? " · " + esc(it.surface) : ""}</span></span>`;
     li.querySelector(".grow").onclick = () => { it.via ? map.setView(it.coords[0], 15) : map.fitBounds(L.latLngBounds(it.coords).pad(0.3), { maxZoom: 15 }); if (phone()) setSheet("peek"); };
     const x = document.createElement("button"); x.className = "x"; x.textContent = "✕"; x.setAttribute("aria-label", "Take out " + it.name);
     x.onclick = () => removeItem(i);
@@ -1189,7 +1232,8 @@ function gpxText(title, parts){
   const budget = Math.floor(9000 / parts.length);   // older Garmins cut tracks at 10,000 points
   parts.forEach((p, n) => {
     if (n === 0 && p.trip.start) w.push(`<wpt lat="${f(p.trip.start[0])}" lon="${f(p.trip.start[1])}"><name>Start</name><sym>Flag, Blue</sym></wpt>`);
-    p.trip.items.forEach((it, i) => w.push(it.via ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}Via ${i + 1}`)}</name><sym>Waypoint</sym></wpt>`
+    p.trip.items.forEach((it, i) => w.push(it.stop ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}${it.kind}: ${it.name}`.replace(`${it.kind}: ${it.kind}`, it.kind).slice(0, 40))}</name><sym>${CODE[it.stop.code]?.sym || "Waypoint"}</sym></wpt>`
+      : it.via ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}Via ${i + 1}`)}</name><sym>Waypoint</sym></wpt>`
       : `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}L${i + 1} ${it.name}`.slice(0, 40))}</name><desc>${x(`${it.kind}, ${km(lineLen(it.coords))} km`)}</desc><sym>Flag, Green</sym></wpt>`));
     if (stops) for (const r of p.stops || []) { const s = stops[r.i]; if (groupOn(s.code)) w.push(`<wpt lat="${f(s.lat)}" lon="${f(s.lng)}"><name>${x((CODE[s.code].one + ": " + (s.name || "")).replace(/: $/, "").slice(0, 40))}</name><desc>${x(`${p.prefix}${km(r.along)} km in${s.extra ? ", " + s.extra : ""}`)}</desc><sym>${CODE[s.code].sym}</sym></wpt>`); }
     if (p.nightAt) w.push(`<wpt lat="${f(p.nightAt[0])}" lon="${f(p.nightAt[1])}"><name>${x(p.nightName.slice(0, 40))}</name><sym>Lodging</sym></wpt>`);

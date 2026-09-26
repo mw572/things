@@ -156,6 +156,7 @@ ul.list li .s{font-size:13px;color:var(--muted)}
 .handle{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--route);box-shadow:0 0 0 1.5px #fff,1px 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);cursor:grab}
 .handle.via{width:20px;height:20px;background:var(--route);border-color:#fff}
 .leaflet-marker-draggable .handle:active{cursor:grabbing}
+.poi-pin.via-stop{transform:translate(-50%,-50%) scale(1.15);cursor:grab;filter:drop-shadow(0 0 0 #fff) drop-shadow(0 0 3px var(--route))}
 /* Explore */
 .carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 8px;margin:0 -2px;scrollbar-width:thin}
 .rcard{flex:0 0 min(230px,64vw);scroll-snap-align:start;border:2px solid var(--ink);border-radius:10px;background:var(--card);box-shadow:var(--shadow);overflow:hidden;text-align:left;padding:0;cursor:pointer;color:var(--ink);font:inherit}
@@ -354,7 +355,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
     <ol class="steps">
       <li><b>Pick an area</b> on Explore and ride a ready-made route, or plan your own.</li>
       <li><b>Plan your own:</b> <i>Loop</i> from a start, <i>Draw</i> roughly where you want to go, or a multi-day <i>Tour</i>.</li>
-      <li><b>Change it:</b> tap a green lane to add it, tap a pink one to take it out, or drag ○ onto a lane.</li>
+      <li><b>Change it:</b> tap a green lane to add it, tap a pink one to take it out, or drag ○ onto a lane. To stop somewhere, tap its icon and choose Add to route, or drag ○ onto the icon.</li>
       <li><b>Show</b> (under the search box) puts tea, food, toilets, fuel, beauty spots and places to stay on the map and in the GPX.</li>
       <li><b>Download the GPX</b> for your sat nav or phone.</li>
     </ol>
