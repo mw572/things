@@ -127,7 +127,55 @@ let councilAdded = 0;
   putWay(-(i + 1), { designation: "byway_open_to_all_traffic", name: `${council} byway ${ref.split("|").slice(1).join(" ")}`, source: "council", council }, coords);
   councilAdded++;
 });
-$("#dataNote").textContent = `Lanes: ${(osmWays.size - councilAdded).toLocaleString()} from OpenStreetMap, ${window.OSM_LANES?.built || "date unknown"}` + (councilAdded ? `, plus ${councilAdded.toLocaleString()} byway stretches from council records.` : ".");
+// OpenStreetMap splits a lane wherever its tags change (surface, a bridge, a new ref), so one lane can arrive as
+// a dozen pieces. Join pieces end to end where exactly two of them meet, nothing else touches that point, both are
+// the same kind of lane and their names don't disagree. Junctions where lanes fork stay split.
+const osmPieces = osmWays.size - councilAdded, laneOf = new Map();
+(function joinPieces(){
+  const key = c => c[0].toFixed(5) + "," + c[1].toFixed(5), ends = new Map(), inner = new Set(), nb = new Map();
+  for (const w of osmWays.values()) {
+    for (const c of [w.coords[0], w.coords.at(-1)]) { const k = key(c); if (!ends.has(k)) ends.set(k, []); ends.get(k).push(w.id); }
+    for (let i = 1; i < w.coords.length - 1; i++) inner.add(key(w.coords[i]));
+  }
+  const link = (a, b) => { if (!nb.has(a)) nb.set(a, []); nb.get(a).push(b); };
+  for (const [k, ids] of ends) {
+    if (ids.length !== 2 || ids[0] === ids[1] || inner.has(k)) continue;
+    const a = osmWays.get(ids[0]), b = osmWays.get(ids[1]);
+    if (a.cls !== b.cls || (a.tags.name && b.tags.name && a.tags.name !== b.tags.name)) continue;
+    link(a.id, b.id); link(b.id, a.id);
+  }
+  const done = new Set();
+  for (const id0 of [...nb.keys()]) {
+    if (done.has(id0)) continue;
+    // walk to one end of the chain (or all the way round a closed loop), then collect it from there
+    let prev = null, cur = id0;
+    for (let n = 0; n < 1000; n++) { const nx = (nb.get(cur) || []).find(x => x !== prev); if (nx == null || nx === id0) break; prev = cur; cur = nx; }
+    const seq = [cur]; prev = null;
+    for (let n = 0; n < 1000; n++) { const nx = (nb.get(cur) || []).find(x => x !== prev && !seq.includes(x)); if (nx == null) break; prev = cur; cur = nx; seq.push(nx); }
+    seq.forEach(id => done.add(id));
+    if (seq.length < 2) continue;
+    const ws = seq.map(id => osmWays.get(id));
+    let coords = ws[0].coords.slice();
+    const k1 = ws[1].coords;
+    if (key(coords[0]) === key(k1[0]) || key(coords[0]) === key(k1.at(-1))) coords.reverse();
+    for (const w of ws.slice(1)) {
+      const c = key(w.coords[0]) === key(coords.at(-1)) ? w.coords : w.coords.slice().reverse();
+      coords = coords.concat(c.slice(1));
+    }
+    const longest = ws.reduce((a, b) => b.len > a.len ? b : a), tags = { ...longest.tags };
+    tags.name = tags.name || ws.find(w => w.tags.name)?.tags.name;
+    if (!tags.name) delete tags.name;
+    const surf = [...new Set(ws.map(w => w.tags.surface).filter(Boolean))];
+    if (surf.length) tags.surface = surf.slice(0, 3).join(", ");
+    for (const id of seq) { osmWays.delete(id); laneOf.set(id, seq[0]); }
+    let a = 90, b = 180, c = -90, d = -180;
+    for (const [la, lo] of coords) { if (la < a) a = la; if (lo < b) b = lo; if (la > c) c = la; if (lo > d) d = lo; }
+    osmWays.set(seq[0], { id: seq[0], members: seq, tags, coords, cls: longest.cls, council: ws.find(w => w.council)?.council || null, bbox: [a, b, c, d], len: ws.reduce((t, w) => t + w.len, 0) });
+  }
+  grid.clear();
+  for (const w of osmWays.values()) for (const k of cells(w.bbox)) { if (!grid.has(k)) grid.set(k, new Set()); grid.get(k).add(w.id); }
+})();
+$("#dataNote").textContent = `Lanes: ${osmPieces.toLocaleString()} pieces from OpenStreetMap joined into ${(osmWays.size - councilAdded).toLocaleString()} lanes, ${window.OSM_LANES?.built || "date unknown"}` + (councilAdded ? `, plus ${councilAdded.toLocaleString()} byway stretches from council records.` : ".");
 const laneLayer = L.layerGroup().addTo(map);
 const shown = new Set();
 let fadeLanes = false;
@@ -174,7 +222,7 @@ function drawLanes(){
   if (band !== lastZoomBand) { lastZoomBand = band; for (const id of shown) osmWays.get(id).layer.setStyle(laneStyle(osmWays.get(id))); }
 }
 function setFade(on){ if (fadeLanes === on) return; fadeLanes = on; for (const id of shown) osmWays.get(id).layer.setStyle(laneStyle(osmWays.get(id))); }
-const inRoute = id => trip.items.some(it => it.ids.includes(id));
+const inRoute = id => trip.items.some(it => it.ids.some(i => i === id || laneOf.get(i) === id));
 function lanePopup(w){
   const t = w.tags, c = CLASSES[w.cls], mid = w.coords[Math.floor(w.coords.length / 2)];
   const div = document.createElement("div");
@@ -192,7 +240,6 @@ function lanePopup(w){
     acts.append(b); div.append(acts);
   }
   div.insertAdjacentHTML("beforeend", `<div class="pop-links">
-    <a href="https://www.greenroadmap.org.uk/" target="_blank" rel="noopener">Check closures (TRF map)</a>
     <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${mid[0].toFixed(6)},${mid[1].toFixed(6)}" target="_blank" rel="noopener">Street View</a>
     <a href="#" class="whole">Show the whole lane</a></div>`);
   div.querySelector(".whole").onclick = e => { e.preventDefault(); map.fitBounds(L.latLngBounds(w.coords).pad(0.4), { maxZoom: 16, paddingBottomRight: phone() ? [0, 200] : [0, 0] }); };
@@ -744,13 +791,13 @@ let built = store.get("built5", null);
 let editingDay = null;       // when editing one day of a tour
 const saveTrip = () => { store.set("trip2", trip); store.set("built5", built); };
 const routeLayer = L.layerGroup().addTo(map);
-const itemFromWay = (w, coords) => { const t = w.tags; return { ids: [w.id], name: laneName(t), kind: DESIG[t.designation] || "Byway", cls: w.cls, coords: coords || w.coords.slice(), surface: [t.surface, t.tracktype].filter(Boolean).join(", ") }; };
+const itemFromWay = (w, coords) => { const t = w.tags; return { ids: w.members ? w.members.slice() : [w.id], name: laneName(t), kind: DESIG[t.designation] || "Byway", cls: w.cls, coords: coords || w.coords.slice(), surface: [t.surface, t.tracktype].filter(Boolean).join(", ") }; };
 function chainToItems(chain){   // join lanes that touch into one entry, so the list reads as lanes, not fragments
   const items = [];
   for (const n of chain) {
     const last = items.at(-1);
     if (last && hav(last.coords.at(-1), n.a) < 30 && last.cls === n.w.cls) {
-      last.coords = last.coords.concat(n.coords.slice(1)); last.ids.push(n.w.id);
+      last.coords = last.coords.concat(n.coords.slice(1)); last.ids.push(...(n.w.members || [n.w.id]));
       if (last.name.startsWith("Unnamed")) last.name = laneName(n.w.tags);
       continue;
     }
@@ -817,7 +864,7 @@ function dragMarker(at, cls, onDrop){
   m.on("dragend", e => { highlightLane(null); const ll = e.target.getLatLng(); onDrop(laneNear(ll), [ll.lat, ll.lng]); });
   return m;
 }
-function removeLane(id){ const i = trip.items.findIndex(it => it.ids.includes(id)); if (i >= 0) removeItem(i); }
+function removeLane(id){ const i = trip.items.findIndex(it => it.ids.some(x => x === id || laneOf.get(x) === id)); if (i >= 0) removeItem(i); }
 function removeItem(i){
   trip.items.splice(i, 1); built = null; saveTrip();
   if (!trip.items.length) { routeLayer.clearLayers(); routeStopIdx = new Set(); routeStopLayer.clearLayers(); showView(editingDay != null ? "tour" : "plan", "peek"); return; }
@@ -1005,7 +1052,6 @@ function renderRoute(){
   $("#routeStatus").textContent = built ? `${nLanes} lane${nLanes !== 1 ? "s" : ""} · ${km(built.off)} km off-road` : "Finding roads between the lanes…";
   $("#routeStatus").title = built ? `Includes ${km(built.joinM || 0)} km of connecting lanes. Roads by ${built.via}.` : "";
   const warn = routeWarnings(built).map(esc);
-  warn.push(`Check each lane for closures before you ride (<a href="https://www.greenroadmap.org.uk/" target="_blank" rel="noopener">TRF map</a>).`);
   $("#routeWarn").innerHTML = warn.join("<br>");
   const ul = $("#laneList"); ul.innerHTML = "";
   trip.items.forEach((it, i) => {
@@ -1133,7 +1179,7 @@ function gpxText(title, parts){
   parts.forEach((p, n) => {
     if (n === 0 && p.trip.start) w.push(`<wpt lat="${f(p.trip.start[0])}" lon="${f(p.trip.start[1])}"><name>Start</name><sym>Flag, Blue</sym></wpt>`);
     p.trip.items.forEach((it, i) => w.push(it.via ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}Via ${i + 1}`)}</name><sym>Waypoint</sym></wpt>`
-      : `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}L${i + 1} ${it.name}`.slice(0, 40))}</name><desc>${x(`${it.kind}, ${km(lineLen(it.coords))} km. Check for closures before riding.`)}</desc><sym>Flag, Green</sym></wpt>`));
+      : `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}L${i + 1} ${it.name}`.slice(0, 40))}</name><desc>${x(`${it.kind}, ${km(lineLen(it.coords))} km`)}</desc><sym>Flag, Green</sym></wpt>`));
     if (stops) for (const r of p.stops || []) { const s = stops[r.i]; if (groupOn(s.code)) w.push(`<wpt lat="${f(s.lat)}" lon="${f(s.lng)}"><name>${x((CODE[s.code].one + ": " + (s.name || "")).replace(/: $/, "").slice(0, 40))}</name><desc>${x(`${p.prefix}${km(r.along)} km in${s.extra ? ", " + s.extra : ""}`)}</desc><sym>${CODE[s.code].sym}</sym></wpt>`); }
     if (p.nightAt) w.push(`<wpt lat="${f(p.nightAt[0])}" lon="${f(p.nightAt[1])}"><name>${x(p.nightName.slice(0, 40))}</name><sym>Lodging</sym></wpt>`);
     let pts = []; for (const s of p.built.segs) for (const q of s.coords) { const l = pts.at(-1); if (!l || l[0] !== q[0] || l[1] !== q[1]) pts.push(q); }
