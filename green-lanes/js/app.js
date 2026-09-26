@@ -204,7 +204,8 @@ const osmPieces = osmWays.size - councilAdded, laneOf = new Map();
     for (const id of seq) { osmWays.delete(id); laneOf.set(id, seq[0]); }
     let a = 90, b = 180, c = -90, d = -180;
     for (const [la, lo] of coords) { if (la < a) a = la; if (lo < b) b = lo; if (la > c) c = la; if (lo > d) d = lo; }
-    osmWays.set(seq[0], { id: seq[0], members: seq, tags, coords, cls: longest.cls, council: ws.find(w => w.council)?.council || null, bbox: [a, b, c, d], len: lineLen(coords) });
+    const search = [...new Set(ws.flatMap(w => [w.tags.name, w.tags.prow_ref, w.tags.ref]).filter(Boolean))].join(" | ").toLowerCase();
+    osmWays.set(seq[0], { id: seq[0], members: seq, search, tags, coords, cls: longest.cls, council: ws.find(w => w.council)?.council || null, bbox: [a, b, c, d], len: lineLen(coords) });
   }
   grid.clear();
   for (const w of osmWays.values()) for (const k of cells(w.bbox)) { if (!grid.has(k)) grid.set(k, new Set()); grid.get(k).add(w.id); }
@@ -1732,7 +1733,7 @@ function renderLaneFinder(){
   let list = [];
   for (const w of osmWays.values()) {
     if (!CLASSES[w.cls].ride || (boatOnly && w.cls !== "boat") || w.len < 100) continue;   // scraps under 100 m are mapping leftovers
-    if (q && ![w.tags.name, w.tags.prow_ref, w.tags.ref].some(t => t && t.toLowerCase().includes(q))) continue;
+    if (q && !(w.search ? w.search.includes(q) : [w.tags.name, w.tags.prow_ref, w.tags.ref].some(t => t && t.toLowerCase().includes(q)))) continue;   // every piece's name and number counts
     if (laneSort === "here" && !q && !b.intersects(L.latLngBounds([w.bbox[0], w.bbox[1]], [w.bbox[2], w.bbox[3]]))) continue;
     list.push(w);
   }
