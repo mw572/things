@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta name="build" content="af84a1e847">
+<meta name="build" content="69e79f7601">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f4efe1">
@@ -415,7 +415,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   #sheet[data-state="min"] #sheetHandle{padding-top:12px}
   #sheet:not([data-state="min"]) #handleText{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
   #sheet:not([data-state="min"]) #sheetHandle{min-height:16px;padding:0}
-  #sheetHandle .tab{width:108px;height:28px;top:-28px}
+  #sheetHandle .tab{width:88px;height:28px;top:-28px;left:auto;right:10px;transform:none}   /* at the right, clear of the map credit on the left */
   #banner{left:10px;right:10px;transform:none;max-width:none;top:66px;padding:6px 8px;gap:6px;font-size:14px;line-height:1.25}
   #bannerText{flex:1 1 100%;text-align:center}
   #status{left:10px;bottom:min(calc(var(--sheet-h) + 10px), calc(100% - 170px));max-width:calc(100% - 20px)}
@@ -423,7 +423,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   #queueChip{left:50%;bottom:min(calc(var(--sheet-h) + 58px), calc(100% - 124px))}   /* above the status line, never over the top buttons */
   .leaflet-control-zoom{display:none}
   .pop{top:auto;bottom:calc(var(--sheet-h) + 8px);right:8px;left:8px;width:auto;max-height:calc(100% - var(--sheet-h) - 84px);z-index:1200}
-  .leaflet-bottom{bottom:calc(var(--sheet-ctl) + 30px)}   /* clear of the panel's tab */
+  .leaflet-bottom{bottom:var(--sheet-ctl)}
 }
 /* small phones (iPhone SE and narrower): keep every row inside the screen */
 @media (max-width:370px){

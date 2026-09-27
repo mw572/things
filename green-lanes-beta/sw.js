@@ -12,7 +12,7 @@
 // Routing and place search servers are never kept here: the app caches those answers itself.
 
 // deploy.sh rewrites the next two lines with the release's hash and the stamped file list
-const BUILD = "af84a1e847";
+const BUILD = "69e79f7601";
 const SHELL = ["index.html", "about.html", "manifest.webmanifest", "img/icons/apple-touch-icon.png", "img/icons/favicon.png", "img/icons/icon-192.png", "img/icons/icon-512.png", "img/icons/icon-maskable-512.png", "img/regions/argyll.jpg", "img/regions/black-mountains.jpg", "img/regions/borders-galloway.jpg", "img/regions/brecks.jpg", "img/regions/cairngorms.jpg", "img/regions/cotswolds.jpg", "img/regions/dales.jpg", "img/regions/devon.jpg", "img/regions/lakes.jpg", "img/regions/mid-wales.jpg", "img/regions/moors.jpg", "img/regions/northumberland.jpg", "img/regions/peak.jpg", "img/regions/ridgeway.jpg", "img/regions/salisbury-plain.jpg", "img/regions/shropshire.jpg", "img/regions/south-downs.jpg", "img/regions/start-hero-wide.jpg", "img/regions/start-hero.jpg", "img/regions/west-highlands.jpg", "data/regions.js?v=96f2904e", "data/region-stats.js?v=635c4fc6", "data/osm-lanes.js?v=a10797ab", "data/council-flags.js?v=0caaf474", "data/council-boats.js?v=d29ae6d4", "data/closures.js?v=613bc2dd", "data/classics.js?v=06d1a86d", "data/featured.js?v=3747ca0e", "js/plan.js?v=89dd517b", "js/app.js?v=3ca02fb5", "js/offline.js?v=6fe83e21", "js/ride.js?v=f7088694", "js/localroute.js", "js/route-worker.js", "data/stops.js", "data/roads/index.json"];
 const REMOTE = ["https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css", "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
   "https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Zilla+Slab:wght@600;700&display=swap"];
