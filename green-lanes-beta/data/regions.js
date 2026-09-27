@@ -1,0 +1,52 @@
+// Riding areas for the Explore screen. Each has a poster (img/regions/<slug>.jpg), a map view, and the towns
+// the ready-made rides start from. Rides themselves are in data/featured.js (built by tools/build_featured.md).
+window.REGIONS = [
+  { slug: "salisbury-plain", name: "Salisbury Plain", sub: "and Cranborne Chase", centre: [51.18, -1.92], zoom: 10,
+    line: "Long chalk byways over open downland. Some cross the military training area, so watch for red flags and closures.",
+    starts: [{ name: "Shrewton", at: [51.197, -1.905] }, { name: "Tisbury", at: [51.061, -2.078] }] },
+  { slug: "ridgeway", name: "The Ridgeway", sub: "and Marlborough Downs", centre: [51.50, -1.60], zoom: 10,
+    line: "Ancient chalk ridge tracks and downland byways between Marlborough and Wantage.",
+    starts: [{ name: "Marlborough", at: [51.419, -1.729] }, { name: "Wantage", at: [51.588, -1.426] }] },
+  { slug: "cotswolds", name: "Cotswolds", sub: "", centre: [51.85, -1.85], zoom: 10,
+    line: "Stone villages and walled lanes. Most lanes here are unclassified roads rather than byways, so check each one.",
+    starts: [{ name: "Stow-on-the-Wold", at: [51.930, -1.723] }, { name: "Cirencester", at: [51.718, -1.968] }] },
+  { slug: "mid-wales", name: "Mid-Wales", sub: "and the Elan Valley", centre: [52.33, -3.55], zoom: 10,
+    line: "Big empty hills, reservoirs and long stony mountain roads around Rhayader and Llanidloes.",
+    starts: [{ name: "Rhayader", at: [52.303, -3.512] }, { name: "Llanidloes", at: [52.448, -3.540] }] },
+  { slug: "black-mountains", name: "Black Mountains", sub: "and the Brecon Beacons", centre: [52.00, -3.15], zoom: 10,
+    line: "Hill tracks and border lanes around Hay-on-Wye and Talgarth.",
+    starts: [{ name: "Hay-on-Wye", at: [52.075, -3.127] }, { name: "Crickhowell", at: [51.860, -3.137] }] },
+  { slug: "shropshire", name: "Shropshire Hills", sub: "and the Marches", centre: [52.45, -2.95], zoom: 10,
+    line: "Sunken lanes and ridge tracks along the Welsh border around Clun and Bishop's Castle.",
+    starts: [{ name: "Clun", at: [52.422, -3.031] }, { name: "Bishop's Castle", at: [52.491, -2.999] }] },
+  { slug: "peak", name: "Peak District", sub: "", centre: [53.22, -1.80], zoom: 10,
+    line: "Walled limestone lanes and gritstone edges. Several lanes here have closure orders, so check each one before you go.",
+    starts: [{ name: "Buxton", at: [53.259, -1.911] }, { name: "Bakewell", at: [53.214, -1.676] }] },
+  { slug: "dales", name: "Yorkshire Dales", sub: "", centre: [54.33, -2.05], zoom: 10,
+    line: "Walled green roads climbing out of the dales between Hawes and Reeth.",
+    starts: [{ name: "Hawes", at: [54.304, -2.197] }, { name: "Reeth", at: [54.388, -1.943] }] },
+  { slug: "moors", name: "North York Moors", sub: "", centre: [54.30, -0.95], zoom: 10,
+    line: "Moorland tracks and forest roads around Helmsley and Pickering.",
+    starts: [{ name: "Helmsley", at: [54.246, -1.058] }, { name: "Pickering", at: [54.247, -0.776] }] },
+  { slug: "lakes", name: "Lake District", sub: "and Cumbria", centre: [54.42, -2.75], zoom: 10,
+    line: "Few lanes but famous ones. Some carry voluntary restraints, so check the TRF map before you ride.",
+    starts: [{ name: "Coniston", at: [54.369, -3.074] }, { name: "Kirkby Stephen", at: [54.472, -2.349] }] },
+  { slug: "northumberland", name: "Northumberland", sub: "and Kielder", centre: [55.25, -2.10], zoom: 10,
+    line: "Huge border country with long byways, many of them added here from the council's own records.",
+    starts: [{ name: "Bellingham", at: [55.145, -2.253] }, { name: "Rothbury", at: [55.310, -1.909] }] },
+  { slug: "devon", name: "Dartmoor", sub: "and Devon", centre: [50.68, -3.85], zoom: 10,
+    line: "Deep sunken lanes and moorland edges. Many are unclassified roads, so check each one.",
+    starts: [{ name: "Okehampton", at: [50.739, -4.003] }, { name: "Moretonhampstead", at: [50.661, -3.765] }] },
+  { slug: "south-downs", name: "South Downs", sub: "", centre: [50.95, -0.90], zoom: 10,
+    line: "Chalk ridge byways within reach of London, around Petersfield.",
+    starts: [{ name: "Petersfield", at: [51.003, -0.935] }] },
+  { slug: "brecks", name: "The Brecks", sub: "Norfolk and Suffolk", centre: [52.43, 0.70], zoom: 10,
+    line: "Sandy forest tracks and heath byways around Thetford.",
+    starts: [{ name: "Thetford", at: [52.413, 0.749] }] }
+];
+// Ready-made tours: start, finish, days, hours a day.
+window.TOUR_PRESETS = [
+  { slug: "london-wales", name: "London to Mid-Wales", start: { name: "London", at: [51.507, -0.128] }, end: { name: "Rhayader", at: [52.303, -3.512] }, days: 3, dayHours: 6, round: false },
+  { slug: "wessex-weekend", name: "Wessex weekend from London", start: { name: "London", at: [51.507, -0.128] }, end: { name: "Salisbury Plain", at: [51.197, -1.905] }, days: 2, dayHours: 6, round: true },
+  { slug: "peak-to-dales", name: "Peak District to the Dales", start: { name: "Buxton", at: [53.259, -1.911] }, end: { name: "Hawes", at: [54.304, -2.197] }, days: 2, dayHours: 6, round: false }
+];
