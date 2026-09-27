@@ -8,7 +8,8 @@
 const Ride = (() => {
   const OFF_M = 60, OFF_S = 10, AHEAD_M = 6000, BEHIND_M = 400, JOIN_M = 150, WAY_KM = 80;
   let toStartSaid = false;
-  let peak = 0, wrongSaid = 0;   // the furthest along you've been, and when the wrong-way warning was last given
+  let peak = 0, wrongSaid = 0, wrongUntil = 0, wrongCount = 0;   // (said twice and you're still going: you mean it)   // the furthest along you've been, and when the wrong-way warning was last given
+  let joins = [];
   let on = false, line = [], cum = [], lanes = [], places = [], planned = [], total = 0, along = 0, watch = null, lock = null, follow = true, joined = false;
   let offSince = null, lastFix = null, heading = null, practice = null, backLine = null, zoomBefore = null, msgTimer = null, toStartShown = false;
   const layer = L.layerGroup(), me = L.marker([0, 0], { interactive: false, zIndexOffset: 2000, icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<div class="ride-me"><i></i></div>` }) });
@@ -21,10 +22,10 @@ const Ride = (() => {
     if (/^Unnamed/.test(n)) return `${it.kind || "Lane"}, ${kmTxt(lineLen(it.coords) / (it.there ? 2 : 1))}${it.there ? " each way" : ""}`;
     return n.replace(/^[A-Z][A-Za-z' -]+? byway (?=\S)/, "Byway "); };
   function prepare(b, t){
-    line = []; cum = []; lanes = []; let d = 0;
+    line = []; cum = []; lanes = []; joins = []; let d = 0;
     for (const s of b.segs) {
-      if (s.type === "lane") lanes.push({ at: d, name: rideName(t.items[s.i]), kind: t.items[s.i]?.kind || "", len: lineLen(s.coords) });
-      else if (s.lanes && lineLen(s.coords) > 200) lanes.push({ at: d, name: "Lanes joining up", kind: "", len: lineLen(s.coords) });   // a join along other lanes is lane riding too
+      if (s.type === "lane") lanes.push({ at: d, name: rideName(t.items[s.i]), kind: t.items[s.i]?.kind || "", len: lineLen(s.coords), no: typeof rowNo === "function" ? rowNo(t, s.i) : s.i + 1 });
+      else if (s.lanes && lineLen(s.coords) > 200) joins.push({ at: d, len: lineLen(s.coords) });   // a join along other lanes: lane riding, but not a numbered lane
       for (const p of s.coords) { if (line.length) d += hav(line.at(-1), p); line.push(p); cum.push(d); }
     }
     total = d;
@@ -34,7 +35,7 @@ const Ride = (() => {
     if (!t.loop && t.finish) places.push({ at: total, name: "the finish" });
     // the stops you chose (a café, a campsite): these come before any other stop the route happens to pass
     planned = []; from = 0;
-    for (const it of t.items) if (it.stop) { const [, at] = nearest(it.coords[0], from); planned.push({ at, name: it.name, code: it.stop.code }); from = at; }
+    for (const it of t.items) if (it.stop) { const [, at] = nearest(it.coords[0], from); planned.push({ at, along: at, name: it.name, code: it.stop.code }); from = at; }
   }
   // nearest point on the line to p, searching only between two distances along it: [metres off, distance along, point].
   // With `near` set, a match further from where you were costs a little, so where a route comes back along the same
@@ -96,7 +97,7 @@ const Ride = (() => {
       // the earliest part of the route that's close: on a loop the start and the finish are the same place
       let [off, a, q] = nearest(p, 0, Infinity, 0);
       // not near the early part: anywhere on it will do (joining a loop in its last few km, say)
-      if (off > JOIN_M) { const g = nearest(p); if (g[0] <= JOIN_M) [off, a, q] = g; }
+      if (off > JOIN_M) { const g = nearest(p); if (g[0] <= JOIN_M || g[0] + 200 < off) [off, a, q] = g; }   // (and say how far it really is)
       if (off <= JOIN_M) { joined = true; along = a; peak = a; follow = true; followBtn(); clearBack(); msg(""); }
       else { toStart(p, off, q); return; }
     }
@@ -109,7 +110,7 @@ const Ride = (() => {
       along = Math.max(0, a); offSince = null; $("#rideOff").hidden = true; clearBack();
       // going the wrong way along it: the distance along keeps falling
       if (along > peak) peak = along;
-      else if (peak - along > 250 && Date.now() - wrongSaid > 120000) { wrongSaid = Date.now(); navigator.vibrate?.([150, 100, 150]); msg("You're riding the route the wrong way round.", null, 15000); }
+      else if (peak - along > 250 && Date.now() - wrongSaid > 120000 && wrongCount++ < 2) { wrongSaid = Date.now(); peak = along; wrongUntil = Date.now() + 15000; navigator.vibrate?.([150, 100, 150]); msg("You're riding the route the wrong way round.", null, 15000); }
       if (peak - along > 1500) peak = along + 250;   // accepted: count from here
     }
     else if (!offSince) offSince = Date.now();
@@ -138,10 +139,11 @@ const Ride = (() => {
       if (!nx) { $("#rideNextLabel").textContent = "Nearly there"; $("#rideNextName").textContent = trip.loop ? "Back to the start" : "The finish"; $("#rideNextDist").textContent = kmTxt(Math.max(0, total - along)); }
       else { $("#rideNextLabel").textContent = `Next · ${i + 1} of ${places.length}`; $("#rideNextName").textContent = nx.name; $("#rideNextDist").textContent = `in ${kmTxt(nx.at - along)}`; }
     } else if (!beforeStart) {
-      const lane = lanes.find(l => along < l.at + l.len);
-      if (!lane) { $("#rideNextLabel").textContent = "No more lanes"; $("#rideNextName").textContent = "Roads to the finish"; $("#rideNextDist").textContent = ""; }
+      const lane = lanes.find(l => along < l.at + l.len), onJoin = joins.find(j => along >= j.at && along < j.at + j.len);
+      if (onJoin && !(lane && along >= lane.at)) { $("#rideNextLabel").textContent = "On lanes"; $("#rideNextName").textContent = lane ? `Joining up to ${lane.name}` : "Lanes joining up"; $("#rideNextDist").textContent = `${kmTxt(onJoin.at + onJoin.len - along)} to go`; }
+      else if (!lane) { $("#rideNextLabel").textContent = "No more lanes"; $("#rideNextName").textContent = "Roads to the finish"; $("#rideNextDist").textContent = ""; }
       else if (along >= lane.at) { $("#rideNextLabel").textContent = "On the lane"; $("#rideNextName").textContent = lane.name; $("#rideNextDist").textContent = `${kmTxt(lane.at + lane.len - along)} to go`; }
-      else { $("#rideNextLabel").textContent = `Next · ${lanes.indexOf(lane) + 1} of ${lanes.length}`; $("#rideNextName").textContent = lane.name; $("#rideNextDist").textContent = `in ${kmTxt(lane.at - along)}`; }
+      else { $("#rideNextLabel").textContent = `Next · ${lane.no} on the map`; $("#rideNextName").textContent = lane.name; $("#rideNextDist").textContent = `in ${kmTxt(lane.at - along)}`; }
     }
     const left = Math.max(0, total - along);
     $("#rideDone").textContent = (along / 1000).toFixed(1); $("#rideLeft").textContent = (left / 1000).toFixed(left < 9950 ? 1 : 0);
@@ -153,7 +155,7 @@ const Ride = (() => {
     const icon = { cafe: "☕", pub: "🍺", restaurant: "🍴", toilet: "🚻", view: "⛰", water: "💧", castle: "🏰", picnic: "🧺", hotel: "🛏", guest: "🛏", hostel: "🛏", camp: "⛺" };
     // the distance first, so a long name is what gets cut short; before you reach the route they count from its start
     // before you reach the route they say where on it they are ("at 25 km"); on it, how far ahead
-    const dist = r => beforeStart ? `at ${kmTxt(r.along)}` : kmTxt(r.along - along);
+    const dist = r => beforeStart ? `${kmTxt(r.along)} into the route` : kmTxt(r.along - along);
     $("#rideStop").textContent = mine ? `${icon[mine.code] || "•"} ${dist(mine)} · ${mine.name}` : stop ? `${icon[stops[stop.i].code] || "•"} ${dist(stop)} · ${stops[stop.i].name || CODE[stops[stop.i].code]?.one || "Stop"}` : "";
     $("#rideFuel").textContent = fuel ? `⛽ ${dist(fuel)} · ${stops[fuel.i].name || "Fuel"}` : (routeStops?.length ? "⛽ No more fuel near the route" : "");
     fitName();
@@ -187,13 +189,15 @@ const Ride = (() => {
   let gpsWaiting = false;
   function gpsError(e){
     gpsIcon(null); gpsWaiting = true;
+    // a warning on screen (wrong way, a message you haven't read) isn't replaced by a GPS hiccup
+    if (e.code !== 1 && !$("#rideMsg").hidden && !/GPS/.test($("#rideMsgText").textContent)) return;
     msg(e.code === 1 ? "Location is off for this page. Turn it on in the phone's settings (Location, then your browser) to see where you are." : "Looking for GPS… Outdoors with a clear view of the sky works best.");
   }
 
   function start(){
     if (!built || built.provisional || on) return;
     if (typeof navPush === "function") navPush();   // the phone's Back ends the ride screen rather than leaving the planner
-    prepare(built, trip); on = true; along = 0; follow = true; joined = false; followZoom = null; toStartSaid = false; toStartShown = false; offSince = null; heading = null; lastFix = null;
+    prepare(built, trip); on = true; along = 0; wrongCount = 0; follow = true; joined = false; followZoom = null; toStartSaid = false; toStartShown = false; offSince = null; heading = null; lastFix = null;
     zoomBefore = { c: map.getCenter(), z: map.getZoom() };
     if (typeof drawRoute === "function") drawRoute();   // without the planning handles
     if (typeof tourLayer !== "undefined") map.removeLayer(tourLayer);   // riding one day of a tour: only that day on the map

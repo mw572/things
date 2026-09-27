@@ -117,18 +117,18 @@
       while (q.length && seen.size < enough) { const x = q.pop(); for (const id of this.adj.get(x) || []) { const e = this.edge.get(id); if (!e) continue; const m = e.a === x ? e.b : e.a; if (this.node.has(m) && !seen.has(m)) { seen.add(m); q.push(m); } } }
       const ok = seen.size >= enough; if (ok) for (const x of seen) this.conn.set(x, true); else this.conn.set(n, false); return ok;
     }
-    snap(p) {   // remembered per point until the roads loaded change
-      const k = p[0].toFixed(6) + "," + p[1].toFixed(6), c = this.snapped?.get(k);
+    snap(p, maxCls = 15) {   // remembered per point until the roads loaded change; maxCls 11 keeps to proper roads
+      const k = p[0].toFixed(6) + "," + p[1].toFixed(6) + "," + maxCls, c = this.snapped?.get(k);
       if (c !== undefined && (c === null || this.edge.has(c.id))) return c;
-      const r = this.snapNew(p); (this.snapped ||= new Map()).set(k, r); return r;
+      const r = this.snapNew(p, maxCls); (this.snapped ||= new Map()).set(k, r); return r;
     }
-    snapNew(p) {
+    snapNew(p, maxCls) {
       // the nearest road that joins the wider network: a lane end can sit next to an isolated stub or a track that
       // only connects through a private road, and routing from there finds nothing. Look within about 3 km first, as
       // that's quick; failing a joined road within 300 m there, look wider. Some lane ends are deep in forest or moor,
       // so take the nearest joined one within 5 km (the distance goes back to the app, which shows it as a gap).
       for (const r of [0.03, 0.07]) {
-        const cands = this.snapAll(p, r).sort((a, b) => a.d - b.d);
+        const cands = this.snapAll(p, r).filter(c => this.edge.get(c.id).cls <= maxCls).sort((a, b) => a.d - b.d);
         for (const c of cands.slice(0, 200)) { const e = this.edge.get(c.id); if (this.connected(e.a) || this.connected(e.b)) { if (c.d < 300 || r > 0.03) return c; break; } }
       }
       return null;

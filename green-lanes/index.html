@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta name="build" content="dd960c3018">
+<meta name="build" content="5d2a45673f">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f4efe1">
@@ -250,7 +250,7 @@ ul.list li .s{font-size:13px;color:var(--muted)}
 .poster.banner img{object-position:50% 55%}
 /* editing a tour day: one slim row */
 .editing{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
-.editing .btn{min-height:36px;padding:4px 8px;font-size:13px;white-space:nowrap;flex:0 0 auto}
+.editing .btn{min-height:44px;padding:4px 8px;font-size:13px;white-space:nowrap;flex:0 0 auto}
 #editingText{flex:1;min-width:0;font-size:13px;font-weight:600}
 .settingsBox>#revBtn{width:auto;margin:10px 12px 4px}
 /* a form's main button stays in view at the bottom of the panel while you fill the form in */
@@ -281,7 +281,7 @@ ul.list li .s{font-size:13px;color:var(--muted)}
 .tool{width:52px;height:52px;border:2px solid var(--ink);border-radius:8px;background:var(--card);box-shadow:var(--shadow);font:700 12px Barlow,sans-serif;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--ink);padding:0}
 .tool .ic{font-size:19px;line-height:1}
 #banner{top:72px;left:calc((100% - var(--side-w))/2);transform:translateX(-50%);background:var(--ink);color:var(--paper);border-radius:8px;padding:8px 10px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - var(--side-w) - 40px);box-shadow:var(--shadow);font-weight:600}
-#banner .btn{min-height:36px;padding:4px 10px;box-shadow:none;border-color:var(--paper)}
+#banner .btn{min-height:44px;padding:4px 10px;box-shadow:none;border-color:var(--paper)}
 body.banner-on #poiWrap,body.banner-on #tools,body.banner-on #btnSearch{display:none}
 .leaflet-popup-content{max-height:calc(100dvh - 220px);overflow:auto}
 @media (max-height:500px){.leaflet-popup-content{max-height:calc(100dvh - 110px)}}
@@ -335,7 +335,7 @@ html.topo{--l-boat:#0b57d0;--l-ucr:#e8590c;--l-closed:#b3001b;--l-rb:#555a61;--l
 .handle{position:relative;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--route);box-shadow:0 0 0 1.5px #fff,1px 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);cursor:grab}
 .handle.via{width:20px;height:20px;background:var(--route);border-color:#fff}
 .handle.via.small{width:12px;height:12px;border-width:2px}   /* the points that keep a drawn route to its line */
-.handle::after{content:"";position:absolute;inset:-14px;border-radius:50%}   /* a thumb-sized grip round a small dot */
+.handle::after{content:"";position:absolute;inset:-9px;border-radius:50%}   /* a thumb-sized grip round a small dot */
 .leaflet-marker-draggable .handle:active{cursor:grabbing}
 .poi-pin.via-stop{transform:translate(-50%,-50%) scale(1.15);cursor:grab;filter:drop-shadow(0 0 0 #fff) drop-shadow(0 0 3px var(--route))}
 /* Explore */
@@ -394,7 +394,7 @@ details.settingsBox .setting{padding:0 12px;margin-top:8px}
 .night>.opts{flex:1 1 100%}
 .opts button{text-align:left;border:1.5px solid var(--ink);border-radius:6px;background:var(--card);padding:6px 8px;font:14px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
 .editing{background:var(--ink);color:var(--paper);border-radius:8px;padding:8px 10px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-.editing .btn{min-height:34px;padding:4px 10px;box-shadow:none}
+.editing .btn{min-height:44px;padding:4px 10px;box-shadow:none}
 
 /* pop-overs */
 .pop{position:absolute;z-index:1100;top:12px;right:calc(var(--side-w) + 80px);width:330px;max-height:calc(100% - 24px);overflow:auto;background:var(--paper);border:2px solid var(--ink);border-radius:10px;box-shadow:4px 4px 0 var(--ink);padding:14px;display:flex;flex-direction:column;gap:12px}
@@ -422,6 +422,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
 .flag.night.below{transform:translate(10px,14px)}
 .flag{background:var(--ink);color:#fff;font:700 12px Barlow,sans-serif;border-radius:4px;padding:3px 7px;white-space:nowrap;transform:translate(-50%,-50%);display:inline-block;border:2px solid #fff}
 .route-arrow{display:block}
+#rStartBtn{white-space:normal;text-align:left}
 #nearBtn{white-space:normal;text-align:left;height:auto;min-height:44px;line-height:1.3;padding-top:8px;padding-bottom:8px}
 .lane-num{background:var(--route);color:#fff;font:700 12px Barlow,sans-serif;border-radius:50%;width:22px;height:22px;display:grid;place-items:center;transform:translate(-50%,-50%);border:2px solid #fff}
 .leaflet-control-attribution{font-size:10px}
@@ -487,6 +488,7 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   #zoomHint{left:10px;right:10px;top:66px;bottom:auto;transform:none;font-size:13px;white-space:normal;text-align:left}   /* under the corner buttons */
   #queueChip{left:50%;bottom:min(calc(var(--sheet-h) + 58px), calc(100% - 124px))}   /* above the status line, never over the top buttons */
   .leaflet-control-zoom{display:none}
+  body.drawing .leaflet-control-zoom{display:block}   /* while drawing a finger can't pinch without drawing, so + and - are back */
   .pop{top:auto;bottom:calc(var(--sheet-h) + 8px);right:8px;left:8px;width:auto;max-height:calc(100% - var(--sheet-h) - 84px);z-index:1200}
   .leaflet-bottom{bottom:var(--sheet-ctl)}
 }
@@ -987,8 +989,8 @@ html.booting #welcome .btn,html.booting #welcome .wl-tile,html.booting #welcome 
 <script src="data/featured.js?v=5f047364" onerror="window.FEATURED=null"></script>
 
 <script src="js/plan.js?v=89dd517b"></script>
-<script src="js/app.js?v=1e361fc9"></script>
+<script src="js/app.js?v=bde2c013"></script>
 <script src="js/offline.js?v=4ba26330"></script>
-<script src="js/ride.js?v=92d361a0"></script>
+<script src="js/ride.js?v=e03e29dd"></script>
 </body>
 </html>

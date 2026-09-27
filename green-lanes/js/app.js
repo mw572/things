@@ -43,7 +43,7 @@ function queueChanged(){
   const n = Object.values(SERVERS).reduce((t, s) => t + s.pending, 0);
   $("#busyQueue").textContent = n ? `Waiting on the free routing servers: ${n} request${n > 1 ? "s" : ""} in the queue.` : "";
   $("#queueChip").hidden = !n || !$("#busy").hidden;
-  $("#queueChip").textContent = `Asking the routing servers… ${n} in the queue`;
+  $("#queueChip").textContent = `Waiting for the map servers… ${n} in the queue`;
 }
 function polite(server, url, opts = {}, { cache = true, timeout = 30000 } = {}){
   const key = server + " " + url;
@@ -133,7 +133,8 @@ function seasonOf(t, today = window.PLAN_DATE ? new Date(window.PLAN_DATE) : new
 function classify(t){
   const no = v => ["no", "private", "forestry", "agricultural", "delivery", "permit"].includes(v);
   if (t.designation === "restricted_byway") return "rb";
-  if (no(t.motor_vehicle) || no(t.motorcycle) || (no(t.access) && !t.motor_vehicle && !t.motorcycle)) return "closed";
+  const openSeason = seasonOf(t);   // "no, but yes from April to October": in season it's open (with a warning), not closed
+  if ((no(t.motor_vehicle) || no(t.motorcycle) || (no(t.access) && !t.motor_vehicle && !t.motorcycle)) && !(openSeason?.openOnly && !openSeason.closedNow)) return "closed";
   const txt = [t.note, t.description].join(" ").toLowerCase(), season = seasonOf(t);
   if (season?.closedNow) return "closed";
   const cond = (t["motor_vehicle:conditional"] || t["motorcycle:conditional"]) && !season?.bikesOk;
@@ -343,7 +344,7 @@ function lanePopup(w){
     <div><span class="chip" style="background:${css(c.color)}">${esc(DESIG[t.designation] || "Byway")}</span> ${km(w.len)} km${surface ? " · " + esc(surface) : ""}</div>
     <p style="margin-top:6px">${esc(w.tags.source === "council" ? `From ${w.tags.council} Council's rights-of-way record, where it's a byway open to all traffic. It isn't in OpenStreetMap yet, so the line on the map may be rough.` : w.council ? `OpenStreetMap calls this a byway, but ${w.council.council} Council's rights-of-way record calls it a ${w.council.calls} (${w.council.ref.split("|").slice(1).join(" ")}). Treated as not open to motor vehicles.` : w.closure ? `Closed to ${w.closure.what} by a traffic regulation order${w.closure.since ? " since " + w.closure.since : ""} (${w.closure.order}). OpenStreetMap doesn't show this yet.`
       : w.season && !w.season.bikesOk ? `${w.season.openOnly ? `Open to motor vehicles only from ${w.season.text} each year` : `Closed to motor vehicles from ${w.season.text} each year`}${w.season.closedNow ? ", so it's closed now." : w.season.soon ? `. It closes on ${w.season.from}, within the next fortnight.` : ". Open now."}`
-      : c.say + (t.partCouncil ? ` Part of it is only in ${t.partCouncil} Council's rights-of-way record, so that stretch of line may be rough.` : "") + (t.note ? ` OpenStreetMap's note on it: “${t.note}”` : ""))}</p>${w.closure ? `<p class="small"><a href="${esc(w.closure.url)}" target="_blank" rel="noopener">Source: ${esc(w.closure.source)}</a></p>` : ""}`;
+      : (w.cls === "tro" && /contested|disputed/i.test(t.note || "") ? "OpenStreetMap notes that whether it's open to motor vehicles is disputed. Check before riding." : c.say) + (t.partCouncil ? ` Part of it is only in ${t.partCouncil} Council's rights-of-way record, so that stretch of line may be rough.` : "") + (t.note ? ` OpenStreetMap's note on it: “${t.note}”` : ""))}</p>${w.closure ? `<p class="small"><a href="${esc(w.closure.url)}" target="_blank" rel="noopener">Source: ${esc(w.closure.source)}</a></p>` : ""}`;
   const away = view === "route" && !inRoute(w.id) ? distFromRoute(w) : null;
   if (away != null) div.insertAdjacentHTML("beforeend", `<p class="small muted">${away < 150 ? "Right next to your route." : `About ${km(away)} km from your route.`}</p>`);
   if (c.ride && view !== "tour") {
@@ -701,6 +702,7 @@ function setSheet(state){
   });
 
   document.documentElement.style.setProperty("--sheet-h", h);
+  if (!$("#undoBar").hidden) requestAnimationFrame(() => { const top = phone() ? sheet.getBoundingClientRect().top : 0; $("#undoBar").style.bottom = top > 180 ? `${innerHeight - top + 10}px` : ""; });
   // map credits and the zoom hint tuck behind the panel when it's fully open, instead of floating near the top
   document.documentElement.style.setProperty("--sheet-ctl", state === "open" ? "0px" : h);
   if (typeof drawZones === "function" && view) drawZones();
@@ -809,7 +811,7 @@ function showView(v, sheetState){
 
 /* ---------- picking a spot / drawing a route in strokes ---------- */
 let picking = null, drawing = false, painting = null, liveLine = null, loopStart = null, lastKind = null, drawWhenZoomed = false;
-let strokes = [], shapeChoice = null;       // the drawn route is a list of finger strokes; shape is auto unless chosen
+let strokes = store.get("strokes", []), shapeChoice = null;       // the drawn route is a list of finger strokes; shape is auto unless chosen
 const sketchLayer = L.layerGroup().addTo(map);
 function setBanner(text, opts = {}){
   $("#banner").hidden = !text; $("#bannerText").textContent = text || "";
@@ -820,7 +822,7 @@ function setBanner(text, opts = {}){
 }
 function stopModes(){
   drawWhenZoomed = false;
-  picking = null; drawing = false; painting = null;
+  picking = null; drawing = false; painting = null; document.body.classList.remove("drawing");
   if (liveLine) { map.removeLayer(liveLine); liveLine = null; }
   map.dragging.enable(); map.getContainer().style.cursor = ""; map.getContainer().style.touchAction = "";
   setBanner(null); drawZones(); $("#bannerSearch").hidden = true;
@@ -868,7 +870,7 @@ $("#goLoop").onclick = () => {
   lastKind = "loop"; ideas = []; picked = -1; ideaRun++;
   openIdeas();
   // a place you've just searched for is the obvious start
-  if (searchPin) { const at = searchPin.getLatLng(); setLoopStart([at.lat, at.lng], searchPin.options.title); }
+  if (searchPin && map.getBounds().contains(searchPin.getLatLng())) { const at = searchPin.getLatLng(); setLoopStart([at.lat, at.lng], searchPin.options.title); }
   else if (loopStart) runIdeas(); else pickSpot("Tap the map where you'll start", setLoopStart);
 };
 $("#changeStart").onclick = () => pickSpot("Tap the map where you'll start", setLoopStart);
@@ -893,7 +895,7 @@ function startDrawing(){
     setBanner("Zoom in to where you want to ride, or search. Drawing starts when the lanes show.", { wait: true });
     $("#bannerSearch").hidden = false; return;
   }
-  drawWhenZoomed = false; drawing = true; map.dragging.disable();
+  drawWhenZoomed = false; drawing = true; map.dragging.disable(); document.body.classList.add("drawing");
   map.getContainer().style.cursor = "crosshair"; map.getContainer().style.touchAction = "none";
   setBanner(strokes.length ? "Keep drawing, or press Done." : "Draw roughly where you want to go. Lift and draw again to add more.", { draw: true });
 }
@@ -911,8 +913,11 @@ $("#undoStroke").onclick = () => { strokes.pop(); drawSketch(); setIdeasUi(); st
 $("#clearStrokes").onclick = () => { strokes = []; shapeChoice = null; drawSketch(); setIdeasUi(); clearIdeas(); };
 document.querySelectorAll("#shapeSeg button").forEach(b => b.onclick = () => { shapeChoice = b.dataset.shape; drawSketch(); setIdeasUi(); replanSoon(); });
 const mapEl = map.getContainer();
+const fingers = new Set();   // two fingers on the map while drawing are a pinch to zoom, not a line
+mapEl.addEventListener("pointerdown", ev => { fingers.add(ev.pointerId); if (fingers.size > 1 && painting) { painting = null; if (liveLine) { map.removeLayer(liveLine); liveLine = null; } } }, true);
+["pointerup", "pointercancel"].forEach(t => mapEl.addEventListener(t, ev => fingers.delete(ev.pointerId), true));
 mapEl.addEventListener("pointerdown", ev => {
-  if (!drawing || ev.button > 0) return;
+  if (!drawing || ev.button > 0 || fingers.size > 1) return;
   if (ev.target.closest?.(".leaflet-control, .mapui, button, #sheet")) return;   // the zoom buttons and the banner still work
   ev.preventDefault(); ev.stopPropagation(); mapEl.setPointerCapture?.(ev.pointerId);
   painting = [map.mouseEventToLatLng(ev)];
@@ -942,7 +947,7 @@ function drawnSketch(){ const l = drawnLine(); if (l.length < 2) return null; re
 const flagShift = p => { const c = map.latLngToContainerPoint(p), w = map.getSize().x; return c.x < 70 ? "translate(8px,-50%)" : c.x > w - 70 ? "translate(calc(-100% - 8px),-50%)" : ""; };
 const flag = (p, t, bg) => L.marker(p, { interactive: false, zIndexOffset: 2000, icon: L.divIcon({ className: "", html: `<span class="flag" style="background:${bg || "#1f1d18"};${flagShift(p) ? "transform:" + flagShift(p) : ""}">${t}</span>`, iconSize: [0, 0] }) });
 function drawSketch(){
-  sketchLayer.clearLayers();
+  sketchLayer.clearLayers(); store.set("strokes", strokes);   // a drawing survives the app being closed
   if (lastKind === "draw" && strokes.length) {
     const l = drawnLine(), loop = drawnShape() === "loop";
     for (const st of strokes) L.polyline(st, { color: "#c2185b", weight: 12, opacity: .2, lineCap: "round", interactive: false, renderer: routeRenderer }).addTo(sketchLayer);
@@ -1068,7 +1073,8 @@ async function runIdeas(){
   if (lastKind === "draw") {
     const sk = drawnSketch(); if (!sk) { renderIdeas("Draw on the map to start."); return; }
     renderIdeas("Finding lanes along your route…");
-    const r = await fitPlan(sk, settings.width * 1000, wr, target, alive);
+    // keeping to the line, lanes come from close to it (2 km at most), so the shape isn't pulled out of true
+    const r = await fitPlan(sk, (settings.followLine !== false ? Math.min(settings.width, 2) : settings.width) * 1000, wr, target, alive);
     if (!alive()) return;
     ideasUpdating = false;
     // no lanes along it: keeping to the line, it's still a ride on the roads you drew (Scotland, a lap of a lake)
@@ -1192,7 +1198,8 @@ function renderIdeas(msg){
     go.onclick = ev => { ev.stopPropagation(); useIdea(i); };
     card.querySelector(".top").append(go);
     // a loop idea can be joined on to the route already open (two headings from one start, say)
-    if (lastKind === "loop" && trip.items.length && editingDay == null && it.chain.length) {
+    const inRt = new Set(trip.items.flatMap(x => x.ids));
+    if (lastKind === "loop" && trip.items.length && editingDay == null && it.chain.length && trip.name !== it.name && it.chain.some(n => !(n.w.members || [n.w.id]).every(id => inRt.has(id)))) {
       const join = document.createElement("button"); join.className = "btn quiet"; join.textContent = `+ Join on to “${trip.name}”`;
       join.onclick = ev => { ev.stopPropagation(); joinRide({ name: it.name, trip: { items: chainToItems(it.chain) } }); };
       card.append(join);
@@ -1348,6 +1355,7 @@ $("#routeBack").onclick = () => {
   goBack();
 };
 function useIdea(i){
+  dropUndo();
   const it = ideas[i], sk = it.sketch, loop = isLoop(sk);
   trip = { name: it.name, start: sk[0], finish: loop ? null : sk.at(-1), loop, items: chainToItems(it.chain) };
   built = null; editingDay = null; ideaRun++;
@@ -1391,7 +1399,8 @@ async function followLine(t, sk){
   }
   want.sort((a, b) => a.at - b.at);
   if (!want.length) return;
-  const snapped = await localRouter.call({ type: "snap", pts: want.map(w => w.p) });
+  // onto a proper road (up to residential streets): a farm drive or a service road would be ridden up and back
+  const snapped = await localRouter.call({ type: "snap", pts: want.map(w => w.p), maxCls: 11 });
   const vias = want.map((w, k) => snapped?.[k] && snapped[k].d < 1500 ? { at: w.at, it: { ...itemVia(snapped[k].pt), name: "On your line", drawn: true } } : null).filter(Boolean);
   if (t !== trip || !vias.length) return;
   const all = lanes.map((it, k) => ({ at: laneAt[k], it })).concat(vias).sort((a, b) => a.at - b.at);
@@ -1552,7 +1561,11 @@ async function tidyNow(placed = null){
   const doubled = thereAndBack(t);
   let moved = doubled;
   if (!t.keepOrder) moved = tidyTrip(t) || moved;
-  else if (placed && t.items.includes(placed)) moved = placeItem(t, placed) || moved;
+  else if (placed && t.items.includes(placed)) {
+    // the lane now does the job of any point near it that kept the route to the drawn line
+    if (!placed.via) t.items = t.items.filter(it => !(it.drawn && distToLine(it.coords[0], placed.coords) < 1500));
+    moved = placeItem(t, placed) || moved;
+  }
   joinTouching(t);
   built = null; saveTrip();
   if (view === "route") { renderRoute(); drawRoute(); }
@@ -1744,12 +1757,25 @@ async function build(){
   $("#routeStatus").textContent = todo ? say(0) : "";
   const b = await routeTrip(trip, () => run === buildRun, () => { if (run === buildRun) $("#routeStatus").textContent = say(++done); });
   if (!b) return;
+  // a point that keeps a drawn route to its line but makes it ride up a road and straight back: drop it, build again
+  const spurs = trip.items.filter(it => it.drawn && isSpur(trip, b, trip.items.indexOf(it)));
+  if (spurs.length) { trip.items = trip.items.filter(it => !spurs.includes(it)); saveTrip(); build(); return; }
   built = b; saveTrip(); drawRoute(); renderRoute(); findRouteStops();
   if (nearAdded && !$("#undoBar").hidden) $("#undoText").textContent = `Added ${nearAdded.n} lane${nearAdded.n > 1 ? "s" : ""}: ${km(b.off - nearAdded.off)} km more off-road, ${km(b.total - b.off - nearAdded.road)} km more road, ${hm(b.hours)} riding now`;
   nearAdded = null;
   // a saved copy of this route keeps the figures it has now
   const all = store.get("saved", []), mine = all.find(o => o.trip && o.name === trip.name && tripSig(o.trip) === tripSig(trip));
   if (mine) { mine.summary = `${km(b.total)} km, ${hm(b.hours)}`; store.set("saved", all); }
+}
+// Does the route go to item i and come straight back the way it came? (the road in and the road out overlap)
+function isSpur(t, b, i){
+  const before = b.segs.find(s => s.type === "road" && s.link === i), after = b.segs.find(s => s.type === "road" && s.link === i + 1);
+  if (!before || !after || lineLen(before.coords) < 300 || lineLen(after.coords) < 300) return false;
+  const tail = [], head = []; let d = 0;
+  for (let k = before.coords.length - 1; k > 0 && d < 1000; k--) { tail.push(before.coords[k]); d += hav(before.coords[k], before.coords[k - 1]); }
+  d = 0; for (let k = 0; k < after.coords.length - 1 && d < 1000; k++) { head.push(after.coords[k]); d += hav(after.coords[k], after.coords[k + 1]); }
+  const back = head.filter(p => distToLine(p, tail) < 30).length;
+  return head.length > 3 && back / head.length > 0.6;
 }
 // Degrees of turning per km, sampled every 20 m so GPS jitter doesn't count.
 function bendiness(lines){
@@ -1783,13 +1809,16 @@ function drawBuilt(layer, t, b, bold, numbers = bold, col = "#c2185b"){
     L.polyline(it.coords, { color: col, weight: bold ? 6 : 4, opacity: op, interactive: false, renderer: R }).addTo(layer);
     if (numbers) {   // a number that would sit on another is left off until you zoom in
       const p = map.latLngToContainerPoint(it.coords[0]);
-      if (!numPlaced.some(q => Math.abs(q.x - p.x) < 24 && Math.abs(q.y - p.y) < 22)) { numPlaced.push(p); L.marker(it.coords[0], { interactive: false, icon: L.divIcon({ className: "", html: `<span class="lane-num">${i + 1}</span>`, iconSize: [0, 0] }) }).addTo(layer); }
+      if (!numPlaced.some(q => Math.abs(q.x - p.x) < 24 && Math.abs(q.y - p.y) < 22)) { numPlaced.push(p); L.marker(it.coords[0], { interactive: false, icon: L.divIcon({ className: "", html: `<span class="lane-num">${rowNo(t, i)}</span>`, iconSize: [0, 0] }) }).addTo(layer); }
     }
   });
 }
+// A row's number: the same on the map, in the list, in the GPX and on the ride screen. The points that only keep a
+// drawn route to its line aren't counted, as they aren't listed.
+function rowNo(t, i){ let n = 0; for (let k = 0; k <= i; k++) if (!t.items[k]?.drawn) n++; return n; }
 function drawRoute(){
   routeLayer.clearLayers();
-  if (view !== "route" || !trip.items.length) return;
+  if ((view !== "route" && !(typeof Ride !== "undefined" && Ride.on)) || !trip.items.length) return;   // (riding a tour day from the tour screen draws it too)
   drawBuilt(routeLayer, trip, built, true);
   if (built) drawArrows(routeLayer, built);
   if (trip.start) flag(trip.start, trip.loop ? "START / FINISH" : "START").addTo(routeLayer);
@@ -1804,12 +1833,14 @@ function drawRoute(){
     for (let h = 1; h <= n; h++) {
     let half = len * h / (n + 1), at = s.coords[0];
     for (let i = 1; i < s.coords.length; i++) { const d = hav(s.coords[i - 1], s.coords[i]); if (d >= half) { const f = half / d; at = [s.coords[i-1][0] + (s.coords[i][0] - s.coords[i-1][0]) * f, s.coords[i-1][1] + (s.coords[i][1] - s.coords[i-1][1]) * f]; break; } half -= d; }
-    dragMarker(at, "", (w, p, st) => { st ? insertAt(s.link, itemStop(st)) : w ? insertAt(s.link, itemFromWay(w)) : onRoad(p).then(q => insertAt(s.link, itemVia(q))); status(st ? `Added ${stopName(st)}` : w ? `Added ${laneName(w.tags)}` : "Added a via point"); }).addTo(routeLayer);
+    dragMarker(at, "", (w, p, st) => { const before = clone(trip); st ? insertAt(s.link, itemStop(st)) : w ? insertAt(s.link, itemFromWay(w)) : onRoad(p).then(q => insertAt(s.link, itemVia(q)));
+      undoBar(st ? `Added ${stopName(st)}` : w ? `Added ${laneName(w.tags)}` : "Added a via point", () => { trip = before; built = null; saveTrip(); renderRoute(); drawRoute(); build(); }); }).addTo(routeLayer);
     }
   }
   trip.items.forEach((it, i) => {
     if (!it.via) return;
     dragMarker(it.coords[0], it.drawn ? "via small" : "via", (w, p, st) => {
+      const before = clone(trip); undoBar("Moved a via point", () => { trip = before; built = null; saveTrip(); renderRoute(); drawRoute(); build(); });
       if (st) insertAt(i, itemStop(st), true);
       else if (w) insertAt(i, itemFromWay(w), true);
       else onRoad(p).then(q => { Object.assign(it, itemVia(q)); delete it.stop; built = null; saveTrip(); renderRoute(); drawRoute(); build(); });
@@ -1942,14 +1973,17 @@ function renderRoute(){
   }
   const ul = $("#laneList"); ul.innerHTML = "";
   trip.items.forEach((it, i) => {
+    if (it.drawn) return;   // the points keeping a drawn route to its line get one line at the end, not a row each
     const li = document.createElement("li");
     const col = it.cls === "file" ? "#0e7490" : it.stop ? GROUPS[CODE[it.stop.code]?.g]?.color || "#5d5848" : it.via ? "#5d5848" : css(CLASSES[it.cls]?.color || "--ucr");
-    li.innerHTML = `<span class="num">${i + 1}</span><span class="grow"><span class="t">${esc(it.name)}</span><br><span class="s"><span class="chip" style="background:${col}">${esc(it.kind)}</span> ${it.stop ? "stop on the way" : it.via ? "the road passes through here" : km(lineLen(it.coords)) + " km" + (it.there ? ` (dead end: ${km(lineLen(it.coords) / 2)} km each way, there and back)` : "")}${it.surface ? " · " + esc(it.surface) : ""}</span></span>`;
+    li.innerHTML = `<span class="num">${rowNo(trip, i)}</span><span class="grow"><span class="t">${esc(it.name)}</span><br><span class="s"><span class="chip" style="background:${col}">${esc(it.kind)}</span> ${it.stop ? "stop on the way" : it.via ? "the road passes through here" : km(lineLen(it.coords)) + " km" + (it.there ? ` (dead end: ${km(lineLen(it.coords) / 2)} km each way, there and back)` : "")}${it.surface ? " · " + esc(it.surface) : ""}</span></span>`;
     li.querySelector(".grow").onclick = () => { if (phone()) setSheet("min"); it.via ? map.setView(it.coords[0], 15) : fitMap(L.latLngBounds(it.coords).pad(0.3), { maxZoom: 15 }); };
     const x = document.createElement("button"); x.className = "x"; x.textContent = "✕"; x.setAttribute("aria-label", "Take out " + it.name);
     x.onclick = () => removeItem(i);
     li.append(x); ul.append(li);
   });
+  const drawnN = trip.items.filter(it => it.drawn).length;
+  if (drawnN) ul.insertAdjacentHTML("beforeend", `<li class="muted small">And ${drawnN} small dot${drawnN > 1 ? "s" : ""} on the map keeping the roads to the line you drew: drag one to move it.</li>`);
   renderStops();
 }
 $("#routeName").oninput = e => { trip.name = e.target.value || "My route"; saveTrip(); $("#offlineNote").hidden = true; if (typeof Offline !== "undefined") Offline.refreshButton(); };
@@ -1984,7 +2018,7 @@ function armed(btn, label, then){
   delete btn.dataset.armed; btn.textContent = label; then();
 }
 // New route asks first, in the panel: save it, clear it, or keep going.
-function clearRoute(){ trip = newTrip(); built = null; editingDay = null; lastKind = null; saveTrip(); routeStopIdx = new Set(); routeStops = []; showView("plan", "peek"); }
+function clearRoute(){ dropUndo(); trip = newTrip(); built = null; editingDay = null; lastKind = null; saveTrip(); routeStopIdx = new Set(); routeStops = []; showView("plan", "peek"); }
 $("#newBtn").onclick = () => { $("#newConfirm").hidden = !$("#newConfirm").hidden; if (!$("#newConfirm").hidden) $("#newClear").focus(); };
 $("#newCancel").onclick = () => { $("#newConfirm").hidden = true; $("#newBtn").focus(); };
 $("#newClear").onclick = clearRoute;
@@ -2071,7 +2105,7 @@ function renderStops(){
       map.setView([s.lat, s.lng], 16);
       setTimeout(() => L.popup({ maxWidth: 300 }).setLatLng([s.lat, s.lng]).setContent(stopPopup(s)).openOn(map), 80);
     };
-    const b = document.createElement("button"); b.className = "btn " + (planned >= 0 ? "" : "quiet"); b.style.minHeight = "38px";
+    const b = document.createElement("button"); b.className = "btn " + (planned >= 0 ? "" : "quiet"); b.style.minHeight = "44px";
     b.textContent = planned >= 0 ? "✓ Stopping" : "+ Stop"; b.setAttribute("aria-label", (planned >= 0 ? "Take out stop at " : "Stop at ") + stopName(s));
     b.onclick = () => planned >= 0 ? removeItem(planned) : addStop(s);
     li.append(b);
@@ -2100,7 +2134,7 @@ function gpxText(title, parts){
   parts.forEach((p, n) => {
     if (n === 0 && p.trip.start) w.push(`<wpt lat="${f(p.trip.start[0])}" lon="${f(p.trip.start[1])}"><name>Start</name><sym>Flag, Blue</sym></wpt>`);
     // lanes are numbered as on the map and in the list (L3 is the third row), so the GPX and the app agree
-    p.trip.items.forEach((it, i) => { const ln = i + 1; w.push(it.stop ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}Stop: ${it.name}`.slice(0, 40))}</name><desc>${x(it.kind)}, a stop you chose</desc><sym>${CODE[it.stop.code]?.sym || "Waypoint"}</sym></wpt>`
+    p.trip.items.forEach((it, i) => { const ln = rowNo(p.trip, i); w.push(it.stop ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}Stop: ${it.name}`.slice(0, 40))}</name><desc>${x(it.kind)}, a stop you chose</desc><sym>${CODE[it.stop.code]?.sym || "Waypoint"}</sym></wpt>`
       : it.drawn ? ""   // the points that keep a drawn route to its line are in the track already
       : it.via ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}${it.name && it.name !== "Via point" ? it.name : "Via " + (i + 1)}`.slice(0, 40))}</name><sym>Waypoint</sym></wpt>`
       : `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}L${ln} ${it.name}`.slice(0, 40))}</name><desc>${x(`${it.kind}, ${km(lineLen(it.coords))} km`)}</desc><sym>Flag, Green</sym></wpt>`); });
@@ -2145,8 +2179,9 @@ $("#gpxBtn").onclick = () => built && download(trip.name, gpxText(trip.name, [{ 
 
 /* ---------- saved routes and tours ---------- */
 let undoTimer = null, undoCommit = null;
+function dropUndo(){ clearTimeout(undoTimer); const c = undoCommit; undoCommit = null; $("#undoBar").hidden = true; c?.(); }   // something else opened: that undo no longer applies
 function undoBar(text, undo, commit, ms = 6000){
-  if (undoCommit) { clearTimeout(undoTimer); undoCommit(); }   // a second delete settles the first
+  clearTimeout(undoTimer); if (undoCommit) undoCommit();   // a second one settles the first (and the first's timer can't hide this one)
   $("#undoText").textContent = text; $("#undoBar").hidden = false; undoCommit = commit;
   // on an upright phone it sits on the map just above the panel, so it doesn't cover the next row in the list
   // (unless the panel is up so high there's no map to sit on)
@@ -2173,7 +2208,7 @@ function renderSaved(){
     li.querySelector(".grow").onclick = () => {
       if (s.tour) { tour = clone(s.tour); saveTour(); openTour(); return; }
       if (trip.items.length && editingDay == null && !saved.some(o => o.trip && tripSig(o.trip) === tripSig(trip))) keepCurrent();   // the open route, if it isn't saved, is kept
-      trip = clone(s.trip); built = null; editingDay = null; lastKind = null; ideas = []; routeFrom = { kind: "plan" }; saveTrip(); showView("route", "mid"); renderRoute();
+      dropUndo(); trip = clone(s.trip); built = null; editingDay = null; lastKind = null; ideas = []; routeFrom = { kind: "plan" }; saveTrip(); showView("route", "mid"); renderRoute();
       fitMap(L.latLngBounds(trip.items.flatMap(it => it.coords)).pad(0.1)); build();
     };
     const x = document.createElement("button"); x.className = "x"; x.textContent = "✕"; x.setAttribute("aria-label", "Delete " + s.name);
@@ -2323,7 +2358,7 @@ for (const which of ["start", "end"]) {
     if (!typed) { tourPlaces[which] = null; renderTourSetup(); return; }   // an emptied box clears the place
     const found = await searchPlace(typed);
     // not found: the box no longer shows the old place as set
-    if (!found) { tourPlaces[which] = null; renderTourSetup(); status(navigator.onLine ? `Couldn't find “${typed}”. Check the spelling, or tap “On the map” and choose the spot.` : "No signal, so places can't be looked up. Tap “On the map” and choose the spot instead.", 6000); return; }
+    if (!found) { tourPlaces[which] = null; renderTourSetup(); status(navigator.onLine ? `Couldn't find “${typed}”. Check the spelling, or tap “Tap map” and choose the spot.` : "No signal, so places can't be looked up. Tap “Tap map” and choose the spot instead.", 6000); return; }
     found.name = found.name.split(",")[0]; input.value = found.name;   // the place it found, which may not be the one you meant: so it says which
     tourPlaces[which] = found; renderTourSetup();
     // with both ends chosen, show both; otherwise the one just found
@@ -2638,7 +2673,8 @@ function openRegion(slug){
     c.querySelector(".top").append(go);
     // with another route open, this one can be joined on to it (two rides in one day)
     let join = null;
-    if (trip.items.length && editingDay == null && trip.name !== rd.name && !isRoad) {
+    const inIt = new Set(trip.items.flatMap(it => it.ids));
+    if (trip.items.length && editingDay == null && trip.name !== rd.name && !isRoad && rd.trip.items.some(it => !it.via && !it.ids.every(id => inIt.has(id)))) {
       join = document.createElement("button"); join.className = "btn quiet"; join.textContent = `+ Join on to “${trip.name}”`;
       join.onclick = e => { e.stopPropagation(); joinRide(rd); };
       c.append(join);
@@ -2682,7 +2718,7 @@ function joinRide(rd){
   undoBar(`Joined ${rd.name} on to ${name}`, () => { trip = before; built = null; saveTrip(); renderRoute(); drawRoute(); buildSoon(300); }, null, 8000);
 }
 function loadFeaturedRide(rd){
-  keepCurrent();
+  dropUndo(); keepCurrent();
   routeFrom = view === "region" ? { kind: "region", slug: rd.region || regionOpen } : { kind: "plan" };
   trip = clone(rd.trip); trip.keepOrder = true; built = clone(rd.built); editingDay = null; lastKind = null; ideas = [];
   saveTrip(); showView("route", "mid"); renderRoute();
@@ -2802,7 +2838,7 @@ $("#searchForm").onsubmit = async e => {
   const go = p => {
     $("#results").hidden = true; closeSearch(); const at = [+p.lat, +p.lon];
     if (picking) { const then = picking; stopModes(); map.setView(at, 11); then(at, p.display_name.split(",")[0]); return; }
-    viewAt(at, 12); placePin(at, p.display_name.split(",")[0]);
+    viewAt(at, drawing || drawWhenZoomed ? 10 : 12); placePin(at, p.display_name.split(",")[0]);
     exploreNear = at; renderExplore(); $("#regionCards").scrollLeft = 0;
   };
   const label = p => p.display_name.split(",").slice(0, 3).join(",");
