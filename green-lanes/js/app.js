@@ -15,6 +15,7 @@ function hav(a, b){
 }
 const lineLen = c => c.reduce((s, p, i) => i ? s + hav(c[i-1], p) : 0, 0);
 const km = m => { const k = m / 1000; return k < 100 ? k.toFixed(1) : Math.round(k).toString(); };
+const mins = h => h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : hm(h);   // "18 min" rather than "0h 18"
 const hm = h => { const m = Math.round(h * 60); return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}`; };
 const clone = o => JSON.parse(JSON.stringify(o));
 const store = {
@@ -24,7 +25,12 @@ const store = {
 function loadScript(src){ return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = fail; document.head.append(s); }); }
 let statusTimer;
 function status(msg, ms = 5000){ const el = $("#status"); el.textContent = msg; el.hidden = !msg; clearTimeout(statusTimer); if (msg && ms) statusTimer = setTimeout(() => el.hidden = true, ms); }
-const phone = () => innerWidth <= 820;
+// Phones held upright get the bottom panel. Anything wider, or short (a phone on its side), gets the side panel.
+const phone = () => innerWidth <= 820 && innerHeight > 500;
+const sideAuto = () => !phone() && innerHeight <= 500;   // a phone on its side: the side panel folds away when the map needs the room
+// the phone's back gesture (see "the phone's back gesture steps back inside the planner" further down)
+let navDepth = 0, navBusy = false, welcomeFromHome = false;
+function navPush(){ if (navBusy) return; try { history.pushState({ glp: ++navDepth }, ""); } catch (e) {} }
 
 /* ---------- polite requests to the free public servers ----------
    OSRM's demo server, BRouter and Nominatim are free and ask users to keep requests modest
@@ -63,8 +69,14 @@ const busy = {
 };
 
 /* ---------- map ---------- */
-const map = L.map("map", { preferCanvas: true, renderer: L.canvas({ tolerance: 10 }), zoomControl: false }).setView([52.6, -2.3], 7);
+// the whole of Britain, Scotland included: a zoom out on a phone's narrow screen
+const GB_CENTRE = [54.4, -3.2], gbZoom = () => innerWidth <= 820 ? 5 : 6;
+// the whole of Britain as a box, so it can be fitted into the part of the map the panel leaves visible
+const GB_BOUNDS = [[50.0, -5.8], [58.7, 1.8]];
+// (on a touch screen a lane can be tapped from a little further off the line: a finger isn't a mouse pointer)
+const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true, renderer: L.canvas({ tolerance: matchMedia("(pointer: coarse)").matches ? 18 : 10 }), zoomControl: false }).setView(GB_CENTRE, gbZoom());
 L.control.zoom({ position: "bottomright" }).addTo(map);
+map.attributionControl.setPosition("bottomleft");   // the map's credits: small, in the bottom-left corner
 map.createPane("route"); map.getPane("route").style.zIndex = 450; map.getPane("route").style.pointerEvents = "none";
 const routeRenderer = L.svg({ pane: "route" });
 // Map moves fly unless the rider has asked their phone for less motion
@@ -125,7 +137,7 @@ function classify(t){
   const txt = [t.note, t.description].join(" ").toLowerCase(), season = seasonOf(t);
   if (season?.closedNow) return "closed";
   const cond = (t["motor_vehicle:conditional"] || t["motorcycle:conditional"]) && !season?.bikesOk;
-  if (cond || /\btro\b|traffic regulation/.test(txt) || t.seasonal) return "tro";
+  if (cond || /\btro\b|traffic regulation|contested|disputed/.test(txt) || t.seasonal) return "tro";   // (a note that its status is disputed: check first)
   return t.designation === "byway_open_to_all_traffic" ? "boat" : "ucr";
 }
 const laneName = t => t.name || t.prow_ref || t.ref || (t.designation === "byway_open_to_all_traffic" ? "Unnamed byway" : "Unnamed lane");
@@ -136,6 +148,8 @@ function cells(bb){
     for (let j = Math.floor(bb[1]/CELL); j <= Math.floor(bb[3]/CELL); j++) out.push(i + "," + j);
   return out;
 }
+// OpenStreetMap's surface words as a rider would write them: "mud;rocks" is "mud, rocks", "grade3" is "grade 3"
+const surfTxt = t => [t.surface && t.surface.replace(/;/g, ", ").replace(/_/g, " "), t.tracktype && t.tracktype.replace(/^grade(\d)/, "grade $1")].filter(Boolean).join(", ");
 function putWay(id, tags, coords){
   let a = 90, b = 180, c = -90, d = -180;
   for (const [la, lo] of coords) { if (la < a) a = la; if (lo < b) b = lo; if (la > c) c = la; if (lo > d) d = lo; }
@@ -153,8 +167,11 @@ for (const [id, tags, f] of (window.OSM_LANES?.ways || [])) {
 }
 // Byways in councils' own rights-of-way records that OpenStreetMap is missing (see checks/). They get negative ids.
 let councilAdded = 0;
+const councilSeen = new Set();   // some councils list the same byway twice under two numbers: keep one
 (window.COUNCIL_BOATS?.ways || []).forEach(([ref, council, coords], i) => {
   if (coords.length < 2) return;
+  const g = [coords[0], coords.at(-1)].map(c => c[0].toFixed(4) + "," + c[1].toFixed(4)).sort().join("|") + "|" + Math.round(lineLen(coords) / 20);
+  if (councilSeen.has(g)) return; councilSeen.add(g);
   putWay(-(i + 1), { designation: "byway_open_to_all_traffic", name: `${council} byway ${ref.split("|").slice(1).join(" ")}`, source: "council", council }, coords);
   councilAdded++;
 });
@@ -238,6 +255,19 @@ const osmPieces = osmWays.size - councilAdded, laneOf = new Map();
   grid.clear();
   for (const w of osmWays.values()) for (const k of cells(w.bbox)) { if (!grid.has(k)) grid.set(k, new Set()); grid.get(k).add(w.id); }
 })();
+// A traffic order lists the pieces of a lane it closes, and the list can miss one: a lane whose two ends both meet
+// pieces closed by the same order (Gorbeck Road, the middle 4.4 km) is taken to be closed by it too.
+(function closeBetween(){
+  const closedNear = p => { const out = new Set(), pad = 0.0005, bb = [p[0] - pad, p[1] - pad * 1.6, p[0] + pad, p[1] + pad * 1.6];
+    for (const k of cells(bb)) for (const id of grid.get(k) || []) { const w = osmWays.get(id); if (w?.closure?.order && [w.coords[0], w.coords.at(-1)].some(q => hav(q, p) < 30)) out.add(w.closure.order); }
+    return out; };
+  const byName = new Map(); for (const w of osmWays.values()) if (w.closure?.order) byName.set(w.closure.order, w.closure);
+  for (const w of osmWays.values()) {
+    if (w.cls === "closed" || !CLASSES[w.cls]?.ride) continue;
+    const a = closedNear(w.coords[0]), b = closedNear(w.coords.at(-1)), both = [...a].find(n => b.has(n));
+    if (both) { w.closure = byName.get(both); w.cls = "closed"; }
+  }
+})();
 $("#dataNote").textContent = `Lanes: ${osmPieces.toLocaleString()} pieces from OpenStreetMap (${window.OSM_LANES?.built || "date unknown"})` + (councilAdded ? ` and ${councilAdded.toLocaleString()} from council records` : "") + `, joined into ${osmWays.size.toLocaleString()} lanes.`;
 const laneLayer = L.layerGroup().addTo(map);
 const shown = new Set();
@@ -308,19 +338,19 @@ function endViews(c){
 function lanePopup(w){
   const t = w.tags, c = CLASSES[w.cls], mid = w.coords[Math.floor(w.coords.length / 2)];
   const div = document.createElement("div");
-  const surface = [t.surface, t.tracktype && t.tracktype.replace("grade", "grade ")].filter(Boolean).join(", ");
+  const surface = surfTxt(t);
   div.innerHTML = `<h3>${esc(laneName(t))}</h3>
     <div><span class="chip" style="background:${css(c.color)}">${esc(DESIG[t.designation] || "Byway")}</span> ${km(w.len)} km${surface ? " · " + esc(surface) : ""}</div>
     <p style="margin-top:6px">${esc(w.tags.source === "council" ? `From ${w.tags.council} Council's rights-of-way record, where it's a byway open to all traffic. It isn't in OpenStreetMap yet, so the line on the map may be rough.` : w.council ? `OpenStreetMap calls this a byway, but ${w.council.council} Council's rights-of-way record calls it a ${w.council.calls} (${w.council.ref.split("|").slice(1).join(" ")}). Treated as not open to motor vehicles.` : w.closure ? `Closed to ${w.closure.what} by a traffic regulation order${w.closure.since ? " since " + w.closure.since : ""} (${w.closure.order}). OpenStreetMap doesn't show this yet.`
       : w.season && !w.season.bikesOk ? `${w.season.openOnly ? `Open to motor vehicles only from ${w.season.text} each year` : `Closed to motor vehicles from ${w.season.text} each year`}${w.season.closedNow ? ", so it's closed now." : w.season.soon ? `. It closes on ${w.season.from}, within the next fortnight.` : ". Open now."}`
-      : c.say + (t.partCouncil ? ` Part of it is only in ${t.partCouncil} Council's rights-of-way record, so that stretch of line may be rough.` : ""))}</p>${w.closure ? `<p class="small"><a href="${esc(w.closure.url)}" target="_blank" rel="noopener">Source: ${esc(w.closure.source)}</a></p>` : ""}`;
+      : c.say + (t.partCouncil ? ` Part of it is only in ${t.partCouncil} Council's rights-of-way record, so that stretch of line may be rough.` : "") + (t.note ? ` OpenStreetMap's note on it: “${t.note}”` : ""))}</p>${w.closure ? `<p class="small"><a href="${esc(w.closure.url)}" target="_blank" rel="noopener">Source: ${esc(w.closure.source)}</a></p>` : ""}`;
   const away = view === "route" && !inRoute(w.id) ? distFromRoute(w) : null;
   if (away != null) div.insertAdjacentHTML("beforeend", `<p class="small muted">${away < 150 ? "Right next to your route." : `About ${km(away)} km from your route.`}</p>`);
   if (c.ride && view !== "tour") {
     const acts = document.createElement("div"); acts.className = "pop-actions";
     const b = document.createElement("button"); b.className = "btn " + (inRoute(w.id) ? "" : "primary");
     b.textContent = inRoute(w.id) ? "− Take out of route" : (trip.items.length ? "+ Add to route" : "+ Start a route with this lane");
-    b.onclick = () => { map.closePopup(); inRoute(w.id) ? removeLane(w.id) : addLane(w); };
+    b.onclick = () => { map.closePopup(); if (view === "lanes" && !trip.items.length) routeFrom = { kind: "lanes" }; inRoute(w.id) ? removeLane(w.id) : addLane(w); };
     acts.append(b); div.append(acts);
   }
   // Google has no Street View along most lanes, so a link to the middle of one opens a black screen. Instead:
@@ -330,15 +360,17 @@ function lanePopup(w){
   // how current the answer is, where the decision is made
   const asOf = d => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   div.insertAdjacentHTML("beforeend", `<p class="small muted">${t.source === "council" ? "From the council's record, checked 26 Sep 2026." : `OpenStreetMap data from ${asOf(window.OSM_LANES?.built || "2026-09-26")}.`}</p>`);
-  div.insertAdjacentHTML("beforeend", `<div class="pop-links">
+  // (with no signal, only what works without one: photos, aerial pictures and Street View all need it)
+  const on = navigator.onLine;
+  div.insertAdjacentHTML("beforeend", `<div class="pop-links">${on ? `
     <a href="https://www.geograph.org.uk/near/${mid[0].toFixed(5)},${mid[1].toFixed(5)}" target="_blank" rel="noopener">Photos near here</a>
     <a href="#" class="aerial">${baseName === "Satellite" ? "Normal map" : "Aerial view"}</a>
     <a href="${e1.url}" target="_blank" rel="noopener">Street View, ${e1.side} end</a>
-    <a href="${e2.url}" target="_blank" rel="noopener">Street View, ${e2.side} end</a>
+    <a href="${e2.url}" target="_blank" rel="noopener">Street View, ${e2.side} end</a>` : ""}
     <a href="#" class="whole">Show the whole lane</a></div>`);
   const fitLane = () => fitMap(L.latLngBounds(w.coords).pad(0.4), { maxZoom: 16 });
   div.querySelector(".whole").onclick = e => { e.preventDefault(); fitLane(); };
-  div.querySelector(".aerial").onclick = e => { e.preventDefault(); map.closePopup(); setBase(baseName === "Satellite" ? "Map" : "Satellite"); if (baseName === "Satellite") { fitLane(); highlightLane(w); setTimeout(() => highlightLane(null), 4000); } };
+  if (on) div.querySelector(".aerial").onclick = e => { e.preventDefault(); map.closePopup(); setBase(baseName === "Satellite" ? "Map" : "Satellite"); if (baseName === "Satellite") { fitLane(); highlightLane(w); setTimeout(() => highlightLane(null), 4000); } };
   return div;
 }
 
@@ -363,14 +395,25 @@ const regionPinLayer = L.layerGroup(), regionRideLayer = L.layerGroup().addTo(ma
 })();
 // The shading stays on while the lane lines are still too thin to read (to zoom 10), fading as they take over.
 var restyleZones = () => { const c = css("--l-zone"); zoneLayer.eachLayer(l => l.setStyle({ fillColor: c })); };   // shading colour follows the base map
+let hintDone = false, hintTimer = null, scotDone = false;   // the green-shading hint, and the Scotland one
 function drawZones(){
   const z = map.getZoom(), browse = ["plan", "region", "lanes"].includes(view) || (view === "ideas" && lastKind === "draw");
   const on = $("#tZones").checked && z <= 10 && browse;
   on ? zoneLayer.addTo(map) : map.removeLayer(zoneLayer);
   map.getPane("zones").style.opacity = z <= 8 ? 1 : z <= 9 ? .6 : .35;
   if (view === "plan" && map.getZoom() <= 8) { if (typeof drawRegionPins === "function" && REGION_LIST.length) drawRegionPins(); regionPinLayer.addTo(map); } else map.removeLayer(regionPinLayer);
-  $("#zoomHint").hidden = !(on && z <= 8 && view === "plan" && !drawing && !picking && !(phone() && sheet.dataset.state === "open"));
+  $("#zoomHint").hidden = hintDone || !(on && z <= 8 && view === "plan" && !drawing && !picking && !(phone() && sheet.dataset.state === "open"));
+  if (!$("#zoomHint").hidden && !hintTimer) hintTimer = setTimeout(() => { hintDone = true; $("#zoomHint").hidden = true; }, 6000);   // said once, then out of the way
+  // Over Scotland there's no green shading at all, which looks like missing data: say why, and where its rides are
+  const c = map.getCenter(), scot = c.lat > 55.8 || (c.lat > 55.05 && c.lng < -2.9);
+  if (scot) $("#zoomHint").hidden = true;   // there's no shading to tap there
+  $("#scotHint").hidden = scotDone || !(scot && z >= 6.5 && ["plan", "lanes"].includes(view) && !drawing && !picking && !(phone() && sheet.dataset.state === "open"));
 }
+$("#scotX").onclick = () => { scotDone = true; $("#scotHint").hidden = true; };
+$("#scotGo").onclick = () => {
+  const c = map.getCenter(), near = REGION_LIST.filter(r => r.country === "Scotland").sort((a, b) => hav([c.lat, c.lng], a.centre) - hav([c.lat, c.lng], b.centre))[0];
+  scotDone = true; $("#scotHint").hidden = true; if (near) openRegion(near.slug);
+};
 // Tapping a green patch when zoomed out takes you in to see its lanes.
 map.on("click", e => {
   if (picking || map.getZoom() > 8 || view !== "plan") return;
@@ -442,6 +485,11 @@ function stopPopup(s){
     b.textContent = here ? "− Take out of route" : "+ Add to route";
     b.onclick = () => { map.closePopup(); here ? removeItem(trip.items.findIndex(it => it.stop && hav(it.coords[0], [s.lat, s.lng]) < 5)) : addStop(s); if (view !== "route") showView("route", "peek"); };
     div.insertBefore(b, div.querySelector(".pop-links"));
+  } else if (!trip.items.length && view !== "tour") {   // no route yet: a café or a campsite is a good place to start one
+    const b = document.createElement("button"); b.className = "btn primary"; b.style.marginTop = "8px"; b.style.width = "100%";
+    b.textContent = "⟲ Plan a loop from here";
+    b.onclick = () => { map.closePopup(); lastKind = "loop"; ideas = []; picked = -1; ideaRun++; openIdeas(); setLoopStart([s.lat, s.lng], stopName(s)); };
+    div.insertBefore(b, div.querySelector(".pop-links"));
   }
   return div;
 }
@@ -491,6 +539,8 @@ function nearLane(s){
   return (s.code === "fuel" ? laneNearFuel : laneNearCells).has(nkey(s.lat, s.lng));
 }
 function drawStops(){
+  // a stop whose popup is open stays put (the map slides to show the popup, which would otherwise redraw it away)
+  const open = map._popup?.isOpen() && map._popup._source; if (open && stopLayer.hasLayer(open)) return;
   stopLayer.clearLayers();
   // browsing: near lanes, from town level. With a route or tour, its own stops do the work and the rest only
   // show close in (zoom 15), so you can drag the route onto one.
@@ -500,7 +550,7 @@ function drawStops(){
   const b = map.getBounds().pad(0.05), idxs = [];
   for (let i = Math.floor(b.getSouth()/SCELL); i <= Math.floor(b.getNorth()/SCELL); i++)
     for (let j = Math.floor(b.getWest()/SCELL); j <= Math.floor(b.getEast()/SCELL); j++)
-      for (const k of stopGrid.get(i + "," + j) || []) { const s = stops[k]; if (!routeStopIdx.has(k) && groupOn(s.code) && b.contains([s.lat, s.lng]) && nearLane(s)) idxs.push(k); }
+      for (const k of stopGrid.get(i + "," + j) || []) { const s = stops[k]; if (!routeStopIdx.has(k) && groupOn(s.code) && b.contains([s.lat, s.lng]) && (map.getZoom() >= 15 || nearLane(s))) idxs.push(k); }   // close in, every one (a café in a village away from the lanes)
   drawPicked(stopLayer, idxs, k => stops[k].name ? 0 : 1);
 }
 // The Show menu: one compact button showing the symbols that are on; it opens a tick-list.
@@ -521,7 +571,12 @@ function renderPoiMenu(){
   }
   menu.insertAdjacentHTML("beforeend", `<p class="small muted">Shown near lanes when you zoom in, and along your route. The ones ticked also go into the GPX.</p>`);
 }
-$("#poiBtn").onclick = e => { e.stopPropagation(); const m = $("#poiMenu"); m.hidden = !m.hidden; $("#poiBtn").setAttribute("aria-expanded", !m.hidden); };
+// One top-corner menu at a time, and on a phone the panel goes down so the menu isn't behind it
+$("#poiBtn").onclick = e => {
+  e.stopPropagation(); const m = $("#poiMenu"), opening = m.hidden;
+  if (opening) { $("#layersPop").hidden = true; closeSearch(); if (phone() && sheet.dataset.state !== "min") setSheet("min"); navPush(); }
+  m.hidden = !opening; $("#poiBtn").setAttribute("aria-expanded", opening);
+};
 document.addEventListener("click", e => { if (!e.target.closest("#poiWrap")) { $("#poiMenu").hidden = true; $("#poiBtn").setAttribute("aria-expanded", "false"); } });
 renderPoiMenu();
 
@@ -598,7 +653,7 @@ document.querySelectorAll(".laneKind button").forEach(b => b.onclick = () => {
   if (view === "route") {
     renderRoute(); buildSoon(300);
     // on a route, this setting governs lanes you add from now on and the joins between lanes; say so if nothing changes
-    const amber = trip.items.filter(it => it.cls === "ucr" || it.cls === "tro").length;
+    const amber = trip.items.filter(it => it.cls === "ucr" || (it.cls === "tro" && it.kind !== "BOAT")).length;   // (a byway with a seasonal order is still a byway)
     if (!settings.useUcr) status(amber ? `This route has ${amber} unclassified road${amber > 1 ? "s" : ""}: use the button below to take ${amber > 1 ? "them" : "it"} out.` : "This route already uses byways only. New lanes and joins will be byways too.", 4000);
   } else replanSoon();
 });
@@ -607,28 +662,55 @@ for (const id of ["twisty", "twisty2"]) $("#" + id).onchange = e => { settings.t
 /* ---------- views and the phone sheet ---------- */
 let view = "plan";
 const sheet = $("#sheet");
-const PEEK = { plan: 300, region: 250, ideas: 176, route: 206, tour: 206, lanes: 250 };
+const PEEK = { plan: 300, region: 330, ideas: 176, route: 206, tour: 206, lanes: 250 };
 // On a phone the panel has three positions: a collapsed bar, a preview, and full height.
 // The preview is the short peek on Explore and the area page, and half height on the working screens.
-const previewState = () => ["plan", "region"].includes(view) ? "peek" : "mid";
+const previewState = () => view === "start" ? "open" : "mid";   // one preview height everywhere, so moving between screens doesn't move the panel; Plan is a menu, all four choices in view
 const SHEET_ORDER = () => ["min", previewState(), "open"];
+// The panel's heights in pixels, from the screen you can actually see (Safari's toolbar makes vh units too tall).
+// Full height always stops below the corner buttons and the panel's own tab, so there is always something to grab.
+let safeTop = 0;
+{ const pr = document.createElement("div"); pr.style.cssText = "position:fixed;top:0;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none"; document.body.append(pr); safeTop = pr.getBoundingClientRect().height; pr.remove(); }
+function sheetHeights(){
+  const tb = document.documentElement.classList.contains("tabs-on") ? $("#tabbar").getBoundingClientRect().height : 0;
+  const room = innerHeight - tb - safeTop - 96;   // 10 + 48 (corner buttons) + 10 + 28 (the tab)
+  return { min: 54, peek: Math.min(PEEK[view] || 176, room * 0.62), mid: Math.min(innerHeight * 0.5, room * 0.8), open: room, tb };
+}
+L.Popup.mergeOptions({ autoPanPaddingTopLeft: L.point(10, 72), autoPanPaddingBottomRight: L.point(10, 10) });
 function setSheet(state){
   if (state === "peek" || state === "mid") state = previewState();
+  const prevState = sheet.dataset.state;
   if (phone() && state !== "min" && state !== sheet.dataset.state) map.closePopup();   // a popup has no room once the panel comes up
   sheet.dataset.state = state;
-  const base = { min: "54px", peek: (PEEK[view] || 176) + "px", mid: "50vh", open: "78vh" }[state];
-  const h = `calc(${base} + var(--tabbar-h, 0px))`;   // everything on the map sits above the panel and the tab bar under it
+  if (phone() && state === "open") $("#layersPop").hidden = true;
+  // a phone on its side: "lowered" means the side panel folds away, anything else opens it
+  if (sideAuto()) setSide(state !== "min");
+  const H = sheetHeights(), px = Math.round(H[state] ?? H.peek);
+  if (phone()) { sheet.style.height = px + "px"; sheet.style.bottom = H.tb ? H.tb - 2 + "px" : ""; } else sheet.style.height = sheet.style.bottom = "";   // flush on the tab bar, no strip of map between
+  const h = phone() ? `${px + H.tb}px` : "0px";   // everything on the map sits above the panel and the tab bar under it
+  L.Popup.prototype.options.autoPanPaddingTopLeft = L.point(10, 72 + safeTop);
+  L.Popup.prototype.options.autoPanPaddingBottomRight = L.point(phone() ? 10 : 44, phone() ? px + H.tb + 10 : 10);   // beside a side panel, clear of its fold tab
+  // a short screen (Saved with little in it) doesn't need the full height: stop at its content
+  // (only Saved: other screens fill in after they open, e.g. ideas, and a panel cut short then would hide them)
+  if (phone() && state !== "min" && view === "saved") requestAnimationFrame(() => {
+    // (the body stretches to fill the panel, so add up what's showing in it rather than asking its height)
+    const body = $("#sheetBody"), cs = getComputedStyle(body), kids = [...body.children].filter(e => e.offsetParent !== null);
+    const content = kids.reduce((a, e) => a + e.offsetHeight, 0) + (parseFloat(cs.rowGap) || 0) * Math.max(0, kids.length - 1) + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const need = content + $("#sheetHandle").offsetHeight + 12;
+    if (need < px - 40) { const hh = Math.max(150, need); sheet.style.height = hh + "px"; document.documentElement.style.setProperty("--sheet-h", hh + H.tb + "px"); if (state !== "open") document.documentElement.style.setProperty("--sheet-ctl", hh + H.tb + "px"); }
+  });
+
   document.documentElement.style.setProperty("--sheet-h", h);
   // map credits and the zoom hint tuck behind the panel when it's fully open, instead of floating near the top
   document.documentElement.style.setProperty("--sheet-ctl", state === "open" ? "0px" : h);
   if (typeof drawZones === "function" && view) drawZones();
-  $("#handleText").textContent = state === "open" ? "▼ Show the map" : state === "min" ? "▲ " + minLabel() : "▲ Pull up for more";
+  $("#handleText").textContent = state === "open" ? "▾ Show the map" : state === "min" ? "▲ " + minLabel() : "▲ Pull up for more";
   $("#sheetHandle").setAttribute("aria-label", $("#handleText").textContent.replace(/^[▲▼]\s*/, ""));
 }
 // What the collapsed bar says, so it reads as something to open rather than a clipped panel.
 function minLabel(){
   if (view === "region") return $("#regionName").textContent || "Area";
-  if (view === "ideas") return "Route ideas";
+  if (view === "ideas") return ideas.length ? `${ideas.length} route idea${ideas.length > 1 ? "s" : ""} ready` : "Route ideas";
   if (view === "lanes") return "Find lanes";
   if (view === "start") return "Plan a ride";
   if (view === "saved") return "Saved";
@@ -637,27 +719,74 @@ function minLabel(){
   if (view === "tour") return tour?.name || "Tour";
   return "Where to ride";
 }
+// The side panel folds away to give the map the whole width, and comes back with the tab on its edge
+function setSide(open){
+  const was = !document.documentElement.classList.contains("side-hidden");
+  document.documentElement.classList.toggle("side-hidden", !open);
+  $("#sideToggle").textContent = open ? "▶" : "◀"; $("#sideToggle").setAttribute("aria-label", open ? "Hide the panel" : "Show the panel"); $("#sideToggle").setAttribute("aria-expanded", open);
+  if (was !== open) setTimeout(() => map.invalidateSize(), 0);
+}
+$("#sideToggle").onclick = () => { const open = document.documentElement.classList.contains("side-hidden"); setSide(open); if (sideAuto()) sheet.dataset.state = open ? previewState() : "min";
+  if (lastFit && ["route", "ideas", "tour", "region"].includes(view)) setTimeout(() => fitMap(lastFit.b, lastFit.o), 60); };
+// turning the phone, or Safari's toolbar coming and going, changes the room: re-size the panel to fit
+let lastPhone = phone();
+let refitTimer = null, wasWide = innerWidth > innerHeight;
+function relayout(){
+  const p = phone(), turned = p !== lastPhone || innerWidth > innerHeight !== wasWide; wasWide = innerWidth > innerHeight;
+  if (p) document.documentElement.classList.remove("side-hidden");
+  if (p !== lastPhone) { lastPhone = p; setTimeout(() => map.invalidateSize(), 0); }
+  setSheet(sheet.dataset.state || "peek");
+  // after the phone turns, fit the last route or area again once the new layout has settled
+  if (turned && lastFit && !(typeof Ride !== "undefined" && Ride.on)) { clearTimeout(refitTimer); refitTimer = setTimeout(() => { map.invalidateSize(); fitMap(lastFit.b, lastFit.o); }, 250); }
+}
+addEventListener("resize", relayout);
+visualViewport?.addEventListener("resize", relayout);
 function stepSheet(dir){ const o = SHEET_ORDER(), i = Math.max(0, o.indexOf(sheet.dataset.state)); setSheet(o[Math.min(o.length - 1, Math.max(0, i + dir))]); }
 // Swipe the handle up or down to move between positions; a tap moves up one, or back to the preview from full.
-let handleY = null;
-$("#sheetHandle").addEventListener("pointerdown", e => { handleY = e.clientY; $("#sheetHandle").setPointerCapture?.(e.pointerId); });
+// The panel follows your finger while you drag its tab, then settles at the nearest position; a tap moves it up a step.
+let handleY = null, startH = 0;
+$("#sheetHandle").addEventListener("pointerdown", e => { handleY = e.clientY; startH = sheet.getBoundingClientRect().height; $("#sheetHandle").setPointerCapture?.(e.pointerId); });
+$("#sheetHandle").addEventListener("pointermove", e => {
+  if (handleY == null || !phone()) return; const dy = e.clientY - handleY; if (Math.abs(dy) < 6) return;
+  sheet.classList.add("dragging"); sheet.style.height = Math.max(54, Math.min(sheetHeights().open, startH - dy)) + "px";
+});
 $("#sheetHandle").addEventListener("pointerup", e => {
   if (handleY == null) return; const dy = e.clientY - handleY; handleY = null;
+  const dragged = sheet.classList.contains("dragging"); sheet.classList.remove("dragging");
+  if (dragged) {   // settle on whichever position is nearest to where it was let go, leaning the way it was moving
+    const H = sheetHeights(), h = sheet.getBoundingClientRect().height + (dy < 0 ? 40 : -40);   // lean the way it was moving
+    const opts = SHEET_ORDER().map(st => [st, H[st]]);
+    setSheet(opts.reduce((a, o) => Math.abs(o[1] - h) < Math.abs(a[1] - h) ? o : a)[0]); return;
+  }
   if (dy < -25) stepSheet(1); else if (dy > 25) stepSheet(-1);
   else sheet.dataset.state === "open" ? setSheet("min") : stepSheet(1);   // a tap: up a step, or from full height down to the bar
 });
+$("#sheetHandle").addEventListener("pointercancel", () => { handleY = null; sheet.classList.remove("dragging"); setSheet(sheet.dataset.state); });
+// Swiping the panel's content down when it's already scrolled to the top lowers the panel, as in any phone app
+// (touch events, because the browser's own scrolling cancels pointer events on a real phone; the mouse for testing)
+let bodyY = null, bodyTop = 0;
+const swipeStart = (y, target) => { if (!phone() || target.closest("input,select,textarea,.wl-strip,#ideaList")) return; bodyY = y; bodyTop = $("#sheetBody").scrollTop; };
+const swipeEnd = y => { if (bodyY == null) return; const dy = y - bodyY; bodyY = null; if (bodyTop <= 0 && $("#sheetBody").scrollTop <= 0 && dy > 70) stepSheet(-1); };
+$("#sheetBody").addEventListener("touchstart", e => swipeStart(e.touches[0].clientY, e.target), { passive: true });
+$("#sheetBody").addEventListener("touchend", e => swipeEnd(e.changedTouches[0].clientY), { passive: true });
+$("#sheetBody").addEventListener("pointerdown", e => { if (e.pointerType === "mouse" && e.button === 0) swipeStart(e.clientY, e.target); });
+$("#sheetBody").addEventListener("pointerup", e => { if (e.pointerType === "mouse") swipeEnd(e.clientY); });
+// once the panel's content scrolls, the tab casts a shadow, so the content reads as sliding under it
+$("#sheetBody").addEventListener("scroll", () => sheet.classList.toggle("scrolled", $("#sheetBody").scrollTop > 2), { passive: true });
 // Moving the map on a phone tucks the panel away so the map gets the screen.
-map.on("dragstart", () => { if (phone() && !drawing && !picking && sheet.dataset.state !== "min") setSheet("min"); });
+map.on("dragstart", () => { lastFit = null; if (phone() && !drawing && !picking && sheet.dataset.state !== "min" && !(typeof Ride !== "undefined" && Ride.on)) setSheet("min"); });   // you've moved the map: nothing is refitted over it
 let lastBrowse = "plan";   // the tab screen you were on before a doing screen, where its back arrow returns
 function goBack(){ if (lastBrowse === "region" && regionOpen) openRegion(regionOpen); else showView(lastBrowse, lastBrowse === "plan" ? "peek" : "mid"); }
 const TAB_OF = { plan: "explore", region: "explore", start: "plan", saved: "saved", help: "help" };
 const TAB_VIEW = { explore: "plan", plan: "start", saved: "saved", help: "help" };
 document.querySelectorAll("#tabbar button").forEach(b => b.onclick = () => {
+  if (b.dataset.tab === "home") { stopModes(); welcomeFromHome = true; navPush(); showWelcome(); return; }   // back to the start screen
   const v = TAB_VIEW[b.dataset.tab]; stopModes();
-  if (v === "plan" && view === "region") fly([52.6, -2.3], 7);
+  if (v === "plan" && view !== "plan") setTimeout(showBritain, 30);
   showView(v, v === "plan" ? "peek" : "mid");
 });
 function showView(v, sheetState){
+  if (v !== view) { navPush(); lastFit = null; }   // a new screen fits its own things
   view = v;
   // browsing screens show the tab bar; doing screens (ideas, route, tour, lanes) have their own back arrow instead
   const tab = TAB_OF[v]; if (tab) lastBrowse = v;
@@ -686,8 +815,7 @@ function setBanner(text, opts = {}){
   $("#banner").hidden = !text; $("#bannerText").textContent = text || "";
   document.body.classList.toggle("banner-on", !!text);   // the instruction gets the top of the map to itself
   $("#bannerMe").hidden = !opts.me; $("#bannerMove").hidden = !opts.draw; $("#bannerUndo").hidden = !opts.draw || !strokes.length; $("#bannerDone").hidden = !opts.draw;
-  $("#bannerCancel").hidden = !!opts.draw;
-  if (opts.wait) { $("#bannerCancel").hidden = false; }
+  $("#bannerCancel").hidden = false;   // every mode can be left
   $("#zoomHint").hidden = true;
 }
 function stopModes(){
@@ -695,27 +823,60 @@ function stopModes(){
   picking = null; drawing = false; painting = null;
   if (liveLine) { map.removeLayer(liveLine); liveLine = null; }
   map.dragging.enable(); map.getContainer().style.cursor = ""; map.getContainer().style.touchAction = "";
-  setBanner(null); drawZones();
+  setBanner(null); drawZones(); $("#bannerSearch").hidden = true;
 }
 function pickSpot(text, then){
   stopModes(); picking = then; map.getContainer().style.cursor = "crosshair";
-  setBanner(text + ", or search above", { me: true }); setSheet(phone() ? "min" : "peek");   // give the map the screen while you choose
+  const compact = phone() || innerHeight <= 500;   // search is a corner button here, hidden while the banner shows, so the banner has its own
+  setBanner(text + (compact ? ", or search" : ", or search above"), { me: true }); setSheet(phone() || sideAuto() ? "min" : "peek");   // give the map the screen while you choose
+  $("#bannerSearch").hidden = !compact;
   if (map.getZoom() < 9) status("Zoom in a little so you can tap the right spot", 6000);
 }
-$("#bannerCancel").onclick = stopModes;
+$("#bannerCancel").onclick = () => {
+  const wasDrawing = drawing || drawWhenZoomed; stopModes(); status("");
+  if (view === "ideas" && lastKind === "loop" && !loopStart) { $("#ideasBack").click(); return; }   // no start chosen: back to where you came from
+  if (wasDrawing && !strokes.length && view === "ideas") { $("#ideasBack").click(); return; }   // drawing nothing: back to where you came from
+  if (phone() && sheet.dataset.state === "min") setSheet(previewState());   // choosing was cancelled: the panel comes back
+};
+$("#bannerSearch").onclick = openSearch;
 $("#bannerMe").onclick = () => { const then = picking; locate(p => { stopModes(); then?.(p); }); };
-map.on("click", e => { if (!picking) return; const then = picking; stopModes(); then([e.latlng.lat, e.latlng.lng]); });
+// Choosing a spot: a tap anywhere sets it, including on a lane or a stop (whose popup would otherwise open).
+// Zoomed right out a tap is kilometres out, or in the sea, so it zooms in on that spot first.
+function pickAt(ll){
+  if (map.getZoom() < 9) { map.setView(ll, 11); status("Now tap the exact spot", 4000); return; }
+  const then = picking; stopModes(); highlightLane(null); then([ll.lat, ll.lng]);   // a lane tapped to set the spot isn't picked
+}
+map.on("click", e => { if (picking) pickAt(e.latlng); });
+// A long press on the map: start a loop there, or make it where your route starts
+map.on("contextmenu", e => {
+  if (drawing || (typeof Ride !== "undefined" && Ride.on)) return;
+  if (picking) { pickAt(e.latlng); return; }
+  const at = [e.latlng.lat, e.latlng.lng], div = document.createElement("div");
+  div.innerHTML = `<h3>This spot</h3>`;
+  const btn = (label, go, primary) => { const b = document.createElement("button"); b.className = "btn" + (primary ? " primary" : ""); b.style.cssText = "width:100%;margin-top:8px"; b.textContent = label; b.onclick = () => { map.closePopup(); go(); }; div.append(b); };
+  btn("⟲ Plan a loop from here", () => { lastKind = "loop"; ideas = []; picked = -1; ideaRun++; openIdeas(); setLoopStart(at); }, true);
+  if (trip.items.length && editingDay == null) btn("⚑ Start my route here", () => { trip.start = at; built = null; saveTrip(); showView("route", "mid"); renderRoute(); tidyNow(); });
+  L.popup({ maxWidth: 260 }).setLatLng(e.latlng).setContent(div).openOn(map);
+});
+// a double tap to zoom starts with a tap, which opens whatever lane or stop is under the finger: shut it again
+let popupAt = 0; map.on("popupopen", () => { popupAt = Date.now(); });
+map.on("dblclick", () => { if (Date.now() - popupAt < 600) map.closePopup(); });
+map.on("popupopen", e => { if (!picking) return; const ll = e.popup.getLatLng(); map.closePopup(); if (ll) pickAt(ll); });
 
 // Loop from a place: set the start, then the ideas and all the controls stay on one screen.
 $("#goLoop").onclick = () => {
   lastKind = "loop"; ideas = []; picked = -1; ideaRun++;
   openIdeas();
-  if (loopStart) runIdeas(); else pickSpot("Tap the map where you'll start", setLoopStart);
+  // a place you've just searched for is the obvious start
+  if (searchPin) { const at = searchPin.getLatLng(); setLoopStart([at.lat, at.lng], searchPin.options.title); }
+  else if (loopStart) runIdeas(); else pickSpot("Tap the map where you'll start", setLoopStart);
 };
 $("#changeStart").onclick = () => pickSpot("Tap the map where you'll start", setLoopStart);
 let loopStartName = "";
 // The start is named so you can see where it is without finding the flag: from the search if you used it, or looked up.
 function setLoopStart(p, name){
+  if (searchPin) { map.removeLayer(searchPin); searchPin = null; }   // the start flag replaces the search pin
+  if (sideAuto()) setSheet("mid");
   loopStart = p; loopStartName = name || ""; drawSketch(); setIdeasUi(); runIdeas();
   if (!name) placeName(p).then(n => { if (loopStart === p && n) { loopStartName = n; setIdeasUi(); } });
 }
@@ -726,10 +887,11 @@ $("#drawMore").onclick = () => startDrawing();
 // Drawing needs the lanes on screen, so it waits until you've zoomed in far enough to see them.
 function startDrawing(){
   stopModes();
-  if (phone()) setSheet("min"); else setSheet("peek");
+  setSheet(phone() || sideAuto() ? "min" : "peek");
   if (map.getZoom() < 10) {
     drawWhenZoomed = true; drawZones();
-    setBanner("Zoom in to where you want to ride. Drawing starts when the lanes show.", { wait: true }); return;
+    setBanner("Zoom in to where you want to ride, or search. Drawing starts when the lanes show.", { wait: true });
+    $("#bannerSearch").hidden = false; return;
   }
   drawWhenZoomed = false; drawing = true; map.dragging.disable();
   map.getContainer().style.cursor = "crosshair"; map.getContainer().style.touchAction = "none";
@@ -741,13 +903,17 @@ $("#bannerMove").onclick = () => {   // pause drawing so the map can be moved, t
   else { $("#bannerMove").textContent = "✋ Move map"; startDrawing(); }
 };
 $("#bannerUndo").onclick = () => { strokes.pop(); drawSketch(); setBanner($("#bannerText").textContent, { draw: true }); };
-$("#bannerDone").onclick = () => { $("#bannerMove").textContent = "✋ Move map"; stopModes(); setIdeasUi(); if (strokes.length) runIdeas(); };
+$("#bannerDone").onclick = () => {
+  if (!strokes.length) { status("Nothing drawn yet: draw a line on the map with your finger", 4000); return; }
+  $("#bannerMove").textContent = "✋ Move map"; stopModes(); setIdeasUi(); if (sideAuto()) setSheet("mid"); runIdeas();
+};
 $("#undoStroke").onclick = () => { strokes.pop(); drawSketch(); setIdeasUi(); strokes.length ? replanSoon() : clearIdeas(); };
 $("#clearStrokes").onclick = () => { strokes = []; shapeChoice = null; drawSketch(); setIdeasUi(); clearIdeas(); };
 document.querySelectorAll("#shapeSeg button").forEach(b => b.onclick = () => { shapeChoice = b.dataset.shape; drawSketch(); setIdeasUi(); replanSoon(); });
 const mapEl = map.getContainer();
 mapEl.addEventListener("pointerdown", ev => {
   if (!drawing || ev.button > 0) return;
+  if (ev.target.closest?.(".leaflet-control, .mapui, button, #sheet")) return;   // the zoom buttons and the banner still work
   ev.preventDefault(); ev.stopPropagation(); mapEl.setPointerCapture?.(ev.pointerId);
   painting = [map.mouseEventToLatLng(ev)];
   liveLine = L.polyline(painting, { color: "#c2185b", weight: 10, opacity: .45, lineCap: "round", interactive: false, renderer: routeRenderer }).addTo(map);
@@ -761,8 +927,8 @@ mapEl.addEventListener("pointerup", () => {
   if (!painting) return;
   const pts = painting.map(p => [p.lat, p.lng]); painting = null;
   if (liveLine) { map.removeLayer(liveLine); liveLine = null; }
-  if (lineLen(pts) < 200) return;
-  strokes.push(thin(pts, 60)); drawSketch(); setIdeasUi();
+  if (lineLen(pts) < 200) { status("That was too short to use: draw a longer line", 3000); return; }
+  strokes.push(thin(pts, 60)); drawSketch(); setIdeasUi(); status("");
   setBanner("Keep drawing, or press Done.", { draw: true });
 }, true);
 // The strokes joined up, in order. A route that ends near where it began is a loop unless you say otherwise.
@@ -773,7 +939,8 @@ function drawnShape(){
   return hav(l[0], l.at(-1)) < Math.max(3000, lineLen(l) * 0.2) ? "loop" : "line";
 }
 function drawnSketch(){ const l = drawnLine(); if (l.length < 2) return null; return drawnShape() === "loop" ? thin([...l, l[0]], 60) : thin(l, 60); }
-const flag = (p, t, bg) => L.marker(p, { interactive: false, zIndexOffset: 2000, icon: L.divIcon({ className: "", html: `<span class="flag" style="background:${bg || "#1f1d18"}">${t}</span>`, iconSize: [0, 0] }) });
+const flagShift = p => { const c = map.latLngToContainerPoint(p), w = map.getSize().x; return c.x < 70 ? "translate(8px,-50%)" : c.x > w - 70 ? "translate(calc(-100% - 8px),-50%)" : ""; };
+const flag = (p, t, bg) => L.marker(p, { interactive: false, zIndexOffset: 2000, icon: L.divIcon({ className: "", html: `<span class="flag" style="background:${bg || "#1f1d18"};${flagShift(p) ? "transform:" + flagShift(p) : ""}">${t}</span>`, iconSize: [0, 0] }) });
 function drawSketch(){
   sketchLayer.clearLayers();
   if (lastKind === "draw" && strokes.length) {
@@ -833,12 +1000,12 @@ async function fitPlan(sk, widthM, wr0, targetH, alive, passes = 3){
   for (let pass = 0; pass < passes; pass++) {
     const r = fit(); plan = r.p;
     if (!plan.chain.length || !alive()) break;
-    const rl = await osrmLegs(sk, plan.chain);
+    const rl = (await localLegs(sk, plan.chain)) || (await osrmLegs(sk, plan.chain));
     if (!alive()) return null;
     if (!rl) break;
     const estH = hoursOf(plan.laneM, plan.roadM * tf);
     plan.roadM = rl.dist.reduce((x, y) => x + y, 0); plan.roadGeom = rl.geom; plan.checked = true;
-    const realH = hoursOf(plan.laneM, plan.roadM * tf);
+    const realH = hoursOf(plan.laneM, plan.roadM);   // measured on the twisty roads themselves now, so no allowance
     scale = Math.max(0.6, Math.min(2.5, realH / (estH || 1)));
     const ends = rl.pts, last = plan.chain.length, bad = new Set();
     rl.dist.forEach((m, k) => {
@@ -846,6 +1013,10 @@ async function fitPlan(sk, widthM, wr0, targetH, alive, passes = 3){
       if (h > 25) { if (k > 0 && rl.snap[2*k] > 100) bad.add(k - 1); if (k < last && rl.snap[2*k+1] > 100) bad.add(k); }
       if (m > 3000 && m / (h + 1000) > 2.5) bad.add(Math.min(k, last - 1));
     });
+    // a lane only reached by ferry (the mainland, seen from the Isle of Wight) is across the water: the lanes after
+    // an odd number of ferry crossings are on the far side
+    // (not for a drawing: a line drawn across the water means it)
+    if (rl.ferry && lastKind !== "draw") { let across = false; rl.ferry.forEach((f, k) => { if (f) across = !across; if (across && k < last) bad.add(k); }); }
     const fits = realH <= targetH * 1.15;
     if (bad.size) {   // keep this plan minus the lanes that don't connect, then try again without them
       const keep = plan.chain.filter((_, k) => !bad.has(k)), lost = plan.chain.filter((_, k) => bad.has(k)).reduce((t, n) => t + n.len, 0);
@@ -863,7 +1034,7 @@ async function fitPlan(sk, widthM, wr0, targetH, alive, passes = 3){
 
 /* ---------- route ideas: one screen with the controls and the ideas, re-planned as you change things ---------- */
 const ideaLayer = L.layerGroup().addTo(map);
-const IDEA_COLORS = ["#c2185b", "#1d4ed8", "#7e22ce"];   // pink, blue, purple: clear of the lane greens, amber and red
+const IDEA_COLORS = ["#c2185b", "#1d4ed8", "#9a3412"];   // pink, blue, rust: clear of the lane greens, amber and red, and of each other
 let ideas = [], picked = -1, ideaRun = 0, replanTimer;
 function replanSoon(){ if (view !== "ideas" || !lastKind) return; clearTimeout(replanTimer); replanTimer = setTimeout(() => { if (lastKind === "loop" ? loopStart : strokes.length) runIdeas(); }, 600); }
 function placeSettings(where){
@@ -874,7 +1045,8 @@ function setIdeasUi(){
   const loop = lastKind === "loop";
   $("#ideasTitle").textContent = loop ? "Loop from a place" : "Draw a route";
   $("#loopCtl").hidden = !loop; $("#drawCtl").hidden = loop;
-  $("#startText").textContent = loopStart ? `✓ Start: ${loopStartName || "set"}` : "Tap the map to set your start";
+  $("#startText").textContent = loopStart ? `✓ Start: ${loopStartName || "set"}` : "No start yet";
+  $("#changeStart").textContent = loopStart ? "Change start" : "Set start";
   const shape = drawnShape();
   document.querySelectorAll("#shapeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.shape === shape));
   $("#undoStroke").disabled = !strokes.length; $("#clearStrokes").disabled = !strokes.length;
@@ -882,11 +1054,14 @@ function setIdeasUi(){
   if (lastKind === "draw" && strokes.length && !ideas.length) $("#ideasNote").textContent = drawing ? "Press Done when you've finished drawing." : "";
   placeSettings("ideas");
 }
-function openIdeas(){ showView("ideas", "mid"); setIdeasUi(); drawSketch(); renderIdeas(lastKind === "loop" && !loopStart ? "Tap the map to set your start." : lastKind === "draw" && !strokes.length ? "Draw on the map to start." : ""); }
+// what a back link says: the screen it returns to
+function backLabel(){ return lastBrowse === "region" && regionOpen && regionBySlug(regionOpen) ? `← ${regionBySlug(regionOpen).name}` : `← ${{ plan: "Explore", start: "Plan", saved: "Saved", help: "Help" }[lastBrowse] || "Back"}`; }
+function openIdeas(){ showView("ideas", "mid"); $("#ideasBack").textContent = backLabel(); setIdeasUi(); drawSketch(); renderIdeas(lastKind === "loop" && !loopStart ? "Tap the map to set your start." : lastKind === "draw" && !strokes.length ? "Draw on the map to start." : ""); }
 function clearIdeas(){ ideaRun++; ideas = []; picked = -1; renderIdeas(lastKind === "draw" ? "Draw on the map to start." : ""); }
+let ideasUpdating = false;   // new ideas are being worked out: the old cards stay, dimmed, until the first new one arrives
 async function runIdeas(){
   const run = ++ideaRun, alive = () => run === ideaRun;
-  ideas = []; picked = -1;
+  ideasUpdating = ideas.length > 0 || ideasUpdating; ideas = []; picked = -1;
   if (view !== "ideas") showView("ideas", "mid");
   setIdeasUi();
   const wr = mixToWr(settings.mix), target = settings.hours;
@@ -895,9 +1070,13 @@ async function runIdeas(){
     renderIdeas("Finding lanes along your route…");
     const r = await fitPlan(sk, settings.width * 1000, wr, target, alive);
     if (!alive()) return;
-    if (r && r.chain.length) ideas.push({ ...r, name: drawnShape() === "loop" ? "Your loop" : "Your route", color: IDEA_COLORS[0] });
+    ideasUpdating = false;
+    // no lanes along it: keeping to the line, it's still a ride on the roads you drew (Scotland, a lap of a lake)
+    const roadOnly = r && !r.chain.length && settings.followLine !== false;
+    if (r && (r.chain.length || roadOnly)) ideas.push({ ...r, ...(roadOnly ? { roadM: lineLen(sk) * 1.2, laneM: 0, roadGeom: null, checked: false } : {}), name: drawnShape() === "loop" ? "Your loop" : "Your route", color: IDEA_COLORS[0] });
     picked = ideas.length ? 0 : -1;
     renderIdeas(ideas.length ? "" : `No lanes within ${settings.width} km of what you drew. Look for lanes further out, or draw somewhere else.`);
+    if (!ideas.length && phone()) setSheet("mid");   // the message is in the panel: bring it up so it's seen
     if (ideas.length) fitTo(ideas[0]);
     return;
   }
@@ -915,21 +1094,54 @@ async function runIdeas(){
     for (let tries = 0; tries < 2; tries++) {
       r = await fitPlan(sk, width, wr, target, alive);
       if (!r || !alive()) return;
-      if (!r.chain.length || hoursOf(r.laneM, r.roadM * twistF()) <= target * 1.2) break;
+      if (!r.chain.length || hoursOf(r.laneM, r.roadM * (r.checked ? 1 : twistF())) <= target * 1.2) break;
       sk = e.sk.map(p => [loopStart[0] + (p[0] - loopStart[0]) * 0.7, loopStart[1] + (p[1] - loopStart[1]) * 0.7]);
     }
-    if (r.chain.length) ideas.push({ ...r, name: `Loop heading ${e.name}`, color: IDEA_COLORS[ideas.length] });
+    if (r.chain.length) { ideasUpdating = false; ideas.push({ ...r, name: `Loop heading ${e.name}`, color: IDEA_COLORS[ideas.length] }); }
     if (picked < 0 && ideas.length) { picked = 0; fitTo(ideas[0]); }
     renderIdeas(k < chosen.length - 1 ? `Checking roads for idea ${k + 2} of ${chosen.length}…` : "");
   }
-  if (!ideas.length) renderIdeas("No lanes close enough to this start. Try a longer ride time, or start somewhere else.");
+  ideasUpdating = false;
+  const inScot = loopStart[0] > 55.8 || (loopStart[0] > 55.05 && loopStart[1] < -2.9);
+  if (!ideas.length) { renderIdeas(inScot ? "Scotland has no byways open to motor vehicles, so there are no lanes to make a loop from. Its rides are road rides: see West Highlands, Cairngorms, Argyll or the Borders under Explore." : "No lanes close enough to this start. Try a longer ride time, or start somewhere else."); if (phone() && sheet.dataset.state === "min") setSheet("mid"); }
 }
 // Zoom to something while leaving it clear of what covers the map on a phone: the search bar and Show button at the
 // top, the Map/Me/Help buttons down the right, and the panel at the bottom at whatever height it is now.
+function showBritain(){
+  // on a short strip of map the whole of Britain would be a speck in Europe: keep it at a readable size, centred on England
+  const b = L.latLngBounds(GB_BOUNDS), p = fitPad(), z = map.getBoundsZoom(b, false, L.point(p.paddingTopLeft).add(p.paddingBottomRight));
+  const floor = phone() ? 4.75 : 5;
+  if (z >= floor) return fitMap(b, {});
+  const regions = window.REGIONS || [];   // (REGION_LIST isn't set yet when this runs at start-up)
+  if (!phone() || !regions.length) return viewAt([53.6, -2.4], floor);
+  // Centre the area pins, north to south, in the strip between the corner buttons and the panel, so the northern
+  // pins aren't under Search/Show and the southern ones aren't behind the panel.
+  // (on a small screen they may not all fit; zooming out further makes them overlap, so the ends are partly covered)
+  const lats = regions.map(r => r.centre[0]), top = 95, bottom = Math.max(top + 60, sheet.getBoundingClientRect().top - 36), zf = floor;
+  const yN = map.project([Math.max(...lats), -2.4], zf).y, yS = map.project([Math.min(...lats), -2.4], zf).y;
+  const cy = (yN + yS) / 2 + map.getSize().y / 2 - (top + bottom) / 2;
+  // (no animation: at start-up a zoom still running would finish later and undo whatever the map shows by then)
+  map.setView(map.unproject([map.project([53.6, -2.4], zf).x, cy], zf), zf, { animate: false });
+}
+// a place in the middle of the part of the map you can see (on a phone the panel covers the bottom)
+function viewAt(ll, z){
+  if (!phone()) return map.setView(ll, z);
+  const H = sheetHeights(), dy = ((H[sheet.dataset.state] ?? H.peek) + H.tb - 70) / 2;
+  map.setView(map.unproject(map.project(ll, z).add([0, dy]), z), z);
+}
+// Fit the map to something in the part of the map you can see: below the corner buttons and above the panel.
+// The last fit is remembered, so turning the phone (or folding the side panel) fits the same thing again.
+let lastFit = null, refitAfter = null;
+// the padding that keeps a fit in the part of the map you can see
+function fitPad(){
+  if (!phone()) return { paddingTopLeft: [30, 80], paddingBottomRight: [30, 20] };
+  const H = sheetHeights(), st = sheet.dataset.state === "open" ? "mid" : sheet.dataset.state;
+  const h = Math.min((H[st] ?? H.peek) + H.tb, innerHeight - 84 - safeTop - 160);   // never fit into less than 160px of map
+  return { paddingTopLeft: [30, 84 + safeTop], paddingBottomRight: [30, h + 20] };
+}
 function fitMap(b, o = {}){
-  if (!phone()) return map.fitBounds(b, o);
-  const h = ({ min: 54, peek: PEEK[view] || 176, mid: innerHeight * .5, open: innerHeight * .78 }[sheet.dataset.state] || 176) + (document.documentElement.classList.contains("tabs-on") ? 58 : 0);
-  map.fitBounds(b, { ...o, paddingTopLeft: [14, 118], paddingBottomRight: [66, h + 14] });
+  lastFit = { b, o };
+  map.fitBounds(b, { ...o, ...fitPad() });
 }
 function fitTo(idea){   // the loop itself (its lanes, its roads and the start), not the wider circle it was searched in
   const pts = [idea.sketch[0], ...idea.chain.flatMap(n => [n.a, n.b]), ...(idea.roadGeom || []).flat()];
@@ -950,6 +1162,14 @@ function drawChain(layer, it, on, color){
   }
 }
 function renderIdeas(msg){
+  if (ideasUpdating && !ideas.length) {
+    $("#ideaList").classList.add("updating"); $("#ideasNote").textContent = msg || "";
+    ideaLayer.eachLayer(l => { l.setStyle?.({ opacity: .3 }); l.setOpacity?.(.35); });
+    if (sheet.dataset.state === "min") $("#handleText").textContent = "▲ Finding route ideas…";
+    return;
+  }
+  $("#ideaList").classList.remove("updating");
+  if (sheet.dataset.state === "min") $("#handleText").textContent = "▲ " + minLabel();
   ideaLayer.clearLayers();
   $("#ideasNote").textContent = msg || (ideas.length ? `Change anything above and the ideas update. Times assume ${LANE_KMH} km/h on lanes and about ${Math.round(roadKmh())} km/h on roads.` : "");
   const order = ideas.map((_, i) => i).filter(i => i !== picked); if (picked >= 0) order.push(picked);
@@ -963,7 +1183,7 @@ function renderIdeas(msg){
   }
   const box = $("#ideaList"); box.innerHTML = "";
   ideas.forEach((it, i) => {
-    const roadM = it.roadM * twistF(), tot = it.laneM + roadM, boats = it.chain.filter(n => n.w.cls === "boat").length;
+    const roadM = it.roadM * (it.checked ? 1 : twistF()), tot = it.laneM + roadM, boats = it.chain.filter(n => n.w.cls === "boat").length;
     const card = document.createElement("div"); card.className = "card"; card.style.setProperty("--c", it.color);
     card.setAttribute("aria-current", i === picked ? "true" : "false");
     card.innerHTML = `<div class="top"><h3><span class="inum">${i + 1}</span>${esc(it.name)}${i === picked ? `<span class="onmap">On the map</span>` : ""}</h3></div>
@@ -971,13 +1191,24 @@ function renderIdeas(msg){
     const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Ride this";
     go.onclick = ev => { ev.stopPropagation(); useIdea(i); };
     card.querySelector(".top").append(go);
+    // a loop idea can be joined on to the route already open (two headings from one start, say)
+    if (lastKind === "loop" && trip.items.length && editingDay == null && it.chain.length) {
+      const join = document.createElement("button"); join.className = "btn quiet"; join.textContent = `+ Join on to “${trip.name}”`;
+      join.onclick = ev => { ev.stopPropagation(); joinRide({ name: it.name, trip: { items: chainToItems(it.chain) } }); };
+      card.append(join);
+    }
     const pick = () => { picked = i; renderIdeas(msg); fitTo(it); };
     card.onclick = pick;
     box.append(card);
   });
   // on a phone the cards are a side-swipe row: keep the chosen one in view after redrawing
-  if (phone() && picked >= 0 && box.children[picked]) { ideaScrollQuiet = true; box.scrollLeft = box.children[picked].offsetLeft - (box.clientWidth - box.children[picked].offsetWidth) / 2; setTimeout(() => ideaScrollQuiet = false, 80); }
+  scrollToPicked();
 }
+function scrollToPicked(){
+  const box = $("#ideaList");
+  if (phone() && picked >= 0 && box.children[picked] && box.clientWidth) { ideaScrollQuiet = true; box.scrollLeft = box.children[picked].offsetLeft - (box.clientWidth - box.children[picked].offsetWidth) / 2; setTimeout(() => ideaScrollQuiet = false, 80); }
+}
+new ResizeObserver(() => scrollToPicked()).observe($("#ideaList"));
 // Swiping to a card makes it the one on the map
 var ideaScrollQuiet = false, ideaScrollTimer;
 $("#ideaList").addEventListener("scroll", () => {
@@ -996,9 +1227,10 @@ const newTrip = () => ({ name: "My route", start: null, finish: null, loop: fals
 let trip = store.get("trip2", null) || newTrip();
 let built = store.get("built5", null);
 let editingDay = null;       // when editing one day of a tour
-const saveTrip = () => { store.set("trip2", trip); store.set("built5", built); };
+let dayBefore = null;        // the route that was open before a tour day was opened for editing, put back afterwards
+const saveTrip = () => { store.set("trip2", trip); store.set("built5", built); store.set("editing", editingDay == null ? null : { day: editingDay, before: dayBefore }); };
 const routeLayer = L.layerGroup().addTo(map);
-const itemFromWay = (w, coords) => { const t = w.tags; return { ids: w.members ? w.members.slice() : [w.id], name: laneName(t), kind: DESIG[t.designation] || "Byway", cls: w.cls, coords: coords || w.coords.slice(), surface: [t.surface, t.tracktype].filter(Boolean).join(", ") }; };
+const itemFromWay = (w, coords) => { const t = w.tags; return { ids: w.members ? w.members.slice() : [w.id], name: laneName(t), kind: DESIG[t.designation] || "Byway", cls: w.cls, coords: coords || w.coords.slice(), surface: surfTxt(t) }; };
 function chainToItems(chain){   // join lanes that touch into one entry, so the list reads as lanes, not fragments
   const items = [];
   for (const n of chain) {
@@ -1013,7 +1245,8 @@ function chainToItems(chain){   // join lanes that touch into one entry, so the 
   return items;
 }
 function addItem(item){
-  if (!trip.items.length) { trip = newTrip(); trip.items.push(item); }
+  const first = !trip.items.length;
+  if (first) { trip = newTrip(); trip.items.push(item); }
   else {
     // put the new lane where it adds the least extra distance, facing the way that fits
     let best = { cost: Infinity };
@@ -1032,7 +1265,9 @@ function addItem(item){
   }
   built = null; saveTrip();
   if (view !== "route") showView("route", "mid"); else renderRoute();
-  drawRoute(); buildSoon(300);
+  // a new route's first lane goes where you can see it, above the panel that has just come up
+  if (first) fitMap(L.latLngBounds(item.coords).pad(0.4), { maxZoom: 15 });
+  drawRoute(); tidyNow(item);
 }
 function addLane(w){ addItem(itemFromWay(w)); status(`Added ${laneName(w.tags)}`); }
 const itemVia = p => ({ via: true, ids: [], name: "Via point", kind: "Via", cls: "via", coords: [p] });
@@ -1077,7 +1312,7 @@ function stopNear(ll, px = 24){
 }
 function highlightStop(st){ if (!st) return; L.circleMarker([st.lat, st.lng], { radius: 20, color: "#ffd21f", weight: 5, fill: false, interactive: false }).addTo(highlightLayer); }
 function dragMarker(at, cls, onDrop, html){
-  const m = L.marker(at, { draggable: true, autoPan: true, keyboard: false, zIndexOffset: 500,
+  const m = L.marker(at, { draggable: true, autoPan: true, autoPanPadding: L.point(14, 14), keyboard: false, zIndexOffset: 2000,
     icon: L.divIcon({ className: "", iconSize: [0, 0], html: html || `<div class="handle ${cls}"></div>` }), title: "Drag onto a green lane or a stop" });
   // a stop icon wins over a lane, because it's the smaller target and you aimed at it
   const target = ll => { const st = stopNear(ll); return st ? { st } : { w: laneNear(ll) }; };
@@ -1086,10 +1321,22 @@ function dragMarker(at, cls, onDrop, html){
   return m;
 }
 function removeLane(id){ const i = trip.items.findIndex(it => it.ids.some(x => x === id || laneOf.get(x) === id)); if (i >= 0) removeItem(i); }
+// Taking a lane or stop out can be undone for six seconds (and taking out the last one isn't the end of the route)
+let removed = [];
 function removeItem(i){
-  trip.items.splice(i, 1); built = null; saveTrip();
+  const [gone] = trip.items.splice(i, 1); if (!gone) return; built = null;
+  for (const id of gone.ids || []) (trip.declined ||= []).push(laneOf.get(id) ?? id);   // not offered again by "Add lanes close to this route"
+  saveTrip();
+  if ($("#undoBar").hidden) removed = [];
+  removed.push({ i, gone });
+  const last = !trip.items.length;
+  undoBar(last ? "Took out the last lane: the route is empty" : removed.length > 1 ? `Took out ${removed.length} lanes` : `Took out ${gone.name || "a lane"}`, () => {
+    for (const r of removed.slice().reverse()) trip.items.splice(Math.min(r.i, trip.items.length), 0, r.gone);
+    removed = []; built = null; saveTrip();
+    if (view !== "route") showView("route", "mid"); renderRoute(); drawRoute(); buildSoon(300);
+  }, null);   // the list is reset when the bar has gone, not when the next removal replaces the bar
   if (!trip.items.length) { routeLayer.clearLayers(); routeStopIdx = new Set(); routeStopLayer.clearLayers(); showView(editingDay != null ? "tour" : "plan", "peek"); return; }
-  renderRoute(); drawRoute(); buildSoon(300);
+  renderRoute(); drawRoute(); tidyNow();
 }
 // Back from a route always goes somewhere: to the loop or drawn ideas it came from, the area page of a ready-made
 // ride, or "Where to ride?" (for a saved route, or one still open when the app is reopened).
@@ -1097,6 +1344,7 @@ let routeFrom = { kind: "plan" };
 $("#routeBack").onclick = () => {
   if (lastKind && ideas.length) { showView("ideas", "mid"); setIdeasUi(); drawSketch(); renderIdeas(); if (picked >= 0 && ideas[picked]) fitTo(ideas[picked]); return; }
   if (routeFrom.kind === "region" && regionBySlug(routeFrom.slug)) { openRegion(routeFrom.slug); return; }
+  if (routeFrom.kind === "lanes") { openLanes(); return; }   // back to the lane list it was started from
   goBack();
 };
 function useIdea(i){
@@ -1106,22 +1354,248 @@ function useIdea(i){
   // Show the idea straight away on the quickest roads it was checked with, so the numbers are there at once;
   // the twisty-road version replaces it when BRouter has answered (half a minute or more on the free server).
   if (it.roadGeom) {
-    const roadM = it.roadM * twistF(), lanes = trip.items.filter(x => !x.via);
+    const roadM = it.roadM * (it.checked ? 1 : twistF()), lanes = trip.items.filter(x => !x.via);
     built = { provisional: true, twisty: -1, via: "OSRM", jumps: 0, failed: 0, joinM: 0,
       segs: [...it.roadGeom.filter(g => g.length > 1).map(c => ({ type: "road", coords: c })), ...lanes.map((x, i) => ({ type: "lane", coords: x.coords, i }))],
       total: it.laneM + roadM, off: it.laneM, hours: hoursOf(it.laneM, roadM), bend: bendiness(it.roadGeom) };
   }
+  trip.keepOrder = lastKind === "draw";   // a drawing has a way round; a loop idea's order is only the planner's guess
   saveTrip(); sketchLayer.clearLayers();
-  showView("route", "mid"); renderRoute(); fitTo(it); if (built) findRouteStops(); build();
+  showView("route", "mid"); renderRoute(); fitTo(it); if (built) findRouteStops();
+  const t = trip;
+  (lastKind === "draw" && settings.followLine !== false ? followLine(t, sk) : Promise.resolve()).then(() => { if (t === trip) tidyNow(); });
 }
-function orientTrip(t){
-  const it = t.items; if (!it.length) return;
-  if (t.start) { if (hav(t.start, it[0].coords.at(-1)) < hav(t.start, it[0].coords[0])) it[0].coords.reverse(); }
-  else if (it.length > 1) {
-    const nx = [it[1].coords[0], it[1].coords.at(-1)];
-    if (Math.min(...nx.map(p => hav(it[0].coords[0], p))) < Math.min(...nx.map(p => hav(it[0].coords.at(-1), p)))) it[0].coords.reverse();
+$("#followLine").checked = settings.followLine !== false;
+$("#followLine").onchange = e => { settings.followLine = e.target.checked; saveSettings(); };
+// A drawn route keeps to the line you drew. Lanes are found along it; where there's no lane for a while, a via point
+// every 3 km or so, put on the nearest road, takes the roads along your line (round a lake, over a pass, both
+// halves of a figure 8), in the order and direction you drew. Without them the roads take the quickest way
+// from lane to lane and the shape is lost.
+async function followLine(t, sk){
+  const dense = []; for (const p of sk) { if (dense.length) { const a = dense.at(-1), n = Math.ceil(hav(a, p) / 150); for (let k = 1; k < n; k++) dense.push([a[0] + (p[0] - a[0]) * k / n, a[1] + (p[1] - a[1]) * k / n]); } dense.push(p); }
+  const cum = [0]; for (let i = 1; i < dense.length; i++) cum.push(cum[i - 1] + hav(dense[i - 1], dense[i]));
+  // how far along the drawing a point is, looking forward from `from` (a figure 8 crosses itself, so order matters)
+  const alongFrom = (p, from) => { let bi = -1, bd = Infinity; for (let i = 0; i < dense.length; i++) { if (cum[i] < from - 2000) continue; const d = hav(p, dense[i]) + (cum[i] < from ? 3000 : 0); if (d < bd) { bd = d; bi = i; } } return bi < 0 ? from : cum[bi]; };
+  const lanes = t.items.filter(it => !it.via), laneAt = []; let from = 0;
+  for (const it of lanes) { const a = alongFrom(it.coords[Math.floor(it.coords.length / 2)], from); laneAt.push(a); from = a; }
+  const lanePts = lanes.flatMap(it => thin(it.coords, 250));
+  const want = [];
+  for (let d = 3000; d < cum.at(-1) - 1500; d += 3000) {
+    const i = cum.findIndex(c => c >= d), p = dense[i];
+    if (!lanePts.some(q => hav(p, q) < 1500)) want.push({ at: d, p });
   }
-  for (let i = 1; i < it.length; i++) { const prev = it[i-1].coords.at(-1); if (hav(prev, it[i].coords.at(-1)) < hav(prev, it[i].coords[0])) it[i].coords.reverse(); }
+  // a drawing that comes back through its start between petals (a clover from a café) comes back there too
+  for (let i = 1, last = -1e9; i < dense.length - 1; i++) {
+    const d = hav(dense[i], sk[0]);
+    if (d < 500 && cum[i] > 2000 && cum[i] < cum.at(-1) - 2000 && cum[i] - last > 3000 && d <= hav(dense[i - 1], sk[0]) && d <= hav(dense[i + 1], sk[0])) { want.push({ at: cum[i], p: sk[0] }); last = cum[i]; }
+  }
+  want.sort((a, b) => a.at - b.at);
+  if (!want.length) return;
+  const snapped = await localRouter.call({ type: "snap", pts: want.map(w => w.p) });
+  const vias = want.map((w, k) => snapped?.[k] && snapped[k].d < 1500 ? { at: w.at, it: { ...itemVia(snapped[k].pt), name: "On your line", drawn: true } } : null).filter(Boolean);
+  if (t !== trip || !vias.length) return;
+  const all = lanes.map((it, k) => ({ at: laneAt[k], it })).concat(vias).sort((a, b) => a.at - b.at);
+  const stopsKept = t.items.filter(it => it.via && !it.drawn && !lanes.includes(it));   // anything else keeps its place at the end of the list
+  t.items = all.map(x => x.it).concat(stopsKept); t.keepOrder = true; built = null; saveTrip();
+}
+// Face each lane the way that joins up best with the ones either side (a route that was tidied already is).
+function orientTrip(t){
+  const it = t.items; if (!it.length || t.tidy) return;
+  const dirs = []; orderCost(it.map(x => orderEnds(x)), t.start, t.finish || (t.loop ? t.start : null), hav, dirs);
+  dirs.forEach((k, i) => { if (k) it[i].coords = it[i].coords.slice().reverse(); });
+}
+
+/* ---------- putting the lanes in a sensible order ----------
+   Tapping lanes adds each one where it adds least, measured in straight lines. After many taps that leaves
+   a route that crosses itself, rides roads twice and turns back on itself, and straight lines hop across
+   water (the Medina between Cowes and East Cowes, say). So after every change the whole route is put in the
+   order, and each lane faced the way, that needs the least road between lanes, measured by road on the
+   phone. The start and finish stay where they are, and a loop still comes back to its start. */
+const roadGap = new Map();   // road metres between two points, "a|b", as the phone's router measured them
+const ptKey = p => p[0].toFixed(5) + "," + p[1].toFixed(5);
+const gapTried = new Set();   // points already measured from (to the points of the route at that time)
+async function measureGaps(pts){
+  const keys = pts.map(ptKey), rows = [];
+  // only from points not measured from before: the new ones measure to all the others, and roads mostly run both
+  // ways, so their figures do for the way back too (a pair with no road between them stays unknown, not re-asked)
+  keys.forEach((k, i) => { if (!gapTried.has(k)) rows.push(i); });
+  if (!rows.length || pts.length > 120) return;
+  const r = await localRouter.call({ type: "matrix", pts, t: tw(), rows }); if (!r) return;
+  for (const i of rows) { gapTried.add(keys[i]); if (r.snap[i] != null) offRoad.set(keys[i], r.snap[i]); r.d[i].forEach((d, j) => { if (i !== j && d != null) roadGap.set(keys[i] + "|" + keys[j], d); }); }
+}
+// A lane end is a dead end when it's well away from any road and no other lane carries on from it: the only way
+// out is back along the lane. The build already rides back that way; tidying treats the lane as there and back
+// from its open end, so it doesn't count on a straight line across the fields from the dead end.
+const offRoad = new Map();   // metres from a point to the nearest road the phone can route on
+function deadEnd(it, p){
+  if ((offRoad.get(ptKey(p)) ?? 0) < 150) return false;
+  const own = new Set(it.ids.map(id => laneOf.get(id) ?? id)), pad = 0.001, bb = [p[0] - pad, p[1] - pad * 1.6, p[0] + pad, p[1] + pad * 1.6];
+  for (const k of cells(bb)) for (const id of grid.get(k) || []) {
+    const w = osmWays.get(id); if (!w || own.has(id) || !CLASSES[w.cls].ride) continue;
+    if (distToLine(p, w.coords) < 30) return false;   // (a lane that meets the middle of another joins it there)
+  }
+  return true;
+}
+function distToLine(p, line){
+  const k = Math.cos(p[0] * Math.PI / 180) * 111320; let best = Infinity;
+  for (let i = 1; i < line.length; i++) {
+    const ax = (line[i - 1][1] - p[1]) * k, ay = (line[i - 1][0] - p[0]) * 111320, dx = (line[i][1] - line[i - 1][1]) * k, dy = (line[i][0] - line[i - 1][0]) * 111320;
+    const L2 = dx * dx + dy * dy, t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
+    best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+  }
+  return line.length === 1 ? hav(p, line[0]) : best;
+}
+const deadEndOf = it => it.via || it.coords.length < 2 ? null : deadEnd(it, it.coords.at(-1)) && !deadEnd(it, it.coords[0]) ? "end" : deadEnd(it, it.coords[0]) && !deadEnd(it, it.coords.at(-1)) ? "start" : null;
+// Where the build would join two points along other lanes (see routeTrip), that's lane riding, which is what
+// the route is for: it counts at 40% of its length, so the order keeps joins along lanes rather than trading
+// them for road. Worked out once per pair of points within 3 km, and kept.
+const laneGap = new Map();
+function laneJoin(a, b){
+  const h = hav(a, b); if (h > 3000) return null;
+  const k = [ptKey(a), ptKey(b)].sort().join("|") + (settings.useUcr ? "" : "-");
+  if (!laneGap.has(k)) { const lp = laneGraphPath(a, b, settings.useUcr, h * 3 + 3000); laneGap.set(k, lp && lp.len <= h * 1.6 + 1000 ? lp.len : null); }
+  return laneGap.get(k);
+}
+function gapFn(){
+  // Two lane ends that touch cost nothing. Most roads run both ways, so a figure measured the other way round
+  // will do; with none, a straight line with a third added for bends.
+  return (a, b) => {
+    const h = hav(a, b); if (h < 30) return 0;
+    const lj = laneJoin(a, b); if (lj != null) return lj * 0.4;
+    const ka = ptKey(a), kb = ptKey(b); return roadGap.get(ka + "|" + kb) ?? roadGap.get(kb + "|" + ka) ?? h * 1.35;
+  };
+}
+// Each item for ordering: its two ends (the same point for a stop, a via or a dead-end lane) and the item itself.
+const orderEnds = (it, pt) => { const a = pt || it.coords[0], b = pt || it.coords.at(-1); return { a, b, one: !!pt || it.coords.length < 2 || hav(a, b) < 1, it }; };
+// The same distances again and again, so each pair is worked out once per tidy (the points are the route's own arrays).
+function memoD(D){
+  const id = new Map(), memo = new Map(), ix = p => { let i = id.get(p); if (i === undefined) id.set(p, i = id.size); return i; };
+  return (a, b) => { const k = ix(a) * 8192 + ix(b); let v = memo.get(k); if (v === undefined) memo.set(k, v = D(a, b)); return v; };
+}
+// The least road for items in a given order: each lane can be ridden either way (a small dynamic programme).
+function orderCost(xs, start, end, D, keep){
+  let c0 = 0, c1 = 0, e0 = null, e1 = null;   // c0: last item ridden as drawn, c1: reversed; e0/e1: where it then ends
+  const back = keep ? [] : null;
+  for (let i = 0; i < xs.length; i++) {
+    const { a, b, one } = xs[i];
+    if (i === 0) { c0 = start ? D(start, a) : 0; c1 = one ? Infinity : start ? D(start, b) : 0; back?.push(0, 0); }
+    else {
+      const p0 = c0 + D(e0, a), p1 = c1 + D(e1, a), q0 = c0 + D(e0, b), q1 = c1 + D(e1, b);
+      back?.push(p0 <= p1 ? 0 : 1, q0 <= q1 ? 0 : 1);
+      c0 = Math.min(p0, p1); c1 = one ? Infinity : Math.min(q0, q1);
+    }
+    e0 = b; e1 = a;
+  }
+  if (end) { c0 += D(e0, end); c1 += D(e1, end); }
+  if (keep) { let k = c0 <= c1 ? 0 : 1; const f = []; for (let i = xs.length - 1; i >= 0; i--) { f[i] = k; k = back[2 * i + k]; } keep.push(...f); }
+  return Math.min(c0, c1);
+}
+// Local search over the order: move a run of one to three items elsewhere, or ride a run backwards.
+function bestOrder(items, start, end, D, allowed = null){
+  let cur = items.slice(), best = orderCost(cur, start, end, D);
+  const tryOrder = o => { if (allowed && !allowed(o)) return false; const c = orderCost(o, start, end, D); if (c < best - 1) { best = c; cur = o; return true; } return false; };
+  for (let pass = 0, better = true; better && pass < 40; pass++) {
+    better = false;
+    for (let len = 1; len <= 3; len++) for (let i = 0; i + len <= cur.length; i++) {
+      const run = cur.slice(i, i + len), rest = cur.slice(0, i).concat(cur.slice(i + len));
+      for (let j = 0; j <= rest.length; j++) if (j !== i && tryOrder(rest.slice(0, j).concat(run, rest.slice(j)))) { better = true; break; }
+    }
+    for (let i = 0; i < cur.length - 1; i++) for (let j = i + 1; j < cur.length; j++)
+      if (tryOrder(cur.slice(0, i).concat(cur.slice(i, j + 1).reverse(), cur.slice(j + 1)))) better = true;
+  }
+  return { order: cur, cost: best };
+}
+function nearestFirst(xs, start, D){   // a second starting point for the search: always ride to the nearest lane next
+  const left = xs.slice(), out = []; let at = start || left[0].a;
+  while (left.length) {
+    let bi = 0, bd = Infinity;
+    left.forEach((x, i) => { const d = Math.min(D(at, x.a), D(at, x.b)); if (d < bd) { bd = d; bi = i; } });
+    const [x] = left.splice(bi, 1); out.push(x);
+    at = D(at, x.a) <= D(at, x.b) ? x.b : x.a;
+  }
+  return out;
+}
+function tidyTrip(t, D0 = gapFn()){
+  if (t.items.length < 2 && !t.start) return false;
+  const D = memoD(D0);
+  // (a dead-end lane has been made there and back already, so it starts and ends at its open end, like a point)
+  const xs = t.items.map(it => orderEnds(it));
+  const end = t.finish || (t.loop ? t.start : null);
+  const before = orderCost(xs, t.start, end, D);
+  // via points you placed keep their order (they set the way round a lake, say); lanes and stops can move
+  const pins = xs.filter(x => x.it.via && !x.it.stop), ok = o => { let k = 0; for (const x of o) if (x === pins[k]) k++; return k === pins.length; };
+  let res = bestOrder(xs, t.start, end, D, pins.length > 1 ? ok : null);
+  if (xs.length > 3) { const nf = nearestFirst(xs, t.start, D); if (pins.length < 2 || ok(nf)) { const alt = bestOrder(nf, t.start, end, D, pins.length > 1 ? ok : null); if (alt.cost < res.cost) res = alt; } }
+  const changed = res.cost < before - 200;   // don't shuffle a route for a few hundred metres
+  let order = changed ? res.order : xs; const faces = [];
+  // a loop (or a route with no fixed ends) costs the same either way round: keep the way round it was going
+  if (changed && pins.length < 2 && (t.loop || (!t.start && !t.finish))) {
+    let fwd = 0, back = 0; const was = new Map(xs.map((x, i) => [x, i]));
+    for (let i = 1; i < order.length; i++) was.get(order[i]) > was.get(order[i - 1]) ? fwd++ : back++;
+    if (back > fwd) order = order.slice().reverse();
+  }
+  orderCost(order, t.start, end, D, faces);
+  faces.forEach((k, i) => { if (k && !order[i].one) order[i].it.coords = order[i].it.coords.slice().reverse(); });
+  t.items = order.map(x => x.it); t.tidy = true;
+  return changed;
+}
+let tidyRun = 0;
+// After a change: measure the road gaps (a second or two for a big route), ride dead-end lanes there and back, then
+// either reorder the whole route (a set of lanes you tapped) or, for a route with an order of its own (drawn, a
+// loop idea, a ready-made ride, a tour day), only fit the lane just added into it. Via points keep their order
+// either way: you put them there to make the route go a certain way.
+async function tidyNow(placed = null){
+  const run = ++tidyRun, t = trip;
+  const pts = [t.start, t.finish].filter(Boolean).concat(t.items.flatMap(it => it.coords.length > 1 ? [it.coords[0], it.coords.at(-1)] : [it.coords[0]]));
+  if (t.items.length > 1 || t.start) { $("#routeStatus").textContent = "Putting the lanes in order…"; await measureGaps(pts); }
+  if (run !== tidyRun || t !== trip) return;
+  const doubled = thereAndBack(t);
+  let moved = doubled;
+  if (!t.keepOrder) moved = tidyTrip(t) || moved;
+  else if (placed && t.items.includes(placed)) moved = placeItem(t, placed) || moved;
+  joinTouching(t);
+  built = null; saveTrip();
+  if (view === "route") { renderRoute(); drawRoute(); }
+  buildSoon(moved ? 50 : 300);
+}
+// A lane that stops short of any road, with no other lane carrying on from it, can only be ridden in and back out:
+// make that part of the route itself, so the GPX and the ride screen follow the lane back instead of a straight
+// line across the fields to the next road.
+function thereAndBack(t){
+  let n = 0;
+  for (const it of t.items) {
+    if (it.there || it.via) continue;
+    const de = deadEndOf(it); if (!de) continue;
+    if (de === "start") it.coords = it.coords.slice().reverse();
+    it.coords = it.coords.concat(it.coords.slice(0, -1).reverse()); it.there = true; n++;
+  }
+  return n > 0;
+}
+// Pieces of one lane that end up next to each other, end to start, become one row (Red Lane in three pieces is Red Lane)
+function joinTouching(t){
+  for (let i = t.items.length - 1; i > 0; i--) {
+    const a = t.items[i - 1], b = t.items[i];
+    if (a.via || b.via || a.there || b.there || a.cls !== b.cls || hav(a.coords.at(-1), b.coords[0]) > 30) continue;
+    if (a.name !== b.name && !/^Unnamed/.test(a.name) && !/^Unnamed/.test(b.name)) continue;
+    a.coords = a.coords.concat(b.coords.slice(1)); a.ids.push(...b.ids); if (/^Unnamed/.test(a.name)) a.name = b.name;
+    t.items.splice(i, 1);
+  }
+}
+// Fit one item into a route that keeps its order: where it adds the least, facing the way that fits.
+function placeItem(t, item){
+  const D = memoD(gapFn()), i0 = t.items.indexOf(item); t.items.splice(i0, 1);
+  const end = t.finish || (t.loop ? t.start : null); let best = { cost: Infinity, pos: i0, rev: false };
+  for (let pos = 0; pos <= t.items.length; pos++) {
+    const prev = pos === 0 ? t.start : t.items[pos - 1].coords.at(-1), next = pos === t.items.length ? end : t.items[pos].coords[0];
+    for (const rev of [false, true]) {
+      const a = rev ? item.coords.at(-1) : item.coords[0], b = rev ? item.coords[0] : item.coords.at(-1);
+      const cost = (prev ? D(prev, a) : 0) + (next ? D(b, next) : 0) - (prev && next ? D(prev, next) : 0);
+      if (cost < best.cost - 1) best = { cost, pos, rev };
+    }
+  }
+  if (best.rev) item.coords = item.coords.slice().reverse();
+  t.items.splice(best.pos, 0, item);
+  return best.pos !== i0 || best.rev;
 }
 
 /* ---------- roads between lanes: BRouter with our motorbike profile, OSRM as a fallback ---------- */
@@ -1150,6 +1624,39 @@ async function brouterProfile(fresh){
   const r = await polite("brouter", "https://brouter.de/brouter/profile", { method: "POST", body: MOTO_PROFILE, headers: { "Content-Type": "text/plain" } }, { cache: false });
   const j = JSON.parse(r.text); if (j.error || !j.profileid) throw new Error(j.error || "no profile id");
   store.set("brouterProfile2", { id: j.profileid, t: Date.now() }); return j.profileid;
+}
+/* ---------- routing on the phone ----------
+   Roads between lanes are worked out on the phone from our own road tiles (data/roads/, built by
+   experiments/local-routing/build_road_graph.py), in a background worker, with the same costs as the app's BRouter
+   profile. So planning works without the public servers and with no signal, for any area whose tiles the phone has.
+   BRouter and OSRM are only asked where the tiles can't be had. */
+const localRouter = (() => {
+  let w = null, seq = 0, broken = false; const wait = new Map();
+  const start = () => {
+    try { w = new Worker("js/route-worker.js"); w.onmessage = e => { const f = wait.get(e.data.id); wait.delete(e.data.id); f?.(e.data.r); }; w.onerror = () => { broken = true; for (const f of wait.values()) f(null); wait.clear(); }; }
+    catch { broken = true; }
+  };
+  const call = msg => new Promise(res => {
+    if (!w && !broken) start(); if (broken || !w) return res(null);
+    const id = ++seq; wait.set(id, res); w.postMessage({ ...msg, id });
+    setTimeout(() => { if (wait.has(id)) { wait.delete(id); res(null); } }, 30000);
+  });
+  return { route: (a, b, t) => call({ type: "route", a, b, t }), has: p => call({ type: "has", p }), call };
+})();
+async function localLink(a, b){
+  const r = await localRouter.route(a, b, tw());
+  if (!r || !r.coords?.length) return null;
+  return { coords: [a, ...r.coords, b], ok: true, jumpA: r.snapA, jumpB: r.snapB, via: "this phone", ferry: !!r.ferry };
+}
+// the quick check of a loop idea's roads (what OSRM did): quickest roads between each lane and the next
+async function localLegs(sk, chain){
+  const pts = [sk[0]]; for (const n of chain) pts.push(n.a, n.b); pts.push(isLoop(sk) ? sk[0] : sk.at(-1));
+  const dist = [], snap = [], geom = [], ferry = [];
+  for (let k = 0; k < pts.length; k += 2) {
+    const r = await localRouter.route(pts[k], pts[k + 1], tw()); if (!r) return null;   // the same roads the route will take, so the card's figures hold
+    dist.push(r.len); snap.push(r.snapA, r.snapB); geom.push(r.coords); ferry.push(!!r.ferry);
+  }
+  return { pts, dist, snap, geom, ferry };
 }
 // One road link, lane end to next lane start. Answers are cached, so edits only re-route the links that changed.
 async function brLink(a, b){
@@ -1196,7 +1703,9 @@ async function routeTrip(t, alive, onLink){
     let r;
     if (lp && lp.len <= straight * 1.6 + 1000) r = { coords: lp.coords, ok: true, jump: 0, via: "lanes", lanes: true };
     else {
-      r = { ...((await brLink(l[0], l[1])) || (await osrmLink(l[0], l[1]))) };
+      // the phone's own router first; the servers only with a signal (with none they'd only queue up and fail)
+      r = { ...((await localLink(l[0], l[1])) || (navigator.onLine ? (await brLink(l[0], l[1])) || (await osrmLink(l[0], l[1]))
+        : { coords: [l[0], l[1]], ok: false, jumpA: 0, jumpB: 0, via: "none", offline: true })) };   // counted as "no signal", not as a gap
       // A point off the road (a town centre, a pass, a pub) is reached by the road nearest it: drop the straight
       // line out to it, which would put a spike in the GPX. A lane end off the road keeps its line, and counts as a gap.
       if (r.ok) { if (aPoint && r.jumpA > 25) r.coords = r.coords.slice(1); if (bPoint && r.jumpB > 25) r.coords = r.coords.slice(0, -1); }
@@ -1214,23 +1723,33 @@ async function routeTrip(t, alive, onLink){
   const off = segs.filter(isOff).reduce((a, s) => a + lineLen(s.coords), 0);
   const roadM = segs.filter(s => !isOff(s)).reduce((a, s) => a + lineLen(s.coords), 0);
   const vias = [...new Set(segs.filter(s => s.type === "road" && !s.lanes).map(s => s.via))].filter(v => v !== "none");
-  return { segs, off, road: roadM, joinM: segs.filter(s => s.lanes).reduce((a, s) => a + lineLen(s.coords), 0), total: off + roadM, hours: hoursOf(off, roadM),
+  const ferries = segs.filter(s => s.ferry).length;   // a crossing is about 45 minutes with the wait and boarding, not road riding
+  return { segs, off, road: roadM, joinM: segs.filter(s => s.lanes).reduce((a, s) => a + lineLen(s.coords), 0), total: off + roadM, hours: hoursOf(off, roadM) + 0.75 * ferries,
     bend: bendiness(segs.filter(s => s.type === "road" && !s.lanes).map(s => s.coords)),
     jumps: segs.filter(s => s.type === "road" && s.jump > 100).length, failed: segs.filter(s => s.type === "road" && s.ok === false).length,
     via: vias.join(" and ") || "none needed", twisty: settings.twisty };
 }
-let buildRun = 0, buildTimer;
+let buildRun = 0, buildTimer, nearAdded = null;
 function buildSoon(ms = 900){ clearTimeout(buildTimer); buildTimer = setTimeout(build, ms); }
 async function build(){
   const run = ++buildRun;
   if (!trip.items.length) return;
   $("#gpxBtn").disabled = true;
+  // a route saved for no signal opens from its saved line, with no routing at all
+  const kept = typeof Offline !== "undefined" && await Offline.keptBuilt(trip);
+  if (run !== buildRun) return;
+  if (kept) { built = kept; saveTrip(); drawRoute(); renderRoute(); findRouteStops(); $("#routeStatus").textContent = "Saved on this phone for no signal."; return; }
   const todo = tripLinks(trip).filter(Boolean).length; let done = 0;
   const say = n => (built?.provisional ? "Rough figures on the quickest roads. Finding the twisty roads" : "Finding roads between the lanes") + ` (${n} of ${todo})…`;
   $("#routeStatus").textContent = todo ? say(0) : "";
   const b = await routeTrip(trip, () => run === buildRun, () => { if (run === buildRun) $("#routeStatus").textContent = say(++done); });
   if (!b) return;
   built = b; saveTrip(); drawRoute(); renderRoute(); findRouteStops();
+  if (nearAdded && !$("#undoBar").hidden) $("#undoText").textContent = `Added ${nearAdded.n} lane${nearAdded.n > 1 ? "s" : ""}: ${km(b.off - nearAdded.off)} km more off-road, ${km(b.total - b.off - nearAdded.road)} km more road, ${hm(b.hours)} riding now`;
+  nearAdded = null;
+  // a saved copy of this route keeps the figures it has now
+  const all = store.get("saved", []), mine = all.find(o => o.trip && o.name === trip.name && tripSig(o.trip) === tripSig(trip));
+  if (mine) { mine.summary = `${km(b.total)} km, ${hm(b.hours)}`; store.set("saved", all); }
 }
 // Degrees of turning per km, sampled every 20 m so GPS jitter doesn't count.
 function bendiness(lines){
@@ -1248,7 +1767,13 @@ function bendiness(lines){
 const bendLabel = b => !b ? "–" : b < 90 ? "Straight" : b < 160 ? "Bendy" : "Twisty";
 function drawBuilt(layer, t, b, bold, numbers = bold, col = "#c2185b"){
   const R = routeRenderer, op = bold ? 1 : .45, numPlaced = [];
-  if (b) for (const s of b.segs) if (s.type === "road") {
+  // a road ride (Scotland: only waypoints, no lanes) is all road, so its roads are the route itself: drawn solid, not as links
+  const roadRide = t.items.length && t.items.every(it => it.via);
+  if (b && roadRide) for (const s of b.segs) if (s.type === "road") {
+    if (bold) L.polyline(s.coords, { color: "#fff", weight: 9, interactive: false, renderer: R }).addTo(layer);
+    L.polyline(s.coords, { color: col, weight: bold ? 5 : 3, opacity: op, interactive: false, renderer: R }).addTo(layer);
+  }
+  if (b && !roadRide) for (const s of b.segs) if (s.type === "road") {
     if (s.lanes) { if (bold) L.polyline(s.coords, { color: "#fff", weight: 9, interactive: false, renderer: R }).addTo(layer); L.polyline(s.coords, { color: col, weight: bold ? 5 : 3, opacity: op, interactive: false, renderer: R }).addTo(layer); }
     else L.polyline(s.coords, { color: col, weight: bold ? 4 : 2.5, opacity: bold ? .9 : .4, dashArray: s.ok === false ? "2 7" : "9 6", interactive: false, renderer: R }).addTo(layer);
   }
@@ -1266,57 +1791,128 @@ function drawRoute(){
   routeLayer.clearLayers();
   if (view !== "route" || !trip.items.length) return;
   drawBuilt(routeLayer, trip, built, true);
+  if (built) drawArrows(routeLayer, built);
   if (trip.start) flag(trip.start, trip.loop ? "START / FINISH" : "START").addTo(routeLayer);
   if (trip.finish) flag(trip.finish, "FINISH").addTo(routeLayer);
   // A round handle on each road stretch: drag it onto a green lane to take the route that way,
   // or anywhere else to make the road pass through that spot.
-  if (built && !built.provisional) for (const s of built.segs) {
-    if (s.type !== "road" || lineLen(s.coords) < 300) continue;
-    let half = lineLen(s.coords) / 2, at = s.coords[0];
+  // (only from zoom 13: further out they'd cover the route, and a finger can't place a lane that precisely)
+  if (built && !built.provisional && map.getZoom() >= 13 && !(typeof Ride !== "undefined" && Ride.on)) for (const s of built.segs) {
+    const len = lineLen(s.coords); if (s.type !== "road" || len < 300) continue;
+    // one handle in the middle of a short stretch, one every 5 km or so on a long one
+    const n = Math.max(1, Math.round(len / 5000));
+    for (let h = 1; h <= n; h++) {
+    let half = len * h / (n + 1), at = s.coords[0];
     for (let i = 1; i < s.coords.length; i++) { const d = hav(s.coords[i - 1], s.coords[i]); if (d >= half) { const f = half / d; at = [s.coords[i-1][0] + (s.coords[i][0] - s.coords[i-1][0]) * f, s.coords[i-1][1] + (s.coords[i][1] - s.coords[i-1][1]) * f]; break; } half -= d; }
-    dragMarker(at, "", (w, p, st) => { st ? insertAt(s.link, itemStop(st)) : w ? insertAt(s.link, itemFromWay(w)) : insertAt(s.link, itemVia(p)); status(st ? `Added ${stopName(st)}` : w ? `Added ${laneName(w.tags)}` : "Added a via point"); }).addTo(routeLayer);
+    dragMarker(at, "", (w, p, st) => { st ? insertAt(s.link, itemStop(st)) : w ? insertAt(s.link, itemFromWay(w)) : onRoad(p).then(q => insertAt(s.link, itemVia(q))); status(st ? `Added ${stopName(st)}` : w ? `Added ${laneName(w.tags)}` : "Added a via point"); }).addTo(routeLayer);
+    }
   }
   trip.items.forEach((it, i) => {
     if (!it.via) return;
-    dragMarker(it.coords[0], "via", (w, p, st) => {
+    dragMarker(it.coords[0], it.drawn ? "via small" : "via", (w, p, st) => {
       if (st) insertAt(i, itemStop(st), true);
       else if (w) insertAt(i, itemFromWay(w), true);
-      else { Object.assign(it, itemVia(p)); delete it.stop; built = null; saveTrip(); renderRoute(); drawRoute(); build(); }
+      else onRoad(p).then(q => { Object.assign(it, itemVia(q)); delete it.stop; built = null; saveTrip(); renderRoute(); drawRoute(); build(); });
     }, it.stop ? `<div class="poi-pin via-stop">${poiBadge(it.stop.code)}</div>` : null).addTo(routeLayer);
   });
+}
+// Lanes near the route that are worth tacking on: at least 300 m long, within about 3 km of it, and needing less
+// extra road than 70% of the lane's length (800 m for short ones), judged by where each would fit best in the order.
+function nearbyLanes(t, b){
+  const line = b.segs.flatMap(sg => sg.coords), seen = new Set(), out = [], pad = 0.027;
+  const D = gapFn(), end = t.finish || (t.loop ? t.start : null);
+  const ends = [t.start, ...t.items.map(it => it.coords[0]), ...t.items.map(it => it.coords.at(-1))];
+  for (let i = 0; i < line.length; i += 10) {
+    const p = line[i];
+    for (const k of cells([p[0] - pad, p[1] - pad * 1.6, p[0] + pad, p[1] + pad * 1.6])) for (const id of grid.get(k) || []) {
+      if (seen.has(id)) continue; seen.add(id);
+      const w = osmWays.get(id);
+      if (!w || !CLASSES[w.cls].ride || w.len < 300 || inRoute(id) || t.declined?.includes(id) || window.COUNCIL_FLAGS?.ways?.[id] || w.season?.soon) continue;
+      if (!settings.useUcr && (w.cls === "ucr" || w.cls === "tro")) continue;
+      let extra = Infinity;
+      for (let pos = 0; pos <= t.items.length; pos++) {
+        const prev = pos === 0 ? t.start : t.items[pos - 1].coords.at(-1), next = pos === t.items.length ? end : t.items[pos].coords[0];
+        for (const [a, c] of [[w.coords[0], w.coords.at(-1)], [w.coords.at(-1), w.coords[0]]]) {
+          const e = (prev ? D(prev, a) : 0) + (next ? D(c, next) : 0) - (prev && next ? D(prev, next) : 0);
+          if (e < extra) extra = e;
+        }
+      }
+      if (extra <= Math.max(800, w.len * 0.7) && ends.every(q => !q || hav(q, w.coords[0]) > 30 || hav(q, w.coords.at(-1)) > 30)) out.push({ w, extra: Math.max(0, extra) });
+    }
+  }
+  return out.sort((a, c) => a.extra / a.w.len - c.extra / c.w.len).slice(0, 6);   // a few at a time: the best value first
+}
+// Arrows along the whole ride, about every 110 px at this zoom (at most 300), so you can see which way it goes.
+function drawArrows(layer, b){
+  const line = b.segs.flatMap(sg => sg.coords); if (line.length < 2) return;
+  const total = lineLen(line), mpp = 40075016 * Math.cos(map.getCenter().lat * Math.PI / 180) / 2 ** (map.getZoom() + 8);
+  const step = Math.max(130 * mpp, total / 300);
+  let next = step / 2, along = 0;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1], c = line[i], d = hav(a, c);
+    while (d > 0 && along + d >= next) {
+      const f = (next - along) / d;
+      const pa = map.latLngToContainerPoint(a), pc = map.latLngToContainerPoint(c), deg = Math.atan2(pc.y - pa.y, pc.x - pa.x) * 180 / Math.PI;
+      // a little to the left of the line (the side you ride on), so on a there-and-back the two ways sit side by side
+      const len = Math.hypot(pc.x - pa.x, pc.y - pa.y) || 1, px = pa.x + (pc.x - pa.x) * f + (pc.y - pa.y) / len * 11, py = pa.y + (pc.y - pa.y) * f - (pc.x - pa.x) / len * 11;
+      const at = map.containerPointToLatLng([px, py]);
+      L.marker(at, { interactive: false, keyboard: false, pane: "route", icon: L.divIcon({ className: "", iconSize: [0, 0],
+        html: `<svg class="route-arrow" width="18" height="18" viewBox="0 0 22 22" style="transform:translate(-50%,-50%) rotate(${deg.toFixed(0)}deg)"><path d="M7 4l8 7-8 7" fill="none" stroke="#5b0a2c" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 4l8 7-8 7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>` }) }).addTo(layer);
+      next += step;
+    }
+    along += d;
+  }
+}
+// A via point dropped on a hillside goes onto the nearest road within 500 m; otherwise the route would ride to the
+// nearest road and back, a spur nobody asked for.
+async function onRoad(p){
+  const r = await localRouter.call({ type: "snap", pts: [p] });
+  return r?.[0] && r[0].d < 500 ? r[0].pt : p;
 }
 function routeWarnings(b, t = trip){
   const warn = [];
   const flagged = t.items.filter(it => it.ids?.some(id => window.COUNCIL_FLAGS?.ways?.[id]));
   if (flagged.length) warn.push(`The council says ${flagged.length > 1 ? `${flagged.length} of these lanes aren't` : `${flagged[0].name} isn't`} open to motors. Take ${flagged.length > 1 ? "them" : "it"} out.`);
   const closing = t.items.filter(it => it.ids?.some(id => { const w = osmWays.get(laneOf.get(id) ?? id); return w?.season?.soon; }));
-  if (closing.length) warn.push(`${closing.length > 1 ? `${closing.length} lanes close` : `${closing[0].name} closes`} to motor vehicles for the winter within the next fortnight. Check the dates before you ride.`);
+  if (closing.length) {
+    const said = closing.slice(0, 3).map(it => { const w = osmWays.get(laneOf.get(it.ids[0]) ?? it.ids[0]); return `${it.name} (row ${t.items.indexOf(it) + 1}${w?.season ? `, closed ${w.season.text}` : ""})`; });
+    warn.push(`Closing to motor vehicles for the winter within the next fortnight: ${said.join("; ")}${closing.length > 3 ? ` and ${closing.length - 3} more` : ""}. Take ${closing.length > 1 ? "them" : "it"} out if you're riding after that.`);
+  }
   if (b?.jumps && t === trip) {
     const gaps = b.segs.filter(sg => sg.type === "road" && sg.jump > 100), worst = gaps.reduce((a, g) => g.jump > a.jump ? g : a, gaps[0]);
     warn.push(`${b.jumps === 1 ? "A lane end is" : `${b.jumps} lane ends are`} off the road network, so the GPX draws a straight line there${b.jumps > 1 ? `, the longest ${km(worst.jump)} km` : ` of ${km(worst.jump)} km`}. <a href="#" data-gap>Show me</a>`);
   } else if (b?.jumps) warn.push(`${b.jumps} gap${b.jumps > 1 ? "s" : ""} over 100 m from a road: the GPX draws a straight line there.`);
+  const ferries = b?.segs?.filter(sg => sg.ferry).length || 0;
+  if (ferries) warn.push(`This route crosses by ferry ${ferries === 1 ? "once" : ferries + " times"}; the time allows 45 minutes a crossing. Check the sailings and book for the bike.`);
   const fallback = b?.segs?.filter(sg => sg.type === "road" && sg.via === "OSRM").length || 0;
-  if (fallback && t === trip) warn.push(`The twisty-roads server was busy, so ${fallback} road stretch${fallback > 1 ? "es use" : " uses"} the quickest roads instead. <a href="#" data-retry>Try again</a>`);
+  if (fallback && t === trip && !t.keepOrder) warn.push(`The twisty-roads server was busy, so ${fallback} road stretch${fallback > 1 ? "es use" : " uses"} the quickest roads instead. <a href="#" data-retry>Try again</a>`);
   const instead = b?.segs?.filter(sg => sg.instead).length || 0;
   if (instead) warn.push(`The road servers didn't answer for ${instead} stretch${instead > 1 ? "es" : ""}, so ${instead > 1 ? "they follow" : "it follows"} other lanes instead of roads.`);
-  if (b?.failed) warn.push(`${b.failed} road link${b.failed > 1 ? "s" : ""} couldn't be routed.`);
+  const noSignal = b?.segs?.filter(sg => sg.offline).length || 0;
+  if (noSignal) warn.push(`${noSignal} road link${noSignal > 1 ? "s" : ""} couldn't be planned: there's no signal, and the roads there aren't saved on this phone. ${noSignal > 1 ? "They show" : "It shows"} as straight lines until you have a signal.`);
+  if (b?.failed > noSignal) warn.push(`${b.failed - noSignal} road link${b.failed - noSignal > 1 ? "s" : ""} couldn't be routed.`);
   return warn;
 }
 function renderRoute(){
   $("#routeName").value = trip.name;
+  if (sheet.dataset.state === "min") $("#handleText").textContent = "▲ " + minLabel();   // the lowered panel's title carries the distance
+  $("#rStartBtn").textContent = trip.start ? "⚑ Change where it starts" : "⚑ Set where it starts"; $("#rLoop").checked = !!trip.loop;
+  $("#backBtn").hidden = !!trip.loop;   // a loop comes back already
   $("#editingBar").hidden = editingDay == null;
   $("#routeBack").hidden = editingDay != null;
-  $("#routeBack").textContent = lastKind && ideas.length ? "← Change the plan" : routeFrom.kind === "region" && regionBySlug(routeFrom.slug) ? `← ${regionBySlug(routeFrom.slug).name}` : `← ${{ plan: "Explore", start: "Plan", saved: "Saved", help: "Help", region: "Back" }[lastBrowse] || "Back"}`;
-  if (editingDay != null) $("#editingText").textContent = `Editing day ${editingDay + 1} of your tour`;
+  $("#routeBack").textContent = lastKind && ideas.length ? "← Route ideas" : routeFrom.kind === "region" && regionBySlug(routeFrom.slug) ? `← ${regionBySlug(routeFrom.slug).name}` : routeFrom.kind === "lanes" ? "← Find lanes" : `← ${{ plan: "Explore", start: "Plan", saved: "Saved", help: "Help", region: "Back" }[lastBrowse] || "Back"}`;
+  if (editingDay != null) $("#editingText").textContent = `Editing day ${editingDay + 1}`;
   const off = trip.items.reduce((t, it) => t + lineLen(it.coords), 0);
   $("#stTime").textContent = built ? hm(built.hours) : "…";
   $("#stKm").textContent = built ? km(built.total) : "…";
-  $("#stLane").textContent = built ? Math.round(100 * built.off / built.total) + "%" : km(off) + " km";
+  $("#stLane").textContent = built ? Math.round(100 * built.off / built.total) + "%" : "…";
   $("#stTwist").textContent = built ? bendLabel(built.bend) : "…";
   $("#gpxBtn").disabled = !built || !!built.provisional;
+  $("#saveBtn").disabled = !built;   // saved with its distance and time, once the route is worked out
+  $("#rideBtn").disabled = !built || !!built.provisional;
   $("#vRoute .bigstats").classList.toggle("rough", !!built?.provisional);   // rough figures look rough until the real ones arrive
   const nLanes = trip.items.filter(it => !it.via).length;
-  const amber = trip.items.filter(it => it.cls === "ucr" || it.cls === "tro").length;
+  const amber = trip.items.filter(it => it.cls === "ucr" || (it.cls === "tro" && it.kind !== "BOAT")).length;   // (a byway with a seasonal order is still a byway)
   $("#dropUcr").hidden = settings.useUcr || !amber;
   $("#dropUcr").textContent = `Take out the ${amber} unclassified road${amber === 1 ? "" : "s"} already in this route`;
   $("#routeStatus").textContent = built?.provisional ? "Rough figures on the quickest roads. Finding the twisty roads…" : built ? `${nLanes} lane${nLanes !== 1 ? "s" : ""} · ${km(built.off)} km off-road` : "Finding roads between the lanes…";
@@ -1330,11 +1926,25 @@ function renderRoute(){
     const c = g.coords, ends = hav(c[0], c[1]) > hav(c.at(-2), c.at(-1)) ? [c[0], c[1]] : [c.at(-2), c.at(-1)];
     if (phone()) setSheet("min"); fitMap(L.latLngBounds(ends).pad(0.6), { maxZoom: 16 });
   }; $("#routeWarn").hidden = !warn.length;
+  if (typeof Offline !== "undefined") Offline.refreshButton();
+  const near = built && !built.provisional && editingDay == null ? nearbyLanes(trip, built) : [];
+  $("#nearBtn").hidden = !near.length;
+  if (near.length) {
+    const laneKm = near.reduce((a, n) => a + n.w.len, 0), roadKm = near.reduce((a, n) => a + n.extra, 0);
+    $("#nearBtn").textContent = `+ Add ${near.length} lane${near.length > 1 ? "s" : ""} close to this route (${km(laneKm)} km of lanes)`;
+    $("#nearBtn").onclick = () => {
+      const before = clone(trip), was = { off: built.off, road: built.total - built.off, n: near.length };
+      for (const n of near) { const it = itemFromWay(n.w); trip.items.push(it); if (trip.keepOrder) placeItem(trip, it); }
+      trip.tidy = false; built = null; saveTrip(); renderRoute(); drawRoute(); tidyNow();
+      nearAdded = was;   // the Undo bar gives the real difference once the route is rebuilt
+      undoBar(`Added ${near.length} lane${near.length > 1 ? "s" : ""}…`, () => { nearAdded = null; trip = before; built = null; saveTrip(); renderRoute(); drawRoute(); buildSoon(300); }, null, 10000);
+    };
+  }
   const ul = $("#laneList"); ul.innerHTML = "";
   trip.items.forEach((it, i) => {
     const li = document.createElement("li");
     const col = it.cls === "file" ? "#0e7490" : it.stop ? GROUPS[CODE[it.stop.code]?.g]?.color || "#5d5848" : it.via ? "#5d5848" : css(CLASSES[it.cls]?.color || "--ucr");
-    li.innerHTML = `<span class="num">${i + 1}</span><span class="grow"><span class="t">${esc(it.name)}</span><br><span class="s"><span class="chip" style="background:${col}">${esc(it.kind)}</span> ${it.stop ? "stop on the way" : it.via ? "the road passes through here" : km(lineLen(it.coords)) + " km"}${it.surface ? " · " + esc(it.surface) : ""}</span></span>`;
+    li.innerHTML = `<span class="num">${i + 1}</span><span class="grow"><span class="t">${esc(it.name)}</span><br><span class="s"><span class="chip" style="background:${col}">${esc(it.kind)}</span> ${it.stop ? "stop on the way" : it.via ? "the road passes through here" : km(lineLen(it.coords)) + " km" + (it.there ? ` (dead end: ${km(lineLen(it.coords) / 2)} km each way, there and back)` : "")}${it.surface ? " · " + esc(it.surface) : ""}</span></span>`;
     li.querySelector(".grow").onclick = () => { if (phone()) setSheet("min"); it.via ? map.setView(it.coords[0], 15) : fitMap(L.latLngBounds(it.coords).pad(0.3), { maxZoom: 15 }); };
     const x = document.createElement("button"); x.className = "x"; x.textContent = "✕"; x.setAttribute("aria-label", "Take out " + it.name);
     x.onclick = () => removeItem(i);
@@ -1342,12 +1952,27 @@ function renderRoute(){
   });
   renderStops();
 }
-$("#routeName").oninput = e => { trip.name = e.target.value || "My route"; saveTrip(); };
+$("#routeName").oninput = e => { trip.name = e.target.value || "My route"; saveTrip(); $("#offlineNote").hidden = true; if (typeof Offline !== "undefined") Offline.refreshButton(); };
 $("#dropUcr").onclick = () => {
-  trip.items = trip.items.filter(it => it.via || !(it.cls === "ucr" || it.cls === "tro"));
+  trip.items = trip.items.filter(it => it.via || !(it.cls === "ucr" || (it.cls === "tro" && it.kind !== "BOAT")));
   built = null; saveTrip();
   if (!trip.items.length) { showView("plan", "peek"); return; }
   renderRoute(); drawRoute(); build();
+};
+// Where a route of tapped lanes starts, and whether it comes back there: the order is then worked out from it
+$("#rStartBtn").onclick = () => pickSpot("Tap the map where the route starts", (p, name) => {
+  trip.start = p; if (!trip.finish) trip.loop = $("#rLoop").checked; built = null; saveTrip();
+  showView("route", "mid"); renderRoute(); tidyNow(); status(`Starts at ${name || "the spot you tapped"}`, 3000);
+});
+$("#rLoop").onchange = e => { trip.loop = e.target.checked; if (trip.loop) trip.finish = null; built = null; saveTrip(); renderRoute(); tidyNow(); };
+// Come back the same way: the route out, then the same lanes back in reverse, finishing where it began
+$("#backBtn").onclick = () => {
+  if (!trip.items.length) return;
+  const back = trip.items.slice().reverse().map(it => ({ ...clone(it), coords: it.coords.slice().reverse() }));
+  const start = trip.start || trip.items[0].coords[0];
+  trip.items = trip.items.concat(back); trip.start = start; trip.finish = null; trip.loop = true; trip.keepOrder = true;
+  if (!/there and back/.test(trip.name)) trip.name += ", there and back";
+  built = null; saveTrip(); renderRoute(); drawRoute(); build();
 };
 $("#revBtn").onclick = () => {
   trip.items.reverse(); trip.items.forEach(it => it.coords = it.coords.slice().reverse());
@@ -1369,10 +1994,19 @@ document.querySelectorAll("#routeTabs button").forEach(b => b.onclick = () => {
   $("#rtLanes").hidden = b.dataset.rt !== "lanes"; $("#rtStops").hidden = b.dataset.rt !== "stops";
   if (b.dataset.rt === "stops" && !stops) loadStops().then(findRouteStops); else renderStops();
 });
+$("#editingBack").onclick = () => {   // back to the tour, keeping what you changed (Undo puts the day back as it was)
+  if (editingDay == null) return;
+  const d = editingDay, changed = tour && tripSig(tour.days[d].trip) !== tripSig(trip);
+  if (!changed) { editingDay = null; trip = dayBefore || newTrip(); dayBefore = null; built = null; saveTrip(); showView("tour", "mid"); renderTour(); return; }
+  const old = clone(tour.days[d]), wasEdited = tour.edited;
+  $("#editingSave").click();
+  undoBar(`Day ${d + 1} saved to your tour`, () => { if (!tour?.days[d]) return; tour.days[d] = old; tour.edited = wasEdited; saveTour(); renderTour(); }, null, 8000);
+};
 $("#editingSave").onclick = () => {
   if (editingDay == null || !tour) return;
-  const d = tour.days[editingDay]; d.trip = clone(trip); d.built = built; d.stops = routeStops;
-  saveTour(); editingDay = null; trip = newTrip(); built = null; saveTrip();
+  const d = tour.days[editingDay]; if (tripSig(d.trip) !== tripSig(trip)) tour.edited = true;   // saving an unchanged day isn't an edit
+  d.trip = clone(trip); d.built = built; d.stops = routeStops;
+  saveTour(); editingDay = null; trip = dayBefore || newTrip(); dayBefore = null; built = null; saveTrip();
   showView("tour", "mid"); renderTour(); status("Saved to your tour");
 };
 
@@ -1405,7 +2039,7 @@ function stopsAlong(b){
 }
 async function findRouteStops(){
   if (!built) return;
-  if (!stops) { await loadStops(); if (!stops) return; }
+  if (!stops) { await loadStops(); if (!stops || !built) return; }   // (the route may be being rebuilt by now)
   const r = stopsAlong(built);
   routeStops = r.list; built.fuelGap = r.fuelGap; built.fuelCount = r.fuelCount;
   renderStops(); drawRouteStops();
@@ -1420,7 +2054,7 @@ function drawRouteStops(){
 }
 function renderStops(){
   if (!built || !stops) { $("#stopList").innerHTML = `<li class="muted">${built ? "Loading stops…" : "Stops appear once the route is ready."}</li>`; $("#fuelNote").textContent = ""; $("#stopChips").innerHTML = ""; return; }
-  $("#stopChips").innerHTML = `<span class="small muted">Showing the kinds turned on under the search box.</span>`;
+  $("#stopChips").innerHTML = `<span class="small muted">Showing the kinds turned on with Show, at the top of the map.</span>`;
   $("#fuelNote").textContent = built.fuelCount === 0 ? "No fuel within 2 km of this route. Fill up before you set off."
     : `Longest stretch without fuel: ${km(built.fuelGap)} km.` + (built.fuelGap > 150000 ? " That's a long way on a small tank." : "");
   const ul = $("#stopList"); ul.innerHTML = "";
@@ -1430,7 +2064,7 @@ function renderStops(){
     const s = stops[r.i];
     const li = document.createElement("li");
     const planned = trip.items.findIndex(it => it.stop && hav(it.coords[0], [s.lat, s.lng]) < 5);
-    li.innerHTML = `${poiBadge(s.code)}<span class="grow" role="button" tabindex="0"><span class="t">${esc(stopName(s))}</span><br><span class="s">${esc(CODE[s.code].one)} · ${km(r.along)} km${built?.total && r.along > 1000 ? ", about " + hm(built.hours * r.along / built.total) : ""} in · ${r.off < 60 ? "on the route" : Math.round(r.off / 10) * 10 + " m off"}</span></span>`;
+    li.innerHTML = `${poiBadge(s.code)}<span class="grow" role="button" tabindex="0"><span class="t">${esc(stopName(s))}</span><br><span class="s">${s.name ? esc(CODE[s.code].one) + " · " : ""}${r.along < 500 ? "at the start" : `${km(r.along)} km along${built?.total ? `, about ${mins(built.hours * r.along / built.total)} in` : ""}`} · ${r.off < 60 ? "on the route" : r.off < 950 ? Math.round(r.off / 50) * 50 + " m off it" : km(r.off) + " km off it"}</span></span>`;
     // tap the row to see the place on the map; the button makes it a planned stop the route goes through (or takes it out)
     li.querySelector(".grow").onclick = () => {
       if (phone()) setSheet("min");
@@ -1465,8 +2099,9 @@ function gpxText(title, parts){
   const budget = Math.floor(9000 / parts.length);   // older Garmins cut tracks at 10,000 points
   parts.forEach((p, n) => {
     if (n === 0 && p.trip.start) w.push(`<wpt lat="${f(p.trip.start[0])}" lon="${f(p.trip.start[1])}"><name>Start</name><sym>Flag, Blue</sym></wpt>`);
-    let laneNo = 0;   // lanes numbered L1, L2… on their own, so a stop in between doesn't leave a gap
-    p.trip.items.forEach((it, i) => { if (!it.via) laneNo++; const ln = laneNo; w.push(it.stop ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}${it.kind}: ${it.name}`.replace(`${it.kind}: ${it.kind}`, it.kind).slice(0, 40))}</name><sym>${CODE[it.stop.code]?.sym || "Waypoint"}</sym></wpt>`
+    // lanes are numbered as on the map and in the list (L3 is the third row), so the GPX and the app agree
+    p.trip.items.forEach((it, i) => { const ln = i + 1; w.push(it.stop ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}Stop: ${it.name}`.slice(0, 40))}</name><desc>${x(it.kind)}, a stop you chose</desc><sym>${CODE[it.stop.code]?.sym || "Waypoint"}</sym></wpt>`
+      : it.drawn ? ""   // the points that keep a drawn route to its line are in the track already
       : it.via ? `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}${it.name && it.name !== "Via point" ? it.name : "Via " + (i + 1)}`.slice(0, 40))}</name><sym>Waypoint</sym></wpt>`
       : `<wpt lat="${f(it.coords[0][0])}" lon="${f(it.coords[0][1])}"><name>${x(`${p.prefix}L${ln} ${it.name}`.slice(0, 40))}</name><desc>${x(`${it.kind}, ${km(lineLen(it.coords))} km`)}</desc><sym>Flag, Green</sym></wpt>`); });
     // stops along the way: planned stops are already in, and the rest are thinned to one of each kind every 5 km,
@@ -1509,13 +2144,25 @@ function download(name, text){
 $("#gpxBtn").onclick = () => built && download(trip.name, gpxText(trip.name, [{ name: trip.name, trip, built, stops: routeStops, prefix: "" }]));
 
 /* ---------- saved routes and tours ---------- */
+let undoTimer = null, undoCommit = null;
+function undoBar(text, undo, commit, ms = 6000){
+  if (undoCommit) { clearTimeout(undoTimer); undoCommit(); }   // a second delete settles the first
+  $("#undoText").textContent = text; $("#undoBar").hidden = false; undoCommit = commit;
+  // on an upright phone it sits on the map just above the panel, so it doesn't cover the next row in the list
+  // (unless the panel is up so high there's no map to sit on)
+  const top = phone() && !Ride.on ? sheet.getBoundingClientRect().top : 0;
+  $("#undoBar").style.bottom = top > 180 ? `${innerHeight - top + 10}px` : "";
+  $("#undoGo").onclick = () => { clearTimeout(undoTimer); undoCommit = null; $("#undoBar").hidden = true; undo(); };
+  undoTimer = setTimeout(() => { $("#undoBar").hidden = true; const c = undoCommit; undoCommit = null; c?.(); }, ms);
+}
 function renderSaved(){
   const saved = store.get("saved", []);
   // what's open now comes first, so it's one tap back after reopening the app
   const now = $("#openNow"); now.innerHTML = "";
   const openCard = (title, sub, go) => { const c = document.createElement("div"); c.className = "card"; c.innerHTML = `<div class="top"><h3>${esc(title)}</h3></div><div class="small muted">${esc(sub)}</div>`;
     const b = document.createElement("button"); b.className = "btn primary"; b.textContent = "Open"; b.onclick = e => { e.stopPropagation(); go(); }; c.querySelector(".top").append(b); c.onclick = go; now.append(c); };
-  if (trip.items.length) openCard(trip.name || "Your route", `Open now · ${built ? `${km(built.total)} km, ${hm(built.hours)}` : `${trip.items.length} lanes`}`, () => {
+  const openSaved = saved.find(o => o.trip && o.name === trip.name && tripSig(o.trip) === tripSig(trip));
+  if (trip.items.length && !openSaved) openCard(trip.name || "Your route", `Open now · ${built ? `${km(built.total)} km, ${hm(built.hours)}` : `${trip.items.length} lanes`}`, () => {
     showView("route", "mid"); renderRoute(); fitMap(L.latLngBounds(trip.items.flatMap(it => it.coords)).pad(0.1)); if (!built) build(); });
   if (tour?.days?.length) openCard(tour.name || "Your tour", `Open now · ${tour.days.length} day${tour.days.length > 1 ? "s" : ""}`, () => openTour());
   $("#savedHead").hidden = !saved.length; $("#savedEmpty").hidden = !!saved.length;
@@ -1525,23 +2172,46 @@ function renderSaved(){
     li.innerHTML = `<span class="grow"><span class="t">${s.tour ? "⛺ " : ""}${esc(s.name)}</span><br><span class="s">${esc(s.summary || "")} · saved ${new Date(s.when).toLocaleDateString("en-GB")}</span></span>`;
     li.querySelector(".grow").onclick = () => {
       if (s.tour) { tour = clone(s.tour); saveTour(); openTour(); return; }
+      if (trip.items.length && editingDay == null && !saved.some(o => o.trip && tripSig(o.trip) === tripSig(trip))) keepCurrent();   // the open route, if it isn't saved, is kept
       trip = clone(s.trip); built = null; editingDay = null; lastKind = null; ideas = []; routeFrom = { kind: "plan" }; saveTrip(); showView("route", "mid"); renderRoute();
       fitMap(L.latLngBounds(trip.items.flatMap(it => it.coords)).pad(0.1)); build();
     };
     const x = document.createElement("button"); x.className = "x"; x.textContent = "✕"; x.setAttribute("aria-label", "Delete " + s.name);
-    x.onclick = () => { const all = store.get("saved", []); all.splice(i, 1); store.set("saved", all); renderSaved(); };
-    li.append(x); ul.append(li);
+    x.onclick = () => {
+      const all = store.get("saved", []), k = all.findIndex(o => o.name === s.name && o.when === s.when); if (k < 0) return;
+      const [gone] = all.splice(k, 1); store.set("saved", all); renderSaved();
+      // six seconds to change your mind; the no-signal copy goes only once it's final
+      undoBar(`Deleted “${gone.name}”`, () => { const now = store.get("saved", []); now.splice(Math.min(k, now.length), 0, gone); store.set("saved", now); renderSaved(); },
+        () => { if (typeof Offline !== "undefined" && !store.get("saved", []).some(o => o.name === gone.name)) Offline.forget(gone.name); });
+    };
+    li.dataset.name = s.name; li.append(x); ul.append(li);
+    if (s === openSaved) li.querySelector(".s").append(" · open now");
   });
+  // mark the ones kept for use with no signal
+  if (typeof Offline !== "undefined") Offline.keptNames().then(names => { for (const li of ul.children) if (names.has(li.dataset.name)) li.querySelector(".s").append(" · ready with no signal"); });
 }
 // Only say "Saved" when it was. Tours are large, so if storage is full the oldest saved items make way first.
-function saveItem(entry){
-  let all = store.get("saved", []).filter(s => s.name !== entry.name); all.unshift({ ...entry, when: Date.now() }); all = all.slice(0, 30);
+function saveItem(entry, replace = false){
+  // the same route saved again replaces its old copy; a different route with the same name gets a number instead
+  const own = entry.trip || entry.tour, stamp = own?.savedAt;   // when this route was last saved: its own saved copy carries the same time
+  const same = s => (stamp && s.when === stamp) || s.name === entry.name && ((entry.tour ? !!s.tour && tripSig(s.tour.days[0]?.trip || {items: []}) === tripSig(entry.tour.days[0]?.trip || {items: []}) : s.trip && entry.trip && tripSig(s.trip) === tripSig(entry.trip)));
+  const taken = store.get("saved", []).filter(s => s.name === entry.name && !same(s));
+  const updating = store.get("saved", []).some(s => s.name === entry.name);
+  if (taken.length) {
+    let k = 2; const names = new Set(store.get("saved", []).map(s => s.name)); while (names.has(`${entry.name} (${k})`)) k++; entry = { ...entry, name: `${entry.name} (${k})` };
+    // the route takes the new name too, so saving it again updates this copy rather than making (3), (4)…
+    if (own) own.name = entry.name;
+    if (entry.trip === trip) { $("#routeName").value = entry.name; saveTrip(); }
+    if (entry.tour && entry.tour === tour) { saveTour(); if (typeof renderTour === "function" && view === "tour") renderTour(); }
+  }
+  const when = Date.now(); if (own) own.savedAt = when;
+  let all = store.get("saved", []).filter(s => s.name !== entry.name && !same(s)); all.unshift({ ...entry, when }); all = all.slice(0, 30);   // (a renamed route replaces its old copy)
   while (all.length && !store.set("saved", all)) { if (all.length === 1) break; all.pop(); }
   const ok = store.get("saved", []).some(s => s.name === entry.name);
-  status(ok ? `Saved “${entry.name}”` : "Couldn't save: this browser's storage is full or turned off (private browsing?). Download the GPX to keep it.", ok ? 2500 : 6000);
+  status(ok ? `${updating && !taken.length ? "Updated" : "Saved"} “${entry.name}”` : "Couldn't save: this browser's storage is full or turned off (private browsing?). Download the GPX to keep it.", ok ? 2500 : 6000);
   return ok;
 }
-$("#saveBtn").onclick = () => saveItem({ name: trip.name, trip, summary: built ? `${km(built.total)} km, ${hm(built.hours)}` : "" });
+$("#saveBtn").onclick = () => editingDay != null ? $("#editingSave").click() : saveItem({ name: trip.name, trip, summary: built ? `${km(built.total)} km, ${hm(built.hours)}` : "" }, true);
 
 /* ---------- multi-day tours ----------
    1. Find a way from start to finish through lane country: a shortest path over the 10 km lane squares,
@@ -1552,6 +2222,7 @@ $("#saveBtn").onclick = () => saveItem({ name: trip.name, trip, summary: built ?
 let tour = store.get("tour", null), tourPick = -1, tourRun = 0;
 const tourLayer = L.layerGroup().addTo(map);
 const saveTour = () => store.set("tour", tour);
+const daysTxt = n => `${n} day${n === 1 ? "" : "s"}`;
 const tourPlaces = { start: null, end: null };
 function zonePath(a, b, avoid){
   const ci = p => [Math.floor(p[0] / CELL), Math.floor(p[1] / CELL)];
@@ -1605,7 +2276,7 @@ async function placeName(p){
   try { const a = JSON.parse(r.text).address || {}; return a.village || a.town || a.city || a.hamlet || a.suburb || a.county || ""; } catch { return ""; }
 }
 function openTour(){
-  showView("tour", tour ? "mid" : "open");
+  showView("tour", "mid"); $("#tourBack").textContent = backLabel();
   placeSettings("tour");
   $("#tourSetup").hidden = !!tour; $("#tourResult").hidden = !tour;
   // nights and stops need the places data; a ready-made or saved tour can open before it has loaded
@@ -1613,7 +2284,7 @@ function openTour(){
   if (tour) { renderTour(); if (tour.days.length) fitMap(L.latLngBounds(tour.days.flatMap(d => d.trip.items.flatMap(it => it.coords)).concat([tour.start, tour.end])).pad(0.05)); }
   else renderTourSetup();
 }
-$("#goTour").onclick = () => { if (tour?.days?.length && !featNames().has(tour.name)) saveItem({ name: tour.name || "My tour", tour, summary: `${tour.days.length} days` }); tour = null; tourPick = -1; openTour(); };
+$("#goTour").onclick = () => { if (tour?.days?.length && !featNames().has(tour.name)) saveItem({ name: tour.name || "My tour", tour, summary: daysTxt(tour.days.length) }); tour = null; tourPick = -1; openTour(); };
 $("#tourBack").onclick = () => { tourRun++; tourLayer.clearLayers(); goBack(); };
 // A rough size for the tour before the long wait. Planned tours so far come out at about 2.1 times the straight
 // distance and average about 29 km/h including the lanes, so this is a guide, not a promise.
@@ -1648,14 +2319,21 @@ for (const which of ["start", "end"]) {
   const input = $(which === "start" ? "#tStart" : "#tEnd");
   input.onkeydown = async e => {
     if (e.key !== "Enter") return; e.preventDefault();
-    const found = await searchPlace(input.value.trim());
-    if (!found) { status(`Couldn't find “${input.value}”`); return; }
-    const typed = input.value.trim(); found.name = typed.charAt(0).toUpperCase() + typed.slice(1);
-    tourPlaces[which] = found; renderTourSetup(); map.setView(found.p, 10);
+    const typed = input.value.trim();
+    if (!typed) { tourPlaces[which] = null; renderTourSetup(); return; }   // an emptied box clears the place
+    const found = await searchPlace(typed);
+    // not found: the box no longer shows the old place as set
+    if (!found) { tourPlaces[which] = null; renderTourSetup(); status(navigator.onLine ? `Couldn't find “${typed}”. Check the spelling, or tap “On the map” and choose the spot.` : "No signal, so places can't be looked up. Tap “On the map” and choose the spot instead.", 6000); return; }
+    found.name = found.name.split(",")[0]; input.value = found.name;   // the place it found, which may not be the one you meant: so it says which
+    tourPlaces[which] = found; renderTourSetup();
+    // with both ends chosen, show both; otherwise the one just found
+    const other = tourPlaces[which === "start" ? "end" : "start"];
+    if (other?.p) fitMap(L.latLngBounds([found.p, other.p]).pad(0.25), { maxZoom: 11 }); else viewAt(found.p, 10);
   };
   input.onchange = () => input.onkeydown({ key: "Enter", preventDefault(){} });
-  $(which === "start" ? "#tStartMap" : "#tEndMap").onclick = () => pickSpot(`Tap the map where the tour ${which === "start" ? "starts" : "finishes"}`, async p => {
-    tourPlaces[which] = { p, name: "Map point" }; openTour(); renderTourSetup();
+  $(which === "start" ? "#tStartMap" : "#tEndMap").onclick = () => pickSpot(`Tap the map where the tour ${which === "start" ? "starts" : "finishes"}`, async (p, found) => {
+    tourPlaces[which] = { p, name: found || "Map point" }; openTour(); renderTourSetup();   // found: the name, if it was picked from search
+    if (found) return;
     const n = await placeName(p); if (n) { tourPlaces[which].name = n; renderTourSetup(); }
   });
 }
@@ -1667,8 +2345,8 @@ $("#dPlus").onclick = () => { settings.days = Math.min(14, (settings.days || 1) 
 $("#tourGo").onclick = () => planTour();
 async function planTour(){
   if (!tourPlaces.start || !tourPlaces.end) { status("Set a start and a finish first"); return; }
-  const run = ++tourRun, alive = () => run === tourRun && !$("#busy").hidden;
-  busy.show("Planning your tour", () => { tourRun++; });
+  const run = ++tourRun, alive = () => run === tourRun && !$("#busy").hidden, before = tour;
+  busy.show("Planning your tour", () => { tourRun++; tour = before; saveTour(); openTour(); status("Tour planning cancelled"); });
   busy.set("Loading places to stay…", 0.02);
   await loadStops(); if (!stops || !alive()) return;
   const round = $("#tRound").checked, A = tourPlaces.start.p, B = tourPlaces.end.p;
@@ -1725,8 +2403,9 @@ async function routeTourDays(from, alive, only){
   }
 }
 function dayName(i){
-  const from = i === 0 ? tourPlaces.start?.name?.split(",")[0] || "Start" : tour.nights[i - 1].town || `night ${i}`;
-  const to = i === tour.days.length - 1 ? (tour.round ? from && (tourPlaces.start?.name?.split(",")[0] || "Start") : tourPlaces.end?.name?.split(",")[0] || "Finish") : tour.nights[i].town || `night ${i + 1}`;
+  const startName = tour.startName || tourPlaces.start?.name?.split(",")[0] || "Start", endName = tour.endName || tourPlaces.end?.name?.split(",")[0] || "Finish";
+  const from = i === 0 ? startName : tour.nights[i - 1].town || `night ${i}`;
+  const to = i === tour.days.length - 1 ? (tour.round ? startName : endName) : tour.nights[i].town || `night ${i + 1}`;
   return `Day ${i + 1}: ${from} to ${to}`;
 }
 function renderTour(){
@@ -1744,21 +2423,31 @@ function renderTour(){
   const more = $("#tourNotes [data-moreday]");
   if (more) more.onclick = e => { e.preventDefault(); settings.days = tour.days.length + 1; saveSettings(); syncSettings(); $("#tourReplan").click(); planTour(); };
   $("#tourReplan").hidden = !!tour.featured;
-  $("#tsDays").textContent = tour.days.length; $("#tsKm").textContent = km(tot); $("#tsLane").textContent = tot ? Math.round(100 * off / tot) + "%" : "–"; $("#tsHours").textContent = hm(hrs);
+  $("#tsDays").textContent = tour.days.length; $("#tsKm").textContent = km(tot); $("#tsLane").textContent = tour.kind === "road" ? "Roads" : tot ? Math.round(100 * off / tot) + "%" : "–"; $("#tsHours").textContent = hm(hrs);
+  $("#tsDays").nextElementSibling.textContent = tour.days.length === 1 ? "day" : "days";
+  $("#tsLane").nextElementSibling.textContent = tour.kind === "road" ? "trip" : "lanes";
+  $("#tourGpx").textContent = tour.days.length === 1 ? "⬇ Download GPX" : "⬇ Download tour GPX (all days)";
+  $("#tourDayHint").hidden = tour.days.length === 1;   // no nights to change on a one-day trip
   const box = $("#dayList"); box.innerHTML = "";
+  // ready-made tours made before the places data covered Scotland have no bed for the night: pick the nearest now
+  if (stops) tour.nights.forEach(n => { if (n.stay == null && (n.want || n.at)) { const o = stayOptions(n.want || n.at, 15000)[0]; if (o) { n.stay = o.i; n.want ||= n.at; } } });
   tour.days.forEach((d, i) => {
+    // days built before the places data covered Scotland have no stops: work them out now
+    if (d.built && stops && !d.stops?.length && d.built.noStops) { const a = stopsAlong(d.built); d.stops = a.list; d.built.fuelGap = a.fuelGap; delete d.built.noStops; }
     const b = d.built, card = document.createElement("div");
     card.className = "day"; card.setAttribute("aria-pressed", tourPick === i); card.tabIndex = 0; card.setAttribute("role", "button");
     const warn = routeWarnings(b, d.trip);
     card.innerHTML = `<div class="top"><h3>${esc(d.trip.name || dayName(i))}</h3></div>
-      <div class="stats"><span><b>${b ? hm(b.hours) : "–"}</b> riding</span><span><b>${b ? km(b.total) : "–"}</b> km</span><span><b>${b && b.total ? Math.round(100 * b.off / b.total) : 0}%</b> lanes</span><span><b>${d.trip.items.filter(it => !it.via).length}</b> lanes</span>${b?.fuelGap ? `<span>fuel gap <b>${km(b.fuelGap)}</b> km</span>` : ""}</div>${b?.noStops ? `<p class="small muted">Fuel, food and places to stay aren't loaded for Scotland, so plan those yourself.</p>` : ""}
-      ${b && b.hours > tour.dayHours * 1.3 ? `<div class="small" style="color:#b45309">Longer than your ${tour.dayHours} h a day.</div>` : ""}
+      <div class="stats"><span><b>${b ? hm(b.hours) : "–"}</b> riding</span><span><b>${b ? km(b.total) : "–"}</b> km</span>${tour.kind === "road" ? "" : `<span><b>${b && b.total ? Math.round(100 * b.off / b.total) : 0}%</b> lanes</span>`}${tour.kind === "road" ? "" : `<span><b>${d.trip.items.filter(it => !it.via).length}</b> lanes</span>`}${b?.fuelGap ? `<span>fuel gap <b>${km(b.fuelGap)}</b> km</span>` : ""}</div>
+      ${b && b.hours > tour.dayHours * 1.3 ? `<div class="small" style="color:#b45309">Longer than your ${tour.dayHours} h a day.</div>` : b && !tour.featured && b.hours < tour.dayHours * 0.6 ? `<div class="small" style="color:#b45309">Shorter than your ${tour.dayHours} h a day: there aren't enough lanes along this part of the way. Fewer days would fill them.</div>` : ""}
       ${warn.length ? `<div class="small muted">${esc(warn[0])}</div>` : ""}
       <div class="acts"></div>`;
     const acts = card.querySelector(".acts");
     const mk = (label, fn) => { const x = document.createElement("button"); x.className = "btn quiet"; x.textContent = label; x.onclick = ev => { ev.stopPropagation(); fn(); }; acts.append(x); };
-    mk("Edit lanes", () => { editingDay = i; trip = clone(d.trip); built = d.built; saveTrip(); showView("route", "mid"); renderRoute(); findRouteStops(); fitMap(L.latLngBounds(trip.items.flatMap(it => it.coords).concat([trip.start, trip.finish])).pad(0.05)); });
-    mk("GPX for this day", () => download(`${tour.name} day ${i + 1}`, gpxText(d.trip.name, [{ name: d.trip.name, trip: d.trip, built: d.built, stops: d.stops, prefix: "", nightAt: tour.nights[i]?.at, nightName: nightLabel(i) }])));
+    const keepIfNotADay = () => { if (!tour.days.some(dd => tripSig(dd.trip) === tripSig(trip))) keepCurrent(); };
+    if (b) mk("▶ Ride", () => { keepIfNotADay(); trip = clone(d.trip); built = clone(b); saveTrip(); routeStops = d.stops || []; Ride.start(); });
+    mk("Edit day", () => { keepIfNotADay(); dayBefore = trip.items.length && !tour.days.some(dd => tripSig(dd.trip) === tripSig(trip)) ? clone(trip) : null; editingDay = i; trip = clone(d.trip); trip.keepOrder = true; built = d.built; saveTrip(); showView("route", "mid"); renderRoute(); findRouteStops(); fitMap(L.latLngBounds(trip.items.flatMap(it => it.coords).concat([trip.start, trip.finish])).pad(0.05)); });
+    if (tour.days.length > 1) mk("GPX for this day", () => download(`${tour.name} day ${i + 1}`, gpxText(d.trip.name, [{ name: d.trip.name, trip: d.trip, built: d.built, stops: d.stops, prefix: "", nightAt: tour.nights[i]?.at, nightName: nightLabel(i) }])));
     const pick = () => { tourPick = tourPick === i ? -1 : i; renderTour(); if (tourPick >= 0) fitMap(L.latLngBounds(d.built ? d.built.segs.flatMap(s => s.coords) : [d.trip.start, d.trip.finish]).pad(0.05), {}); };
     card.onclick = pick; card.onkeydown = e => { if (e.key === "Enter") pick(); };
     box.append(card);
@@ -1773,10 +2462,11 @@ function nightRow(i){
   row.innerHTML = `${poiBadge(s ? s.code : "hotel")}<div class="grow"><b>Night ${i + 1}${n.town ? ": " + esc(n.town) : ""}</b><br><span class="small muted">${s ? esc(stopName(s)) + " · " + esc(CODE[s.code].one) : !stops ? "Loading places to stay…" : tour.days[i]?.built?.noStops ? "Places to stay aren't loaded for Scotland, so book this one yourself." : "No places to stay found near here. Try allowing campsites or changing the days."}</span><div class="opts" hidden></div></div>`;
   const btn = document.createElement("button"); btn.className = "btn quiet"; btn.textContent = "Change";
   const opts = row.querySelector(".opts");
+  queueMicrotask(() => row.append(opts));   // below the row, the panel's full width, not squeezed beside the Change button
   btn.onclick = () => {
     opts.hidden = !opts.hidden; opts.innerHTML = "";
-    const list = stayOptions(n.want, 15000).map(o => o.i).filter(k => k !== n.stay);
-    if (!list.length) opts.innerHTML = `<span class="small muted">No other places to stay within 15 km.</span>`;
+    const list = stayOptions(n.want, 30000).map(o => o.i).filter(k => k !== n.stay);
+    if (!list.length) opts.innerHTML = `<span class="small muted">No other places to stay within 30 km.</span>`;
     for (const k of list) {
       const o = stops[k], b = document.createElement("button");
       b.innerHTML = `${esc(stopName(o))} <span class="muted">· ${esc(CODE[o.code].one)} · ${km(hav(n.want, [o.lat, o.lng]))} km off the line</span>`;
@@ -1789,9 +2479,12 @@ function nightRow(i){
 }
 async function changeNight(i, k){
   const s = stops[k], n = tour.nights[i];
-  n.stay = k; n.at = [s.lat, s.lng];
+  const undo = { night: clone(n), a: clone(tour.days[i]), b: clone(tour.days[i + 1]), edited: tour.edited };
+  tour.edited = true; n.stay = k; n.at = [s.lat, s.lng];
   const run = ++tourRun, alive = () => run === tourRun && !$("#busy").hidden;
-  busy.show("Re-planning the two days either side", () => { tourRun++; });
+  busy.show("Re-planning the two days either side", () => {   // Cancel: the night and both days as they were
+    tourRun++; Object.assign(n, undo.night); tour.days[i] = undo.a; tour.days[i + 1] = undo.b; tour.edited = undo.edited; saveTour(); renderTour();
+  });
   n.town = (await placeName(n.at)) || n.town;
   const wr = mixToWr(settings.mix);
   for (const d of [i, i + 1]) {
@@ -1799,6 +2492,12 @@ async function changeNight(i, k){
     const day = tour.days[d], a = d === 0 ? tour.start : tour.nights[d - 1].at, b = d === tour.days.length - 1 ? tour.end : tour.nights[d].at;
     const ia = nearestIdx(tour.line, a), ib = nearestIdx(tour.line, b);
     const sk = [a, ...tour.line.slice(Math.min(ia, ib) + 1, Math.max(ia, ib)), b];
+    if (tour.kind === "road") {   // a road trip: the two days share out the trip's named waypoints either side of the new night
+      const named = [...undo.a.trip.items, ...undo.b.trip.items].filter(it => it.via), cut = nearestIdx(tour.line, n.at);
+      const mine = named.filter(it => (d === i) === (nearestIdx(tour.line, it.coords[0]) < cut) && hav(it.coords[0], n.at) > 2000);
+      day.trip = { name: "", start: a, finish: b, loop: false, items: mine.length ? mine.map(clone) : thin(sk, 20000).slice(1, -1).map(p => itemVia(p)) };
+      continue;
+    }
     const plan = await fitPlan(thin(sk, 300), Math.max(8000, settings.width * 1000), wr, tour.dayHours, alive, 4);
     if (!alive()) return;
     day.trip = { name: "", start: a, finish: b, loop: false, items: chainToItems(plan?.chain || []) };
@@ -1813,13 +2512,14 @@ function drawTour(){
   tour.days.forEach((d, i) => drawBuilt(tourLayer, d.trip, d.built, tourPick < 0 || tourPick === i, tourPick === i));
   flag(tour.start, tour.round ? "START / FINISH" : "START").addTo(tourLayer);
   if (!tour.round) flag(tour.end, "FINISH").addTo(tourLayer);
-  tour.nights.forEach((n, i) => L.marker(n.at, { icon: L.divIcon({ className: "", html: `<span class="flag" style="background:#6d28d9">Night ${i + 1}</span>`, iconSize: [0, 0] }) }).bindPopup(() => { const s = n.stay != null ? stops?.[n.stay] : null; return s ? stopPopup(s) : `<h3>Night ${i + 1}</h3>`; }).addTo(tourLayer));
+  const ends = [tour.start, tour.end].map(p => map.latLngToContainerPoint(p));
+  tour.nights.forEach((n, i) => L.marker(n.at, { icon: L.divIcon({ className: "", html: `<span class="flag night${ends.some(e => e.distanceTo(map.latLngToContainerPoint(n.at)) < 60) ? " below" : ""}" style="background:#6d28d9">Night ${i + 1}</span>`, iconSize: [0, 0] }) }).bindPopup(() => { const s = n.stay != null ? stops?.[n.stay] : null; return s ? stopPopup(s) : `<h3>Night ${i + 1}</h3>`; }).addTo(tourLayer));
   drawRouteStops();
 }
 $("#tourName").oninput = e => { tour.name = e.target.value || "My tour"; saveTour(); };
 $("#tourGpx").onclick = () => tour && download(tour.name, gpxText(tour.name, tour.days.map((d, i) => ({ name: d.trip.name || dayName(i), trip: d.trip, built: d.built, stops: d.stops, prefix: `D${i + 1} `, nightAt: tour.nights[i]?.at, nightName: tour.nights[i] ? nightLabel(i) : "" }))));
-$("#tourSave").onclick = () => tour && saveItem({ name: tour.name, tour, summary: `${tour.days.length} days, ${km(tour.days.reduce((a, d) => a + (d.built?.total || 0), 0))} km` });
-$("#tourNew").onclick = () => armed($("#tourNew"), "✕ New", () => { tour = null; saveTour(); tourPick = -1; openTour(); });
+$("#tourSave").onclick = () => tour && saveItem({ name: tour.name, tour, summary: `${daysTxt(tour.days.length)}, ${km(tour.days.reduce((a, d) => a + (d.built?.total || 0), 0))} km` }, true);
+$("#tourNew").onclick = () => armed($("#tourNew"), "+ New tour", () => { tour = null; saveTour(); tourPick = -1; openTour(); });
 $("#tourReplan").onclick = () => { if (!tour) return; tourPlaces.start = tourPlaces.start || { p: tour.start, name: tour.name.split(" to ")[0] }; tourPlaces.end = tourPlaces.end || { p: tour.round ? tour.line[Math.floor(tour.line.length / 2)] : tour.end, name: tour.name.split(" to ")[1] || "Finish" }; $("#tRound").checked = tour.round; tour = null; openTour(); };
 
 /* ---------- Explore: riding areas, ready-made rides and tours ---------- */
@@ -1840,12 +2540,14 @@ function regionLaneKm(r){   // lane km within 25 km of the area's centre (worked
   }
   laneKmCache.set(r.slug, m); return m;
 }
+let exploreNear = null;   // after a search, the areas nearest the place come first
 function renderExplore(){
   const box = $("#regionCards"); box.innerHTML = "";
-  for (const r of REGION_LIST) {
+  const list = exploreNear ? [...REGION_LIST].sort((a, b) => hav(exploreNear, a.centre) - hav(exploreNear, b.centre)) : REGION_LIST;
+  for (const r of list) {
     const n = featuredIn(r.slug).length;
     const b = document.createElement("button"); b.className = "rcard"; b.setAttribute("role", "listitem");
-    b.innerHTML = `<div class="poster">${posterHtml(r)}</div><div class="cap"><b>${esc(r.name)}</b><span>${n ? `${n} ride${n > 1 ? "s" : ""} · ` : ""}${Math.round(regionLaneKm(r) / 1000)} km of lanes</span></div>`;
+    b.innerHTML = `<div class="poster">${posterHtml(r)}</div><div class="cap"><b>${esc(r.name)}</b><span>${r.kind === "road" ? `${n + (feat()?.tours || []).filter(t => t.region === r.slug).length} road rides` : `${n ? `${n} ride${n > 1 ? "s" : ""} · ` : ""}${Math.round(regionLaneKm(r) / 1000)} km of lanes`}</span></div>`;
     b.onclick = () => openRegion(r.slug);
     box.append(b);
   }
@@ -1857,7 +2559,8 @@ function renderExplore(){
     const tot = t.tour.days.reduce((a, d) => a + (d.built?.total || 0), 0), off = t.tour.days.reduce((a, d) => a + (d.built?.off || 0), 0);
     const c = document.createElement("div"); c.className = "card tcard";
     const road = t.kind === "road", nd = t.tour.days.length;
-    c.innerHTML = `<div><h3>${esc(t.name)}</h3><div class="stats"><span>${nd > 1 ? `<b>${nd}</b> days, ${nd - 1} night${nd > 2 ? "s" : ""}` : "<b>1</b> day"}</span><span><b>${km(tot)}</b> km</span>${road ? `<span>road trip${t.country && t.country !== "England" ? ", " + esc(t.country) : ""}</span>` : `<span><b>${tot ? Math.round(100 * off / tot) : 0}%</b> lanes</span>`}</div>${t.line ? `<p class="small muted" style="margin-top:4px">${esc(t.line)}</p>` : ""}</div>`;
+    // the route's shape and its name side by side, the description the full width underneath
+    c.innerHTML = `<div class="sk">${routeSketch(t.tour.days.flatMap(d => d.built?.segs?.flatMap(sg => sg.coords) || []), t.tour.round)}</div><div class="th"><h3>${esc(t.name)}</h3><div class="stats"><span>${nd > 1 ? `<b>${nd}</b> days, ${nd - 1} night${nd > 2 ? "s" : ""}` : "<b>1</b> day"}</span><span><b>${km(tot)}</b> km</span>${road ? `<span>road trip${t.country && t.country !== "England" ? ", " + esc(t.country) : ""}</span>` : `<span><b>${tot ? Math.round(100 * off / tot) : 0}%</b> lanes</span>`}</div></div>${t.line ? `<p class="small muted td">${esc(t.line)}</p>` : ""}`;
     const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Open"; go.setAttribute("aria-label", "Open " + t.name);
     go.onclick = e => { e.stopPropagation(); loadFeaturedTour(t); };
     c.onclick = () => loadFeaturedTour(t);
@@ -1897,7 +2600,7 @@ function drawRegionRides(){
   for (const i of order) {
     const rd = regionRidesNow[i], col = IDEA_COLORS[i % IDEA_COLORS.length], on = i === regionPick;
     drawBuilt(regionRideLayer, rd.trip, rd.built, on || regionPick < 0, false, col);   // none picked yet: all drawn clearly, each in its colour
-    const lanes = rd.built.segs.filter(sg => sg.type === "lane"), sg = lanes[Math.floor(lanes.length / 2)] || rd.built.segs[0];
+    const pool = rd.built.segs.filter(sg => sg.type === "lane"), segsOf = pool.length ? pool : rd.built.segs, sg = segsOf[Math.floor(segsOf.length * (0.3 + 0.2 * (i % 3)))] || rd.built.segs[0];   // spread, so two rides' badges don't stack
     L.marker(sg.coords[Math.floor(sg.coords.length / 2)], { zIndexOffset: on ? 1000 : 0, title: rd.name, icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<span class="ibadge${on ? " on" : ""}" style="--c:${col}">${i + 1}</span>` }) })
       .on("click", () => pickRegionRide(i)).addTo(regionRideLayer);
   }
@@ -1912,48 +2615,86 @@ let regionOpen = null;
 function openRegion(slug){
   regionOpen = slug;
   const r = regionBySlug(slug); if (!r) return;
-  showView("region", "open");
+  showView("region", "peek");   // the preview, so the map it has just moved to stays in view
   $("#regionPoster").innerHTML = posterHtml(r, false);   // lazy loading missed it as the panel opened
   $("#regionName").textContent = r.name + (r.sub ? " " + r.sub : "");
   $("#regionLine").textContent = r.line;
-  const rides = featuredIn(slug);
-  $("#regionStats").innerHTML = `<div><b>${Math.round(regionLaneKm(r) / 1000)}</b><span>km of lanes</span></div><div><b>${rides.length}</b><span>rides</span></div><div><b>${esc(r.starts[0].name)}</b><span>start</span></div>`;
+  const rides = featuredIn(slug), road = r.kind === "road", trips = (feat()?.tours || []).filter(t => t.region === slug);
+  // Scottish areas are for road riding: there are no byways to count or to plan loops from
+  $("#regionStats").innerHTML = (road ? `<div><b>Roads</b><span>no byways</span></div>` : `<div><b>${Math.round(regionLaneKm(r) / 1000)}</b><span>km of lanes</span></div>`)
+    + `<div><b>${rides.length + trips.length}</b><span>rides</span></div><div><b>${esc(r.starts[0].name)}</b><span>start</span></div>`;
+  $("#regionPlanOwn").hidden = road; $("#regionRoadNote").hidden = !road;
   const box = $("#regionRides"); box.innerHTML = rides.length ? "" : `<p class="small muted">No ready-made rides here yet. Plan your own below.</p>`;
   regionRidesNow = rides; regionPick = -1; drawRegionRides();
   rides.forEach((rd, i) => {
-    const b = rd.built, pct = b.total ? Math.round(100 * b.off / b.total) : 0;
+    const b = rd.built, pct = b.total ? Math.round(100 * b.off / b.total) : 0, isRoad = rd.kind === "road";
     const c = document.createElement("div"); c.className = "card"; c.style.setProperty("--c", IDEA_COLORS[i % IDEA_COLORS.length]);
     c.setAttribute("aria-pressed", "false");
     c.innerHTML = `<div class="top"><h3><span class="inum">${i + 1}</span>${esc(rd.name)}</h3></div>
-      <div class="stats"><span><b>${hm(b.hours)}</b> riding</span><span><b>${km(b.total)}</b> km</span><span><b>${pct}%</b> lanes</span></div>
-      <div>${rd.byways ? `<span class="chip" style="background:var(--boat)">Byways only</span>` : `<span class="chip" style="background:var(--ucr)">Includes unclassified roads</span>`} <span class="small muted">from ${esc(rd.startName)}</span></div>`;
+      <div class="stats"><span><b>${hm(b.hours)}</b> riding</span><span><b>${km(b.total)}</b> km</span>${isRoad ? `<span>${rd.trip.loop ? "loop" : "one way"}</span>` : `<span><b>${pct}%</b> lanes</span>`}</div>
+      <div>${isRoad ? `<span class="chip" style="background:#5b6b8c">Road ride</span>` : rd.byways ? `<span class="chip" style="background:var(--boat)">Byways only</span>` : `<span class="chip" style="background:var(--ucr)">Includes unclassified roads</span>`} <span class="small muted">from ${esc(rd.startName)}</span></div>`;
     const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Ride this"; go.setAttribute("aria-label", "Ride " + rd.name);
     go.onclick = () => loadFeaturedRide(rd);
     c.querySelector(".top").append(go);
-    c.onclick = e => { if (e.target !== go) pickRegionRide(i); };
+    // with another route open, this one can be joined on to it (two rides in one day)
+    let join = null;
+    if (trip.items.length && editingDay == null && trip.name !== rd.name && !isRoad) {
+      join = document.createElement("button"); join.className = "btn quiet"; join.textContent = `+ Join on to “${trip.name}”`;
+      join.onclick = e => { e.stopPropagation(); joinRide(rd); };
+      c.append(join);
+    }
+    c.onclick = e => { if (e.target !== go && e.target !== join) pickRegionRide(i); };
     box.append(c);
   });
-  fly(r.centre, r.zoom);
+  // the area's big trips (the NC500 on the West Highlands page)
+  for (const t of trips) {
+    const c = document.createElement("div"); c.className = "card";
+    const tk = t.tour.days.reduce((a, d) => a + (d.built?.total || 0), 0);
+    c.innerHTML = `<div class="top"><h3>${esc(t.name)}</h3></div><div class="stats"><span><b>${t.tour.days.length}</b> days</span><span><b>${km(tk)}</b> km</span></div><div><span class="chip" style="background:#6d28d9">Big trip</span></div>`;
+    const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Open"; go.setAttribute("aria-label", "Open " + t.name);
+    go.onclick = () => loadFeaturedTour(t); c.querySelector(".top").append(go); c.onclick = e => { if (e.target !== go) loadFeaturedTour(t); };
+    box.append(c);
+  }
+  const lines = (rides.length ? rides.map(rd => rd.built.segs.flatMap(sg => sg.coords)) : trips.flatMap(t => t.tour.days.map(d => d.built?.segs?.flatMap(sg => sg.coords) || []))).flat();
+  if (lines.length) setTimeout(() => fitMap(L.latLngBounds(lines).pad(0.05), {}), 30); else fly(r.centre, r.zoom);
   $("#regionLoop").onclick = () => { loopStart = r.starts[0].at; loopStartName = r.starts[0].name; lastKind = "loop"; ideas = []; picked = -1; ideaRun++; openIdeas(); runIdeas(); };
   $("#regionDraw").onclick = () => { map.setView(r.centre, r.zoom); lastKind = "draw"; strokes = []; shapeChoice = null; ideas = []; picked = -1; ideaRun++; openIdeas(); startDrawing(); };
 }
-$("#regionBack").onclick = () => { showView("plan", "peek"); fly([52.6, -2.3], 7); };
+$("#regionBack").onclick = () => { showView("plan", sheet.dataset.state === "open" ? "open" : "peek"); setTimeout(showBritain, 30); };   // keep the panel where it was
 // Opening a ready-made ride or tour replaces the current one, so anything the rider planned goes to Saved first.
 const featNames = () => new Set([...(feat()?.rides || []).map(r => r.name), ...(feat()?.tours || []).map(t => t.name)]);
+// A plan's shape: its start, finish and lanes (lane ids, or the point for a via), so an edit can be told from the original
+const tripSig = t => JSON.stringify([t.start, t.finish, !!t.loop, t.items.map(i => i.via ? i.coords[0] : (i.ids || []).join(","))]);
 function keepCurrent(){
-  if (trip.items.length && !featNames().has(trip.name)) saveItem({ name: trip.name, trip, summary: built ? `${km(built.total)} km, ${hm(built.hours)}` : "" });
+  if (!trip.items.length) return;
+  const orig = (feat()?.rides || []).find(r => r.name === trip.name);
+  if (!orig) saveItem({ name: trip.name, trip, summary: built ? `${km(built.total)} km, ${hm(built.hours)}` : "" });
+  else if (tripSig(orig.trip) !== tripSig(trip)) saveItem({ name: trip.name + " (edited)", trip, summary: built ? `${km(built.total)} km, ${hm(built.hours)}` : "" });   // a ready-made ride you changed
+}
+// Two rides as one day: the second one's lanes and stops go into the open route, and the whole lot is put in
+// the order that needs least road (it's a new ride now, so the first one's order no longer holds).
+function joinRide(rd){
+  const before = clone(trip), name = trip.name;
+  const have = new Set(trip.items.flatMap(it => it.ids));
+  for (const it of clone(rd.trip).items) if (it.via || !it.ids.some(id => have.has(id))) trip.items.push(it);
+  trip.name = `${name} + ${rd.name}`; trip.keepOrder = false; trip.tidy = false; built = null; saveTrip();
+  showView("route", "mid"); renderRoute(); drawRoute(); tidyNow();
+  undoBar(`Joined ${rd.name} on to ${name}`, () => { trip = before; built = null; saveTrip(); renderRoute(); drawRoute(); buildSoon(300); }, null, 8000);
 }
 function loadFeaturedRide(rd){
   keepCurrent();
   routeFrom = view === "region" ? { kind: "region", slug: rd.region || regionOpen } : { kind: "plan" };
-  trip = clone(rd.trip); built = clone(rd.built); editingDay = null; lastKind = null; ideas = [];
+  trip = clone(rd.trip); trip.keepOrder = true; built = clone(rd.built); editingDay = null; lastKind = null; ideas = [];
   saveTrip(); showView("route", "mid"); renderRoute();
   fitMap(L.latLngBounds(built.segs.flatMap(sg => sg.coords)).pad(0.05), {});
   findRouteStops();
 }
 function loadFeaturedTour(t){
-  if (tour?.days?.length && !featNames().has(tour.name)) saveItem({ name: tour.name || "My tour", tour, summary: `${tour.days.length} days` });
-  tour = clone(t.tour); tour.featured = true; tour.line2 = t.line || ""; tour.notes = t.notes || [];
+  if (tour?.days?.length && (!featNames().has(tour.name) || tour.edited)) saveItem({ name: (tour.name || "My tour") + (featNames().has(tour.name) ? " (edited)" : ""), tour, summary: daysTxt(tour.days.length) });
+  tour = clone(t.tour); tour.featured = true; tour.line2 = t.line || ""; tour.notes = t.notes || []; tour.kind = t.kind || "lanes";
+  // the start and finish names come from the trip's own day names ("Day 1: Inverness to Applecross")
+  const first = (tour.days[0]?.trip?.name || "").match(/:\s*(.+?) to /), last = (tour.days.at(-1)?.trip?.name || "").match(/ to (.+)$/);
+  tour.startName = first?.[1] || tour.name.split(" ")[0]; tour.endName = last?.[1] || tour.startName;
   tourPick = -1; saveTour(); openTour(); }
 
 /* ---------- finding lanes: by name or number, the longest here or anywhere, or the closest ---------- */
@@ -1979,14 +2720,19 @@ function renderLaneFinder(){
     list.push(w);
   }
   // closest first when sorting by nearness, or when searching a name (the Ridgeway near you before one 280 km away)
-  if (laneSort === "near" || (q && laneSort === "here")) { for (const w of list) w._d = hav(cc, laneMid(w)); list.sort((a, b) => a._d - b._d); }
+  if (laneSort === "near") { for (const w of list) w._d = hav(cc, laneMid(w)); list.sort((a, b) => a._d - b._d); }
+  else if (q && laneSort === "here") {
+    const starts = w => [w.tags.name, w.tags.prow_ref, w.tags.ref].some(t => t && t.toLowerCase().replace(/^the\s+/, "").startsWith(q.replace(/^the\s+/, "")));
+    for (const w of list) w._d = hav(cc, laneMid(w)) / (1 + w.len / 4000) / (starts(w) ? 20 : 1);
+    list.sort((a, b) => a._d - b._d);
+  }
   else list.sort((a, b) => b.len - a.len);
   const total = list.length; list = list.slice(0, 40);
   $("#laneCount").textContent = !total ? (laneSort === "here" && !q ? "No lanes on the map here. Move the map, or try Longest anywhere." : "Nothing matches.")
     : `${total.toLocaleString()} lane${total > 1 ? "s" : ""}${laneSort === "here" && !q ? " on the map" : ""}${total > 40 ? ", showing the first 40" : ""}. Tap one to see it.`;
   const ul = $("#laneResults"); ul.innerHTML = "";
   for (const w of list) {
-    const t = w.tags, c2 = CLASSES[w.cls], surf = [t.surface, t.tracktype && t.tracktype.replace("grade", "grade ")].filter(Boolean).join(", ");
+    const t = w.tags, c2 = CLASSES[w.cls], surf = surfTxt(t);
     const li = document.createElement("li");
     li.innerHTML = `<span class="grow" role="button" tabindex="0"><span class="t">${esc(laneName(t))}</span><br><span class="s"><span class="chip" style="background:${css(c2.color)}">${esc(DESIG[t.designation] || "Byway")}</span> <b>${km(w.len)} km</b>${inRoute(w.id) ? " · in your route" : ""} · ${esc(whereIs(w))}${surf ? " · " + esc(surf) : ""}</span></span>`;
     const go = () => showLane(w);
@@ -2004,7 +2750,7 @@ function showLane(w){
 }
 let laneJump = false;
 map.on("popupclose", () => { if (view === "lanes") highlightLane(null); });
-function openLanes(){ showView("lanes", "mid"); renderLaneFinder(); renderClassics(); }
+function openLanes(){ showView("lanes", "open"); $("#lanesBack").textContent = backLabel(); renderLaneFinder(); renderClassics(); }   // full height: the list is the point
 // Lanes riders ask about by name, with whether they're open and where that comes from (data/classics.js)
 function renderClassics(){
   const ul = $("#classicList"); if (ul.children.length) return;
@@ -2034,18 +2780,30 @@ document.querySelectorAll("#laneSort button").forEach(bt => bt.onclick = () => {
 map.on("moveend", () => { if (view !== "lanes") return; if (laneJump) { laneJump = false; return; } if (laneSort !== "all") renderLaneFinder(); });
 
 /* ---------- search ---------- */
+// the place you searched for gets a pin, so you can see where it is on the map (the next search replaces it)
+let searchPin = null;
+function placePin(at, name){
+  if (searchPin) map.removeLayer(searchPin);
+  searchPin = L.marker(at, { interactive: false, title: name, icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<span class="flag" style="background:#1a73e8">${esc(name)}</span>` }) }).addTo(map);
+}
+// On a phone, search is a button in the corner that opens the search bar, so the map keeps the screen until you need it
+function openSearch(){ if (!$("#searchWrap").classList.contains("open")) navPush(); $("#searchWrap").classList.add("open"); $("#btnSearch").setAttribute("aria-expanded", "true"); setTimeout(() => $("#q").focus(), 30); }
+function closeSearch(){ $("#searchWrap").classList.remove("open"); $("#btnSearch").setAttribute("aria-expanded", "false"); $("#results").hidden = true; }
+$("#btnSearch").onclick = openSearch;
+$("#searchClose").onclick = closeSearch;
 $("#searchForm").onsubmit = async e => {
   e.preventDefault(); const q = $("#q").value.trim(); if (!q) return;
   $("#q").blur(); $("#results").hidden = true; status("Searching…", 0);   // a new search clears the last one's list
   const r = await polite("nominatim", `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=gb&q=${encodeURIComponent(q)}`);
   status("");
   let d = []; try { d = JSON.parse(r.text); } catch {}
-  if (!r.ok || !d.length) { status(r.ok ? `Couldn't find “${q}”` : "Place search isn't answering. Try again in a minute."); return; }
+  if (!r.ok || !d.length) { status(!navigator.onLine ? "No signal, so places can't be looked up. You can still move the map and tap where you want." : r.ok ? `Couldn't find “${q}”. Check the spelling, or move the map there and tap.` : "Place search isn't answering. Try again in a minute, or move the map and tap where you want.", 6000); return; }
   // while choosing a start or finish, picking a place from search sets it there; otherwise it just moves the map
   const go = p => {
-    $("#results").hidden = true; const at = [+p.lat, +p.lon];
-    if (picking) { const then = picking; stopModes(); map.setView(at, 11); then(at, p.display_name.split(",")[0]); }
-    else map.setView(at, 12);
+    $("#results").hidden = true; closeSearch(); const at = [+p.lat, +p.lon];
+    if (picking) { const then = picking; stopModes(); map.setView(at, 11); then(at, p.display_name.split(",")[0]); return; }
+    viewAt(at, 12); placePin(at, p.display_name.split(",")[0]);
+    exploreNear = at; renderExplore(); $("#regionCards").scrollLeft = 0;
   };
   const label = p => p.display_name.split(",").slice(0, 3).join(",");
   d = d.filter((p, i) => d.findIndex(x => label(x) === label(p)) === i);   // Nominatim often returns the same town twice
@@ -2054,11 +2812,33 @@ $("#searchForm").onsubmit = async e => {
   for (const p of d) { const b = document.createElement("button"); b.textContent = label(p); b.onclick = () => go(p); box.append(b); }
 };
 
+/* ---------- something is being worked out: say so at the top of the map ----------
+   The screens already write progress into their own notes ("Checking roads for idea 2 of 4…"), but those can be
+   down the panel or behind it when it's lowered. This bar repeats whichever one is running, over the map, with a
+   spinner and, where the note counts ("2 of 4"), how far along it is. */
+const WORK_FROM = ["#routeStatus", "#ideasNote", "#offlineNote", "#status", "#queueChip", "#stopList li"];
+function syncWork(){
+  let src = null;
+  if ($("#busy").hidden) for (const sel of WORK_FROM) {
+    const el = $(sel); if (!el || el.hidden || el.closest(".view[hidden]") || el.closest("[hidden]")) continue;
+    if (/…\s*$/.test(el.textContent.trim()) || (sel === "#queueChip" && el.textContent)) { src = el; break; }
+  }
+  $("#workBar").hidden = !src || Ride.on;
+  $("#status").classList.toggle("mirrored", src === $("#status"));
+  $("#queueChip").classList.add("mirrored");   // the queue's count shows in the bar instead
+  if (!src) return;
+  const t = src.textContent.trim(), m = t.match(/(\d+) of (\d+)/);
+  if ($("#workText").textContent !== t) $("#workText").textContent = t;
+  $("#workFill").style.width = m ? Math.round(100 * +m[1] / +m[2]) + "%" : "0";
+}
+setInterval(syncWork, 250);
+
 /* ---------- pop-overs, toggles, boot ---------- */
 function togglePop(id){
-  const opening = $("#" + id).hidden;
+  const opening = $("#" + id).hidden; if (opening) navPush();
   if (opening && phone()) setSheet("min");   // on a phone the panel goes down so the whole box, and its close button, fits
   for (const p of ["layersPop"]) $("#" + p).hidden = p !== id || !opening;
+  if (opening) { $("#poiMenu").hidden = true; closeSearch(); }
 }
 $("#btnLayers").onclick = () => togglePop("layersPop");
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => $("#" + b.dataset.close).hidden = true);
@@ -2067,7 +2847,7 @@ map.on("click", () => { if (!picking) $("#layersPop").hidden = true; });
 // On a phone, a popup must not open underneath the bottom sheet: drop the sheet and move the map to clear it.
 map.on("popupopen", e => {
   // screens whose preview is a small strip drop to it; the half-height ones (route, ideas, tour, lanes) drop to the bar
-  if (phone() && sheet.dataset.state !== "min") setSheet(previewState() === "peek" ? "peek" : "min");
+  if (phone() && sheet.dataset.state !== "min") setSheet("min");
   // then move the map so the whole popup sits between the search bar and buttons at the top and the panel at the bottom
   setTimeout(() => {
     const el = e.popup.getElement(); if (!el || !map.hasLayer(e.popup)) return;
@@ -2091,47 +2871,113 @@ let moveTimer;
 map.on("zoomend", () => { if (view === "route" && trip.items.length) drawRoute(); });   // lane numbers re-spread at the new zoom
 map.on("moveend", () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => { drawLanes(); drawZones(); drawStops(); drawRouteStops(); }, 120); });
 
-// boot: carry on where you left off
-if (tour && store.get("lastView", "") === "tour") openTour();
+// boot: carry on where you left off (including half way through changing one day of a tour)
+const wasEditing = store.get("editing", null);
+if (wasEditing && tour?.days?.[wasEditing.day] && trip.items.length) { editingDay = wasEditing.day; dayBefore = wasEditing.before; }
+if (tour && store.get("lastView", "") === "tour" && editingDay == null) openTour();
 else if (trip.items.length) {
   showView("route", "peek"); renderRoute();
   fitMap(L.latLngBounds(trip.items.flatMap(it => it.coords).concat(trip.start ? [trip.start] : [])).pad(0.1));
   if (!built || built.twisty !== settings.twisty) build(); else findRouteStops();
-} else showView("plan", "peek");
+} else if (["help", "saved"].includes(store.get("lastView", ""))) showView(store.get("lastView", ""), "mid");
+else { showView("plan", "peek"); showBritain(); }
+navPush();   // one step to go back to, so the phone's Back from here shows the start screen instead of leaving
 addEventListener("pagehide", () => store.set("lastView", view));
+
+/* ---------- the phone's back gesture steps back inside the planner ----------
+   Every move forward (a new screen, ride mode, the search bar, the map key) adds a step to the browser's history, so
+   Back closes what's open or returns to the screen before, instead of leaving the planner altogether. */
+addEventListener("popstate", () => {
+  navBusy = true;
+  try {
+    if (typeof Ride !== "undefined" && Ride.on) Ride.end();
+    else if (!$("#welcome").hidden) { if (!$("#wlCarry").hidden) $("#wlCarry").click(); else closeWelcome(); }
+    else if ($("#searchWrap").classList.contains("open")) closeSearch();
+    else if (!$("#layersPop").hidden) $("#layersPop").hidden = true;
+    else if (!$("#poiMenu").hidden) $("#poiMenu").hidden = true;
+    else if (picking || drawing || drawWhenZoomed) $("#bannerCancel").click();
+    else {
+      const back = document.querySelector(`#${{ route: editingDay != null ? "editingBack" : "routeBack", ideas: "ideasBack", region: "regionBack", lanes: "lanesBack", tour: "tourBack" }[view] || "none"}`);
+      if (back && !back.hidden) back.click();
+      else if (view !== "plan") showView("plan", "peek");
+      else showWelcome();
+    }
+  } finally { navBusy = false; }
+});
 
 /* ---------- start screen: shown once per visit ---------- */
 function showWelcome(){
-  const pick = REGION_LIST[Math.floor(Math.random() * REGION_LIST.length)];
-  if (!$("#wlHero img")) $("#wlHero").innerHTML = pick ? posterHtml(pick, false) : "";   // keep the poster shown while loading
-  const g = $("#wlGrid"); g.innerHTML = "";
-  for (const r of REGION_LIST) {
-    const n = featuredIn(r.slug).length, b = document.createElement("button");
-    b.className = "rcard"; b.setAttribute("role", "listitem");
-    b.innerHTML = `<div class="poster">${posterHtml(r)}</div><div class="cap"><b>${esc(r.name)}</b><span>${n ? `${n} ride${n > 1 ? "s" : ""}` : "Plan your own"}</span></div>`;
-    b.onclick = () => { closeWelcome(); openRegion(r.slug); };
-    g.append(b);
-  }
-  const carry = view === "tour" && tour ? tour.name || "your tour" : view === "route" && trip.items.length ? trip.name || "your route" : null;
-  $("#wlCarry").hidden = !carry; $("#wlMap").hidden = !!carry;
-  if (carry) $("#wlCarry").textContent = "Carry on: " + carry;
+  // big trips: a sketch of each one's line, drawn from the tour data
+  const trips = (feat()?.tours || []).filter(t => t.tour?.line?.length > 1);
+  $("#wlTripsSec").hidden = !trips.length;
+  const box = $("#wlTrips"); box.innerHTML = "";
+  trips.sort((a, b) => b.tour.days.length - a.tour.days.length).forEach(t => {
+    const tk = t.tour.days.reduce((a, d) => a + (d.built?.total || 0), 0), b = document.createElement("button");
+    b.className = "wl-trip"; b.setAttribute("aria-label", `${t.name}, ${daysTxt(t.tour.days.length)}`);
+    b.innerHTML = `${routeSketch(t.tour.days.flatMap(d => d.built?.segs?.flatMap(sg => sg.coords) || []), t.tour.round)}<div class="cap"><b>${esc(t.name)}</b><span>${t.tour.days.length} day${t.tour.days.length > 1 ? "s" : ""} · ${km(tk)} km${t.kind === "road" ? " · roads" : " · lanes"}</span></div>`;
+    b.onclick = () => { closeWelcome(); loadFeaturedTour(t); };
+    box.append(b);
+  });
+  // a way back to wherever you were: the route or tour you had open, the area, the ideas, or just the map
+  const back = { saved: "Back to Saved", help: "Back to Help", start: "Back to Plan" }[view] || "Back to the map";
+  const carry = view === "tour" && tour ? "Carry on: " + (tour.name || "your tour") : trip.items.length && view !== "ideas" && view !== "region" ? "Carry on: " + (trip.name || "your route")
+    : view === "region" && regionOpen ? "Back to " + (regionBySlug(regionOpen)?.name || "the area") : view === "ideas" && ideas.length ? "Back to your route ideas"
+    : welcomeFromHome ? back : null;
+  carryRoute = !!carry && carry.startsWith("Carry on: ") && view !== "tour" && view !== "route";
+  welcomeFromHome = false;
+  $("#wlCarry").hidden = !carry;
+  if (carry) $("#wlCarry").textContent = carry;
+  $("#wlLoading").hidden = true;
   $("#welcome").hidden = false; $("#welcome").scrollTop = 0;
 }
+// A route's shape as a small drawing for a card: the line in the route colour on the poster paper, with its start marked
+function routeSketch(pts, round){
+  if (pts.length < 2) return "";
+  const step = Math.max(1, Math.floor(pts.length / 400)), P = pts.filter((_, i) => i % step === 0).concat([pts.at(-1)]);
+  const k = Math.cos(P[0][0] * Math.PI / 180), xs = P.map(p => p[1] * k), ys = P.map(p => -p[0]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), W = 300, H = 200, pad = 22;
+  const sc = Math.min((W - 2 * pad) / (x1 - x0 || 1), (H - 2 * pad) / (y1 - y0 || 1)), ox = (W - sc * (x1 - x0)) / 2, oy = (H - sc * (y1 - y0)) / 2;
+  const d = P.map((p, i) => `${i ? "L" : "M"}${(ox + sc * (xs[i] - x0)).toFixed(1)} ${(oy + sc * (ys[i] - y0)).toFixed(1)}`).join("");
+  const [sx, sy] = d.slice(1).split("L")[0].split(" "), [ex, ey] = d.split("L").at(-1).split(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="${d}" fill="none" stroke="#fffdf6" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#c2185b" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>`
+    + `<circle cx="${sx}" cy="${sy}" r="7" fill="#1f1d18" stroke="#fffdf6" stroke-width="2.5"/>${round ? "" : `<circle cx="${ex}" cy="${ey}" r="6" fill="#fffdf6" stroke="#1f1d18" stroke-width="3"/>`}</svg>`;
+}
+// tapping an area card (the cards are drawn before the app loads, so one handler serves them all)
+$("#wlAreas").addEventListener("click", e => { const c = e.target.closest(".rcard"); if (c) { closeWelcome(); openRegion(c.dataset.slug); } });
+$("#wlRides").onclick = () => $(trips0() ? "#wlTripsSec" : "#wlAreasTop").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+const trips0 = () => !$("#wlTripsSec").hidden;
+// nearest areas first, with the distance on each card
+$("#wlNear").onclick = () => {
+  const btn = $("#wlNear");
+  if (btn.dataset.on) { delete btn.dataset.on; btn.textContent = "📍 Nearest first"; renderAreas(); return; }
+  if (!navigator.geolocation) { status("This browser can't read your location."); return; }
+  btn.textContent = "Finding you…";
+  navigator.geolocation.getCurrentPosition(pos => {
+    const me = [pos.coords.latitude, pos.coords.longitude], d = r => hav(me, r.starts[0].at);
+    renderAreas([...REGION_LIST].sort((a, b) => d(a) - d(b)));
+    for (const c of $("#wlAreas").querySelectorAll(".rcard")) { const r = regionBySlug(c.dataset.slug); c.querySelector(".dist").textContent = `${Math.round(d(r) / 1000)} km away`; }
+    btn.dataset.on = "1"; btn.textContent = "By country";
+  }, () => { btn.textContent = "Location is off"; setTimeout(() => { btn.textContent = "📍 Nearest first"; }, 4000); }, { timeout: 15000, maximumAge: 600000 });
+};
 function closeWelcome(){ $("#welcome").hidden = true; try { sessionStorage.setItem("glp:welcomed", "1"); } catch (e) {} map.invalidateSize(); }
-$("#wlCarry").onclick = closeWelcome;
-$("#wlMap").onclick = () => { closeWelcome(); showView("plan", phone() ? "min" : "peek"); map.setView([52.6, -2.3], 7); };
+let carryRoute = false;   // "Carry on" from another screen opens the route itself
+$("#wlCarry").onclick = () => {
+  closeWelcome();
+  if (carryRoute) { showView("route", "mid"); renderRoute(); drawRoute(); fitMap(L.latLngBounds(trip.items.flatMap(it => it.coords)).pad(0.1)); if (!built) build(); return; }
+  if (view === "plan" || view === "region") setSheet(sheet.dataset.state);
+};
+$("#wlMap").onclick = () => { closeWelcome(); showView("plan", phone() || sideAuto() ? "min" : "peek"); setTimeout(showBritain, 30); };
 $("#wlLoop").onclick = () => { closeWelcome(); $("#goLoop").click(); };
 $("#wlDraw").onclick = () => { closeWelcome(); $("#goDraw").click(); };
 $("#wlTour").onclick = () => { closeWelcome(); $("#goTour").click(); };
 $("#wlLanes").onclick = () => { closeWelcome(); openLanes(); };
-$("#helpHome").onclick = () => showWelcome();
+$("#helpHome").onclick = () => { welcomeFromHome = true; navPush(); showWelcome(); };
 let welcomed = false; try { welcomed = !!sessionStorage.getItem("glp:welcomed"); } catch (e) {}
 if (!welcomed) showWelcome(); else $("#welcome").hidden = true;
 if (innerWidth < 360) $("#q").placeholder = "Town or postcode";
 document.documentElement.classList.remove("booting");   // the start screen's buttons work from here
 // Keep the app, its data and the map tiles you've looked at on the phone, so it opens and exports GPX with no signal
-if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1"))
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+// the app keeping itself for use with no signal is in js/offline.js
 // The 2012 notes are kept out of the public copy (they're someone else's writing); hide the switch when absent.
 fetch("data/qwerf-lanes.js", { method: "HEAD" }).then(r => { if (!r.ok) { $("#tNotes").closest("label").hidden = true; $("#tNotes").checked = false; } else if ($("#tNotes").checked) showNotes(true); }).catch(() => { $("#tNotes").closest("label").hidden = true; });
 drawLanes(); drawZones(); drawStops();

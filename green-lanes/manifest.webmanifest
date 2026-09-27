@@ -1,7 +1,7 @@
 {
   "name": "Green Lanes Planner",
   "short_name": "Green Lanes",
-  "description": "Plan motorbike rides on legal green lanes in England and Wales, and take the GPX with you.",
+  "description": "Plan motorbike rides on legal green lanes in England and Wales and road rides in Scotland, ride them with the map on your phone, and take the GPX with you.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -9,8 +9,23 @@
   "background_color": "#f4efe1",
   "theme_color": "#f4efe1",
   "icons": [
-    { "src": "img/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "img/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "img/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "img/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "img/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "img/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

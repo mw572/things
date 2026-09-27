@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<meta name="build" content="dd960c3018">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f4efe1">
@@ -40,7 +41,23 @@ a{color:var(--green)}
 .small{font-size:13px}
 
 /* layout: map fills the screen; the sheet is a right-hand panel on wide screens and a bottom sheet on phones */
-#app{position:fixed;inset:0;display:grid;grid-template-columns:minmax(0,1fr) 400px}
+/* the side panel (wide screens, and phones on their side): its width is a variable, and it can be folded away */
+:root{--side-w:400px}
+@media (max-height:500px){:root{--side-w:min(340px,44vw)}}
+html.side-hidden{--side-w:0px}
+#app{position:fixed;inset:0;display:grid;grid-template-columns:minmax(0,1fr) var(--side-w)}
+html.side-hidden #sheet{display:none}
+#sideToggle{display:none}
+@media (min-width:821px),(max-height:500px){
+  #sideToggle{display:grid;place-items:center;position:fixed;z-index:1250;top:50%;right:var(--side-w);transform:translateY(-50%);width:30px;height:84px;border:2px solid var(--ink);border-right:0;border-radius:12px 0 0 12px;background:var(--paper);color:var(--ink);font:800 16px Barlow,sans-serif;cursor:pointer;box-shadow:-2px 2px 0 rgba(0,0,0,.15);padding:0}
+}
+/* a phone on its side: a tighter panel */
+@media (max-height:500px) and (min-width:500px){
+  .sheet-body{padding:10px 12px 16px;gap:10px}
+  #tabbar button{min-height:44px;padding:4px 2px;font-size:12px}
+  .view{gap:10px}
+  h2{font-size:19px}
+}
 #map{position:relative;min-width:0;background:#e8e4d6}
 #sheet{background:var(--paper);border-left:2px solid var(--ink);display:flex;flex-direction:column;min-height:0}
 #sheetHandle{display:none}
@@ -59,7 +76,8 @@ button:focus-visible,input:focus-visible,a:focus-visible,label:focus-visible{out
 .big-choice{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .big-choice .btn{flex-direction:column;min-height:84px;font-size:15px;line-height:1.15;white-space:normal;text-align:center;padding:8px 6px}
 .big-choice .btn .ic{font-size:26px;line-height:1}
-.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.row3{display:flex;gap:8px}
+.row3>*{flex:1 1 0;min-width:0}
 .row3 .btn{padding:6px 4px;font-size:14px}
 
 /* settings */
@@ -79,7 +97,7 @@ input[type=range]{width:100%;height:32px;accent-color:var(--green);margin:0}
 .card{background:var(--card);border:2px solid var(--ink);border-left:10px solid var(--c,var(--ink));border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;cursor:pointer}
 .card[aria-pressed="true"],.card[aria-current="true"]{box-shadow:4px 4px 0 var(--ink);background:color-mix(in srgb,var(--c,var(--ink)) 16%,var(--card));border-width:3px;border-left-width:14px}
 #ideaList .card[aria-current="false"]{opacity:.62}
-@media (max-width:820px){
+@media (max-width:820px) and (min-height:501px){
   #ideaList{flex-direction:row!important;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px!important;margin:0 -14px;padding:2px 14px 8px;scrollbar-width:none}
   #ideaList::-webkit-scrollbar{display:none}
   #ideaList .card{flex:0 0 84%;scroll-snap-align:center}
@@ -98,13 +116,95 @@ input[type=range]{width:100%;height:32px;accent-color:var(--green);margin:0}
 .bigstats.rough b::before{content:"≈ ";font-weight:600}
 
 /* tab bar: a row at the top of the side panel on wide screens, fixed along the bottom on phones */
-#tabbar{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid var(--ink);background:var(--card);flex:0 0 auto}
+#tabbar{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:2px solid var(--ink);background:var(--card);flex:0 0 auto}
 #tabbar button{border:0;background:none;padding:8px 2px 7px;font:600 13px Barlow,sans-serif;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;min-height:52px}
 #tabbar .ti{font-size:19px;line-height:1.1}
 #tabbar button[aria-current="page"]{color:var(--green);box-shadow:inset 0 -3px 0 var(--green)}
 html:not(.tabs-on) #tabbar{display:none}
 .planpick .btn{justify-content:flex-start;text-align:left;white-space:normal;gap:12px;padding:10px 14px;min-height:64px}
 .planpick .ic{font-size:24px;width:30px;text-align:center;flex:0 0 auto}
+
+/* no signal: the plain road map and the update offer */
+html.noSignalMap .leaflet-container{background:#efeadf}
+#updateBar{position:fixed;left:12px;right:12px;bottom:calc(var(--tabbar-h,0px) + 12px + env(safe-area-inset-bottom));z-index:1400;background:var(--card);border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:520px;margin:0 auto}
+#updateBar span{flex:1 1 180px;font-weight:600}
+#updateBar[hidden]{display:none}
+#undoBar{position:fixed;left:12px;right:12px;bottom:calc(var(--tabbar-h,0px) + 12px + env(safe-area-inset-bottom));z-index:1400;background:var(--ink);color:var(--paper);border-radius:12px;box-shadow:var(--shadow);padding:8px 10px 8px 14px;display:flex;gap:10px;align-items:center;max-width:420px;margin:0 auto;font-weight:600}
+#undoBar[hidden]{display:none}
+#undoBar span{flex:1}
+#undoBar .btn{min-height:40px;background:var(--paper)}
+#offlineBtn{width:100%;margin-top:8px}
+#offlineBtn.done{border-color:var(--green);color:var(--green)}
+/* riding view: map full screen, big glove-friendly controls, everything else hidden */
+body.riding #sideToggle,body.riding #tabbar,body.riding #sheet,body.riding #searchWrap,body.riding #tools,body.riding #status,body.riding #queueChip,body.riding #zoomHint,body.riding .leaflet-control-zoom,body.riding #offlineBadge{display:none!important}
+body.riding #app{grid-template-columns:1fr}
+#ride{position:fixed;inset:0;z-index:1300;pointer-events:none;display:grid;grid-template-columns:1fr;grid-template-rows:auto 1fr auto auto;gap:6px;
+  padding:max(6px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))}
+#ride[hidden]{display:none}
+#ride>*{pointer-events:auto}
+#rideTop{grid-row:1}#rideFloat{grid-row:2;align-self:start;pointer-events:none;display:flex;flex-direction:column;gap:6px}#rideFloat>*{pointer-events:auto}
+#rideBottom{grid-row:3}#rideActions{grid-row:4}
+.ride-panel{background:var(--card);border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:6px 12px}
+/* top bar: what's next on the left, the GPS and signal icons on the right */
+#rideTop{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:8px;align-items:center}
+.rt-row{grid-column:1;grid-row:1;display:flex;align-items:baseline;gap:10px;min-width:0}
+.rt-icons{grid-column:2;grid-row:1/3;display:flex;gap:6px}
+.rt-main{grid-column:1;grid-row:2;display:flex;flex-wrap:nowrap;align-items:baseline;column-gap:10px;min-width:0;overflow:hidden}
+.rt-label{font:700 13px Barlow,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ride-ico{width:36px;height:36px;border-radius:50%;border:2px solid var(--ink);background:var(--paper);display:grid;place-items:center;padding:0;color:var(--ink);cursor:pointer}
+.ride-ico svg{width:20px;height:20px}
+.ride-ico.good{color:#1e7b34}.ride-ico.weak{color:#b7791f}.ride-ico.bad{color:#c0392b}
+#rideSignal{color:#c0392b}
+#rideNextName{font:700 26px/1.1 "Zilla Slab",Georgia,serif;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+#rideNextDist{font:800 24px/1 Barlow,sans-serif;color:var(--green);white-space:nowrap;font-variant-numeric:tabular-nums;flex:0 0 auto;margin-left:auto}
+/* messages and the off-route warning float over the map, so the top bar stays one size */
+.rt-msg{background:var(--card);border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:8px 12px;font-size:16px;line-height:1.3;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rt-msg[hidden]{display:none}
+.rt-msg .btn{min-height:44px;font-size:16px}
+.ride-off{background:#c0392b;color:#fff;border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:6px 8px 6px 12px;font-size:16px;line-height:1.25;display:flex;gap:8px;align-items:center}
+.ride-off b{white-space:nowrap}
+#rideOffDist{flex:1;min-width:0}
+.ride-off[hidden]{display:none}
+.ride-off .btn{margin-left:auto;min-height:44px;font-size:15px;padding:4px 10px;white-space:nowrap;flex:0 0 auto}
+.ride-stats{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}
+.ride-stats b{display:block;font:800 26px/1.05 Barlow,sans-serif;font-variant-numeric:tabular-nums}
+.ride-stats span{font:700 13px Barlow,sans-serif;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+/* the next stop and fuel side by side on one line */
+.ride-next2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;font-size:15px;line-height:1.3}
+.ride-next2 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ride-next2 span:empty{display:none}
+.ride-next2:has(span:not(:empty)){border-top:1px solid var(--line,#d8d2c2);padding-top:4px}
+.ride-next2:has(span:empty){grid-template-columns:1fr}
+#rideActions{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.ride-btn{min-height:56px;border:2px solid var(--ink);border-radius:12px;background:var(--card);box-shadow:var(--shadow);color:var(--ink);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:3px 2px;font:800 22px/1 Barlow,sans-serif}
+.ride-btn small{font:700 13px/1.2 Barlow,sans-serif;text-transform:uppercase;letter-spacing:.03em;margin-top:2px}
+.ride-btn.danger{background:#c0392b;color:#fff}
+.ride-btn.on{background:var(--ink);color:var(--card)}
+.ride-btn:disabled{opacity:.45}
+.leaflet-container .leaflet-control-attribution{font-size:9px;line-height:1.3;padding:0 4px;background:rgba(255,253,246,.75);color:#5d5848}
+.leaflet-container .leaflet-control-attribution a{color:#5d5848}
+.leaflet-left .leaflet-control-attribution{margin:0!important;border-top-right-radius:4px}
+/* landscape phone: the two panels down the left, the buttons down the right, the map in the middle */
+@media (orientation:landscape) and (max-height:560px){
+  #ride{grid-template-columns:minmax(250px,36%) 1fr 70px;grid-template-rows:auto 1fr auto;gap:6px}
+  #rideTop{grid-column:1;grid-row:1}
+  #rideFloat{grid-column:2;grid-row:1/3}
+  #rideBottom{grid-column:1;grid-row:3}
+  #rideActions{grid-column:3;grid-row:1/4;grid-template-columns:1fr;grid-auto-rows:1fr;align-self:stretch}
+  .ride-btn{min-height:0}
+  #rideNextName{font-size:22px}#rideNextDist{font-size:21px}
+  .ride-stats b{font-size:22px}
+  .ride-next2{grid-template-columns:1fr;gap:0}
+}
+/* the no-signal badge: a small icon in the map's bottom-left corner; tap it to say what the plain map is */
+#offlineBadge{position:fixed;left:12px;top:calc(66px + env(safe-area-inset-top,0px));z-index:1100;width:44px;height:44px;border-radius:50%;border:2px solid var(--ink);
+  background:var(--card);color:#c0392b;box-shadow:var(--shadow);display:grid;place-items:center;padding:0;cursor:pointer}
+#offlineBadge[hidden]{display:none}
+@media (min-width:821px) and (min-height:501px){#offlineBadge{top:136px}}
+#offlineBadge svg{width:24px;height:24px}
+.ride-me{width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:#1a73e8;border:4px solid #fff;box-shadow:0 0 0 2px rgba(26,115,232,.4),0 2px 6px rgba(0,0,0,.4);position:relative}
+.ride-me i{position:absolute;left:50%;top:-16px;margin-left:-7px;border:7px solid transparent;border-bottom:12px solid #1a73e8}
 .tgroup{margin:4px 0 -2px;font:700 12px Barlow,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 #classicList .s{display:block;margin-top:2px}
 #ideaList .card[aria-current="false"]:hover{opacity:.9}
@@ -121,7 +221,7 @@ html:not(.tabs-on) #tabbar{display:none}
 .bigstats span{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 .note{background:var(--warn);color:var(--warn-ink);border:1.5px solid #d9c27a;border-radius:6px;padding:8px 10px;font-size:14px}
 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:2px solid var(--ink);border-radius:6px;overflow:hidden}
-.seg button{border:0;border-right:2px solid var(--ink);background:var(--card);padding:9px 4px;font:600 15px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
+.seg button{border:0;border-right:2px solid var(--ink);background:var(--card);padding:9px 4px;min-height:44px;font:600 15px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
 .seg button:last-child{border-right:0}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
 
@@ -139,29 +239,64 @@ ul.list li .s{font-size:13px;color:var(--muted)}
 .chips button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
 .emoji{font-size:20px;flex:0 0 28px;text-align:center}
 .back{align-self:flex-start}
+/* a screen's back link and its title share one line */
+.vhead{display:flex;align-items:center;gap:6px 10px;min-width:0;flex-wrap:wrap}
+.vhead .back{flex:0 0 auto;min-height:44px;padding:4px 10px;font-size:14px;white-space:nowrap}
+.vhead h2{min-width:0;font-size:20px}
+.vhead .namebox{flex:1 1 240px;min-width:0;text-overflow:ellipsis}
+.vhead h2{flex:1 1 140px}
+#vTour:has(#tourResult:not([hidden])) #tourSetupTitle,#vTour:has(#tourSetup:not([hidden])) #tourName{display:none}
+.poster.banner{aspect-ratio:auto;height:110px;border:2px solid var(--ink);border-radius:10px;box-shadow:var(--shadow)}
+.poster.banner img{object-position:50% 55%}
+/* editing a tour day: one slim row */
+.editing{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
+.editing .btn{min-height:36px;padding:4px 8px;font-size:13px;white-space:nowrap;flex:0 0 auto}
+#editingText{flex:1;min-width:0;font-size:13px;font-weight:600}
+.settingsBox>#revBtn{width:auto;margin:10px 12px 4px}
+/* a form's main button stays in view at the bottom of the panel while you fill the form in */
+.sticky-go{position:sticky;bottom:0;z-index:2;box-shadow:0 -8px 12px -4px var(--paper),var(--shadow)}
 .namebox{font:700 21px "Zilla Slab",serif;border:0;border-bottom:2px dashed var(--rule);background:transparent;color:var(--ink);padding:2px 0;width:100%;min-width:0}
 
 /* map furniture */
 .mapui{position:absolute;z-index:1000;display:flex;gap:8px}
-#searchWrap{top:12px;left:12px;width:min(620px,calc(100% - 400px - 100px));min-width:220px;flex-direction:column}
+#searchWrap{top:12px;left:12px;width:min(620px,calc(100% - var(--side-w) - 100px));min-width:220px;flex-direction:column}
+#btnSearch,#searchClose{display:none}
+/* something is being worked out: a bar across the top of the map says what, so it never happens silently */
+#workBar{position:absolute;z-index:1210;top:12px;left:calc((100% - var(--side-w))/2);transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--paper);
+  border-radius:999px;padding:9px 16px 11px;font:600 15px Barlow,sans-serif;box-shadow:var(--shadow);overflow:hidden;max-width:calc(100% - var(--side-w) - 40px);white-space:nowrap}
+#workBar[hidden]{display:none}
+#status.mirrored,#queueChip.mirrored{display:none!important}
+#workText{overflow:hidden;text-overflow:ellipsis}
+#workFill{position:absolute;left:0;bottom:0;height:3px;width:0;background:#7fd18b;transition:width .3s}
+.spin{flex:0 0 auto;width:16px;height:16px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
 #searchForm{max-width:400px}
 #searchForm{display:flex;background:var(--card);border:2px solid var(--ink);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
 #q{flex:1;min-width:0;border:0;padding:10px 12px;font:16px Barlow,sans-serif;background:transparent;color:var(--ink)}
 #searchForm button{border:0;border-left:2px solid var(--ink);background:var(--card);padding:0 14px;font:600 15px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
 #results{background:var(--card);border:2px solid var(--ink);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
 #results button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--rule);background:none;padding:10px 12px;font:15px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
-#tools{top:12px;right:412px;flex-direction:column}
+#tools{top:12px;right:calc(var(--side-w) + 12px);flex-direction:column}
 .tool{width:52px;height:52px;border:2px solid var(--ink);border-radius:8px;background:var(--card);box-shadow:var(--shadow);font:700 12px Barlow,sans-serif;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--ink);padding:0}
 .tool .ic{font-size:19px;line-height:1}
-#banner{top:72px;left:calc((100% - 400px)/2);transform:translateX(-50%);background:var(--ink);color:var(--paper);border-radius:8px;padding:8px 10px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 440px);box-shadow:var(--shadow);font-weight:600}
+#banner{top:72px;left:calc((100% - var(--side-w))/2);transform:translateX(-50%);background:var(--ink);color:var(--paper);border-radius:8px;padding:8px 10px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - var(--side-w) - 40px);box-shadow:var(--shadow);font-weight:600}
 #banner .btn{min-height:36px;padding:4px 10px;box-shadow:none;border-color:var(--paper)}
-body.banner-on #poiWrap,body.banner-on #tools{display:none}
+body.banner-on #poiWrap,body.banner-on #tools,body.banner-on #btnSearch{display:none}
 .leaflet-popup-content{max-height:calc(100dvh - 220px);overflow:auto}
+@media (max-height:500px){.leaflet-popup-content{max-height:calc(100dvh - 110px)}}
+@media (max-width:820px) and (min-height:501px){.leaflet-popup-content{max-height:calc(100dvh - 72px - 54px - var(--tabbar-h) - 60px)}}
+#poiMenu{max-height:calc(100dvh - 90px);overflow:auto}
 .leaflet-tooltip.stop-label{background:var(--card);border:1.5px solid var(--ink);border-radius:4px;padding:1px 5px;font:600 12px Barlow,sans-serif;color:var(--ink);box-shadow:none}
 .leaflet-tooltip.stop-label::before{display:none}
 #banner{z-index:1100}
-#zoomHint{bottom:28px;left:calc((100% - 400px)/2);transform:translateX(-50%);background:var(--card);border:2px solid var(--ink);border-radius:20px;padding:6px 14px;font-weight:600;font-size:14px;pointer-events:none;white-space:nowrap}
-#status{position:absolute;left:12px;bottom:28px;z-index:999;background:rgba(255,253,246,.94);border:1.5px solid var(--ink);border-radius:6px;padding:4px 8px;font-size:13px;max-width:calc(100% - 440px)}
+#scotHint{top:calc(66px + env(safe-area-inset-top,0px));left:10px;right:calc(var(--side-w) + 10px);max-width:520px;background:var(--card);border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:8px 8px 8px 12px;font-size:14px;line-height:1.35;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+#scotHint[hidden]{display:none}
+#scotHint span{flex:1 1 220px}
+#scotHint .btn{min-height:40px;font-size:14px}
+body:has(#workBar:not([hidden])) #scotHint{display:none}
+#zoomHint{bottom:28px;left:calc((100% - var(--side-w))/2);transform:translateX(-50%);background:var(--card);border:2px solid var(--ink);border-radius:20px;padding:6px 14px;font-weight:600;font-size:14px;pointer-events:none;white-space:nowrap}
+#status{position:absolute;left:12px;bottom:28px;z-index:999;background:rgba(255,253,246,.94);border:1.5px solid var(--ink);border-radius:6px;padding:4px 8px;font-size:13px;max-width:calc(100% - var(--side-w) - 40px)}
 
 /* the Show menu under the search box: which stops to show on the map */
 #poiWrap{position:relative;margin-top:8px;align-self:flex-start}
@@ -171,7 +306,10 @@ body.banner-on #poiWrap,body.banner-on #tools{display:none}
 #poiIcons .poi{width:20px;height:20px}
 #poiIcons .poi svg{width:12px;height:12px}
 #poiMenu{position:absolute;top:calc(100% + 6px);left:0;width:250px;background:var(--paper);border:2px solid var(--ink);border-radius:10px;box-shadow:4px 4px 0 var(--ink);padding:8px 12px;display:flex;flex-direction:column;z-index:5}
-#poiMenu label{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule);font:600 15px Barlow,sans-serif;cursor:pointer}
+#ideaList.updating{opacity:.4;pointer-events:none;transition:opacity .2s}
+/* the key pop-over scrolls, so nothing in it may be squashed to fit (the map style buttons were) */
+.pop>*{flex-shrink:0}
+#poiMenu label{display:flex;align-items:center;gap:10px;padding:9px 0;min-height:44px;border-bottom:1px solid var(--rule);font:600 15px Barlow,sans-serif;cursor:pointer}
 #poiMenu input{width:20px;height:20px;accent-color:var(--green);margin:0}
 #poiMenu p{padding-top:6px}
 .poi{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;border:1.5px solid #fff;box-shadow:0 0 0 1.5px var(--ink);flex:0 0 auto}
@@ -189,13 +327,15 @@ html.topo{--l-boat:#0b57d0;--l-ucr:#e8590c;--l-closed:#b3001b;--l-rb:#555a61;--l
 .busy-card{background:var(--paper);border:2px solid var(--ink);border-radius:10px;box-shadow:4px 4px 0 var(--ink);padding:18px;width:min(420px,100%);display:flex;flex-direction:column;gap:10px}
 .bar{height:14px;border:2px solid var(--ink);border-radius:8px;background:var(--card);overflow:hidden}
 .bar div{height:100%;width:0;background:var(--green);transition:width .3s}
-#queueChip{top:auto;bottom:70px;left:calc((100% - 400px)/2);transform:translateX(-50%);background:var(--ink);color:var(--paper);border-radius:16px;padding:5px 12px;font-size:13px;font-weight:600;pointer-events:none}
+#queueChip{top:auto;bottom:70px;left:calc((100% - var(--side-w))/2);transform:translateX(-50%);background:var(--ink);color:var(--paper);border-radius:16px;padding:5px 12px;font-size:13px;font-weight:600;pointer-events:none}
 
 .startline{display:flex;gap:8px;align-items:center;background:var(--card);border:2px solid var(--ink);border-radius:8px;padding:6px 6px 6px 10px}
 .startline .grow{flex:1;min-width:0;font-weight:600}
 .seg button{font-size:14px}
-.handle{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--route);box-shadow:0 0 0 1.5px #fff,1px 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);cursor:grab}
+.handle{position:relative;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--route);box-shadow:0 0 0 1.5px #fff,1px 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);cursor:grab}
 .handle.via{width:20px;height:20px;background:var(--route);border-color:#fff}
+.handle.via.small{width:12px;height:12px;border-width:2px}   /* the points that keep a drawn route to its line */
+.handle::after{content:"";position:absolute;inset:-14px;border-radius:50%}   /* a thumb-sized grip round a small dot */
 .leaflet-marker-draggable .handle:active{cursor:grabbing}
 .poi-pin.via-stop{transform:translate(-50%,-50%) scale(1.15);cursor:grab;filter:drop-shadow(0 0 0 #fff) drop-shadow(0 0 3px var(--route))}
 /* Explore */
@@ -219,7 +359,12 @@ html.topo{--l-boat:#0b57d0;--l-ucr:#e8590c;--l-closed:#b3001b;--l-rb:#555a61;--l
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .row2 .btn{white-space:normal;text-align:center}
 .bigstats.three{grid-template-columns:repeat(3,1fr)}
-.card.tcard{flex-direction:row;justify-content:space-between;align-items:center;gap:10px}
+.card.tcard{display:grid;grid-template-columns:76px minmax(0,1fr) auto;column-gap:12px;row-gap:6px;align-items:center}
+.card.tcard .th{grid-column:2}.card.tcard .th h3{font-size:17px;line-height:1.2}
+.card.tcard>.btn{grid-column:3;grid-row:1}
+.card.tcard .td{grid-column:1/-1;margin:0}
+.card.tcard .sk{flex:0 0 76px;width:76px;height:52px;border:2px solid var(--ink);border-radius:8px;overflow:hidden;background:#efe6cc}
+.card.tcard .sk svg{width:100%;height:100%;display:block}
 .card.tcard h3{margin-bottom:2px}
 .confirm{background:var(--card);border:2px solid var(--ink);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px}
 details.settingsBox{border:2px solid var(--ink);border-radius:8px;background:var(--card)}
@@ -245,13 +390,16 @@ details.settingsBox .setting{padding:0 12px;margin-top:8px}
 .night{display:flex;gap:10px;align-items:flex-start;padding:4px 2px 4px 6px;border-left:3px dotted var(--rule);margin-left:10px}
 .night .grow{flex:1;min-width:0}
 .opts{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.night{flex-wrap:wrap}
+.night>.opts{flex:1 1 100%}
 .opts button{text-align:left;border:1.5px solid var(--ink);border-radius:6px;background:var(--card);padding:6px 8px;font:14px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
 .editing{background:var(--ink);color:var(--paper);border-radius:8px;padding:8px 10px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .editing .btn{min-height:34px;padding:4px 10px;box-shadow:none}
 
 /* pop-overs */
-.pop{position:absolute;z-index:1100;top:12px;right:476px;width:330px;max-height:calc(100% - 24px);overflow:auto;background:var(--paper);border:2px solid var(--ink);border-radius:10px;box-shadow:4px 4px 0 var(--ink);padding:14px;display:flex;flex-direction:column;gap:12px}
-.pop .close{position:sticky;top:0;align-self:flex-end;margin-bottom:-38px;z-index:1}
+.pop{position:absolute;z-index:1100;top:12px;right:calc(var(--side-w) + 80px);width:330px;max-height:calc(100% - 24px);overflow:auto;background:var(--paper);border:2px solid var(--ink);border-radius:10px;box-shadow:4px 4px 0 var(--ink);padding:14px;display:flex;flex-direction:column;gap:12px}
+.pop .close{position:absolute;top:8px;right:8px;z-index:1}
+.pop>h3:first-of-type{padding-right:44px}
 .key{display:grid;grid-template-columns:34px 1fr;gap:8px 10px;align-items:center;font-size:14px}
 .sw{height:6px;border-radius:3px}
 .sw.dot{background:repeating-linear-gradient(90deg,currentColor 0 3px,transparent 3px 7px)!important}
@@ -266,14 +414,21 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
 .leaflet-popup-content{margin:12px 14px;font:14px/1.4 Barlow,sans-serif;min-width:220px}
 .leaflet-popup-content h3{margin-bottom:4px}
 .pop-actions{display:flex;flex-direction:column;gap:8px;margin-top:10px}
-.pop-links{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-size:13px}
+.pop-links{display:flex;flex-wrap:wrap;gap:0 14px;margin-top:4px;font-size:14px}
+.pop-links a{display:inline-flex;align-items:center;min-height:40px}
+.leaflet-container a.leaflet-popup-close-button{width:40px;height:40px;font:24px/40px Barlow,sans-serif;top:2px;right:2px}
 .stop-pin{width:30px;height:30px;border-radius:50%;background:var(--card);border:2px solid var(--ink);display:grid;place-items:center;font-size:16px;box-shadow:1px 1px 0 var(--ink);transform:translate(-50%,-50%)}
+.flag.night{transform:translate(10px,-34px);font-size:11px;padding:1px 6px;opacity:.95}
+.flag.night.below{transform:translate(10px,14px)}
 .flag{background:var(--ink);color:#fff;font:700 12px Barlow,sans-serif;border-radius:4px;padding:3px 7px;white-space:nowrap;transform:translate(-50%,-50%);display:inline-block;border:2px solid #fff}
+.route-arrow{display:block}
+#nearBtn{white-space:normal;text-align:left;height:auto;min-height:44px;line-height:1.3;padding-top:8px;padding-bottom:8px}
 .lane-num{background:var(--route);color:#fff;font:700 12px Barlow,sans-serif;border-radius:50%;width:22px;height:22px;display:grid;place-items:center;transform:translate(-50%,-50%);border:2px solid #fff}
 .leaflet-control-attribution{font-size:10px}
 
 /* phones: full-screen map, bottom sheet that peeks or opens */
-@media (max-width:820px){
+@media (max-width:820px) and (min-height:501px){
+  #scotHint{right:10px;max-width:none}
   #app{display:block}
   #map{position:fixed;inset:0}
   #sheet{position:fixed;left:0;right:0;bottom:0;z-index:1200;height:var(--sheet-peek);border-left:0;border-top:2px solid var(--ink);border-radius:14px 14px 0 0;box-shadow:0 -3px 0 rgba(0,0,0,.08);transition:height .25s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -286,23 +441,77 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   #tabbar button[aria-current="page"]{box-shadow:inset 0 3px 0 var(--green)}
   #sheet[data-state="min"] .sheet-body{display:none}
   #sheet[data-state="min"] #sheetHandle{color:var(--ink);font-size:15px;font-weight:700;padding-top:7px;cursor:pointer}
-  #sheet[data-state="mid"]{height:50vh}
-  #sheet[data-state="open"]{height:82vh}
+  /* heights are set by setSheet() from the visible screen height; these are only first-paint fallbacks */
+  #sheet[data-state="mid"]{height:50dvh}
+  #sheet[data-state="open"]{height:calc(100dvh - var(--tabbar-h) - 96px)}
   #sheetHandle{display:flex;flex-direction:column;align-items:center;gap:3px;border:0;background:none;padding:8px 0 2px;cursor:grab;color:var(--muted);font:600 12px Barlow,sans-serif;flex:0 0 auto;touch-action:none;min-height:44px;width:100%}
   #sheetHandle::before{content:"";width:44px;height:5px;border-radius:3px;background:var(--rule)}
   .sheet-body{padding:4px 14px 24px}
   .view{gap:12px}
-  #searchWrap{right:72px;width:auto;min-width:0;left:10px;top:10px}
-  #tools{right:10px;top:10px}
-  .tool{width:50px;height:50px}
+  /* the map's own buttons in the two top corners, one row high: Search and Show on the left, Map and Me on the right */
+  #searchWrap{left:10px;top:10px;right:auto;width:auto;min-width:0;flex-direction:row;align-items:flex-start;gap:8px}
+  #tools{right:10px;top:10px;flex-direction:row}
+  .tool{width:48px;height:48px;font-size:11px}
+  #btnSearch{display:flex}
+  #searchWrap:not(.open) #searchForm,#searchWrap:not(.open) #results{display:none}
+  #searchWrap.open{right:10px;flex-direction:column;z-index:1300}
+  #searchWrap.open #btnSearch,#searchWrap.open #poiWrap{display:none}
+  #searchWrap.open #searchForm{max-width:none;width:100%}
+  #searchClose{display:block;border:0;border-left:2px solid var(--ink);background:var(--card);padding:0 14px;font:700 16px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
+  #poiWrap{margin-top:0}
+  #poiBtn{flex-direction:column;justify-content:center;gap:2px;height:48px;min-height:48px;border-radius:8px;padding:2px 8px;font-size:11px;font-weight:700}
+  #poiBtn b{font-weight:700;order:2}#poiBtn>span[aria-hidden]{display:none}
+  #poiIcons .poi{width:18px;height:18px}
+  #workBar{top:66px;left:10px;right:10px;transform:none;max-width:none;justify-content:center;font-size:15px}
+  html:has(#sheet[data-state="open"]) #workBar{right:108px}   /* clear of the panel's tab */
+  body:has(#workBar:not([hidden])) #zoomHint{display:none}
+  /* the panel's tab: a solid tab standing up from the panel's top edge, to grab and drag */
+  #sheet{overflow:visible}
+  #sheetHandle{position:relative;flex-direction:row;justify-content:center;gap:8px;min-height:40px;padding:6px 0 4px;color:var(--ink);font:700 15px Barlow,sans-serif;z-index:3;background:var(--paper);border-radius:14px 14px 0 0}
+  #sheetHandle::before{display:none}
+  #sheetHandle .tab{position:absolute;left:50%;top:-24px;transform:translateX(-50%);width:92px;height:24px;background:var(--paper);border:2px solid var(--ink);border-bottom:0;border-radius:12px 12px 0 0;display:grid;place-items:center}
+  #sheetHandle .tab i{width:36px;height:9px;border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);opacity:.55}
+  #sheetHandle .tab::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:5px;background:var(--paper)}
+  #sheetHandle::after{content:"";position:absolute;left:0;right:0;top:100%;height:16px;background:linear-gradient(rgba(31,29,24,.30),rgba(31,29,24,0));pointer-events:none;opacity:0;transition:opacity .15s}
+  #sheet.scrolled #sheetHandle::after{opacity:1}
+  #sheet.dragging{transition:none}
+  #sheet[data-state="min"] #sheetHandle{padding-top:12px}
+  #sheet:not([data-state="min"]):not([data-state="open"]) #handleText{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  #sheet:not([data-state="min"]):not([data-state="open"]) #sheetHandle{min-height:16px;padding:0}
+  #sheet[data-state="open"] #sheetHandle{justify-content:flex-start;padding:6px 14px 4px;min-height:36px;font-size:14px;color:var(--green)}
+  #sheetHandle .tab{width:88px;height:28px;top:-28px;left:auto;right:10px;transform:none}   /* at the right, clear of the map credit on the left */
   #banner{left:10px;right:10px;transform:none;max-width:none;top:66px;padding:6px 8px;gap:6px;font-size:14px;line-height:1.25}
   #bannerText{flex:1 1 100%;text-align:center}
-  #status{left:10px;bottom:min(calc(var(--sheet-h) + 10px), calc(100% - 170px));max-width:calc(100% - 20px)}
-  #zoomHint{left:10px;right:72px;top:118px;bottom:auto;transform:none;font-size:13px;white-space:normal;text-align:left}   /* under the Show button, clear of the area pins */
+  #status{left:10px;bottom:min(calc(var(--sheet-h) + 38px), calc(100% - 170px));max-width:calc(100% - 20px)}   /* above the panel's tab */
+  #poiMenu{max-height:calc(100dvh - var(--sheet-h) - 80px)}
+  #zoomHint{left:10px;right:10px;top:66px;bottom:auto;transform:none;font-size:13px;white-space:normal;text-align:left}   /* under the corner buttons */
   #queueChip{left:50%;bottom:min(calc(var(--sheet-h) + 58px), calc(100% - 124px))}   /* above the status line, never over the top buttons */
   .leaflet-control-zoom{display:none}
   .pop{top:auto;bottom:calc(var(--sheet-h) + 8px);right:8px;left:8px;width:auto;max-height:calc(100% - var(--sheet-h) - 84px);z-index:1200}
   .leaflet-bottom{bottom:var(--sheet-ctl)}
+}
+/* a phone on its side: the same compact corner buttons as upright, left of the side panel */
+@media (max-height:500px){
+  .pop{top:66px;right:calc(var(--side-w) + 40px);left:auto;width:min(330px,calc(100% - var(--side-w) - 50px));max-height:calc(100% - 76px)}   /* clear of the fold tab */
+  #undoBar{right:calc(var(--side-w) + 56px)}   /* clear of the zoom buttons */
+  /* the map's own buttons in the two top corners, one row high: Search and Show on the left, Map and Me on the right */
+  #searchWrap{left:10px;top:10px;right:auto;width:auto;min-width:0;flex-direction:row;align-items:flex-start;gap:8px}
+  #tools{right:calc(var(--side-w) + 10px);top:10px;flex-direction:row}
+  .tool{width:48px;height:48px;font-size:11px}
+  #btnSearch{display:flex}
+  #searchWrap:not(.open) #searchForm,#searchWrap:not(.open) #results{display:none}
+  #searchWrap.open{right:calc(var(--side-w) + 10px);flex-direction:column;z-index:1300}
+  #searchWrap.open #btnSearch,#searchWrap.open #poiWrap{display:none}
+  #searchWrap.open #searchForm{max-width:none;width:100%}
+  #searchClose{display:block;border:0;border-left:2px solid var(--ink);background:var(--card);padding:0 14px;font:700 16px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
+  #poiWrap{margin-top:0}
+  #poiBtn{flex-direction:column;justify-content:center;gap:2px;height:48px;min-height:48px;border-radius:8px;padding:2px 8px;font-size:11px;font-weight:700}
+  #poiBtn b{font-weight:700;order:2}#poiBtn>span[aria-hidden]{display:none}
+  #poiIcons .poi{width:18px;height:18px}
+  #workBar{top:66px;left:10px;right:calc(var(--side-w) + 10px);transform:none;max-width:none;justify-content:center;font-size:15px}
+  body:has(#workBar:not([hidden])) #zoomHint{display:none}
+  #zoomHint{left:10px;right:calc(var(--side-w) + 10px);top:66px;bottom:auto;transform:none;font-size:13px;white-space:normal;text-align:left}
+  #banner{left:10px;right:calc(var(--side-w) + 10px);transform:none;max-width:none;top:66px;padding:6px 8px;gap:6px;font-size:14px}
 }
 /* small phones (iPhone SE and narrower): keep every row inside the screen */
 @media (max-width:370px){
@@ -321,68 +530,117 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
 }
 /* start screen */
 #welcome{position:fixed;inset:0;z-index:2500;background:var(--paper);overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
-.wl-inner{max-width:760px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px}
-.wl-hero{border:2px solid var(--ink);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);background:var(--card)}
-.wl-hero .poster{aspect-ratio:3/2}
-.wl-title{padding:12px 14px 14px;border-top:2px solid var(--ink)}
-.wl-title h1{font-size:34px;letter-spacing:.5px;text-transform:uppercase}
-.wl-title p{margin-top:4px;color:var(--muted)}
-.wl-go{display:flex;flex-direction:column;gap:10px}
-.wl-go .btn{min-height:54px;font-size:17px;white-space:normal}
-html.booting #welcome .btn{opacity:.55;pointer-events:none}
-#wlLoading{margin:-4px 0 -6px;text-align:center}
-html:not(.booting) #wlLoading{display:none}
-@media (min-width:1000px){.wl-inner{max-width:1120px}.wl-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-hero{display:grid;grid-template-columns:3fr 2fr}.wl-hero .poster{aspect-ratio:auto;min-height:320px}.wl-title{border-top:0;border-left:2px solid var(--ink);display:flex;flex-direction:column;justify-content:center;padding:24px}.wl-title h1{font-size:48px}}
-.wl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.wl-grid .rcard{flex:none;width:auto}
-.wl-grid .rcard .cap b{font-size:15px}
-@media (min-width:640px){.wl-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.wl-hero{position:relative;height:min(82svh,760px);min-height:520px;border-bottom:3px solid var(--ink);overflow:hidden;background:#e9dfc3}
+.wl-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 62%}
+.wl-top{position:absolute;left:0;right:0;top:0;padding:calc(max(14px,env(safe-area-inset-top)) + 8px) 20px 40px;background:linear-gradient(#f4efe1f2 0%,#f4efe1cc 60%,#f4efe100)}
+.wl-top h1{font:700 clamp(46px,14vw,84px)/.92 "Zilla Slab",Georgia,serif;text-transform:uppercase;letter-spacing:.5px;color:var(--ink)}
+.wl-top p{margin-top:10px;font:600 17px/1.35 Barlow,sans-serif;color:var(--ink);max-width:30ch}
+.wl-cta{position:absolute;left:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));display:grid;gap:10px;max-width:520px}
+.wl-cta .btn{min-height:58px;font-size:19px;border-width:2px}
+.wl-cta #wlMap{background:var(--card)}
+.wl-inner{max-width:1120px;margin:0 auto;padding:16px 16px calc(28px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:18px}
+.wl-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.wl-facts div{border:2px solid var(--ink);border-radius:10px;background:var(--card);padding:8px 10px;box-shadow:var(--shadow)}
+.wl-facts b{display:block;font:800 24px/1.1 Barlow,sans-serif;color:var(--green)}
+.wl-facts span{font:600 13px Barlow,sans-serif;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.wl-sec h2{font-size:26px}
+.wl-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.wl-head .btn{min-height:44px;font-size:15px}
+.wl-country{margin:12px 0 6px;font:700 19px "Zilla Slab",Georgia,serif}
+.wl-country span{font:600 13px Barlow,sans-serif;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-left:6px}
+.wl-strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 4px 12px;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none;overscroll-behavior-x:contain}
+.wl-strip::-webkit-scrollbar{display:none}
+.wl-strip:has(.wl-trip){align-items:flex-start}
+.wl-strip .rcard{flex:0 0 min(270px,74vw)}
+.rcard .cap .dist{font-style:normal;font-weight:700;color:var(--green);font-size:13px}
+.rcard .cap .dist:empty{display:none}
+.wl-trip{flex:0 0 min(290px,78vw);scroll-snap-align:start;border:2px solid var(--ink);border-radius:10px;background:var(--card);box-shadow:var(--shadow);overflow:hidden;text-align:left;padding:0;cursor:pointer;color:var(--ink);font:inherit;display:flex;flex-direction:column}
+.wl-trip svg{display:block;width:100%;aspect-ratio:3/2;background:#efe6cc;border-bottom:2px solid var(--ink)}
+.wl-trip .cap{padding:8px 12px 10px;display:flex;flex-direction:column;gap:2px}
+.wl-trip .cap b{font:700 18px/1.15 "Zilla Slab",Georgia,serif}
+.wl-trip .cap span{font-size:14px;color:var(--muted)}
+.wl-own{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.wl-tile{border:2px solid var(--ink);border-radius:12px;background:var(--card);box-shadow:var(--shadow);padding:12px;text-align:left;display:flex;flex-direction:column;gap:3px;color:var(--ink);font:inherit;cursor:pointer;min-height:112px}
+.wl-tile .ic{font-size:26px;line-height:1}
+.wl-tile b{font:700 19px "Zilla Slab",Georgia,serif}
+.wl-tile span:last-child{font-size:14px;color:var(--muted);line-height:1.3}
+html.booting #welcome .btn,html.booting #welcome .wl-tile,html.booting #welcome .rcard{opacity:.6;pointer-events:none}
+@media (min-width:700px){.wl-facts{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-own{grid-template-columns:repeat(4,minmax(0,1fr))}.wl-strip{margin:0;padding-left:4px;padding-right:4px}}
+@media (min-width:1000px){.wl-hero{height:min(70vh,640px)}.wl-top{padding:40px 48px 60px}.wl-cta{left:48px;bottom:40px;grid-template-columns:1fr 1fr;max-width:560px}}
+/* wide screens: the wide poster, with the title over its open sky on the left */
+@media (orientation:landscape){#welcome .wl-hero img{object-position:50% 60%}#welcome .wl-top{background:linear-gradient(90deg,#f4efe1e6 0%,#f4efe1b3 45%,#f4efe100 100%);bottom:0;right:auto;width:min(640px,62%)}}
+@media (orientation:landscape) and (max-height:560px){.wl-hero{height:100svh;min-height:0}.wl-top h1{font-size:44px}.wl-cta{grid-template-columns:1fr 1fr;max-width:560px}}
 .me-dot{width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 2px rgba(26,115,232,.35),0 1px 4px rgba(0,0,0,.4)}
 @media (prefers-reduced-motion:reduce){#sheet{transition:none}}
 </style>
 </head>
 <body>
 <section id="welcome" aria-label="Start">
-  <div class="wl-inner">
-    <div class="wl-hero"><div class="poster" id="wlHero"></div><div class="wl-title"><h1>Green Lanes</h1><p>Plan motorbike rides on legal byways in England and Wales, then take the GPX with you.</p></div></div>
-    <p class="small muted" id="wlLoading">Loading the lane map…</p>
-    <div class="wl-go">
+  <div class="wl-hero">
+    <picture><source media="(orientation: landscape)" srcset="img/regions/start-hero-wide.jpg"><img src="img/regions/start-hero.jpg" alt="Poster of a rider on a stony lane running down a long green valley" fetchpriority="high"></picture>
+    <div class="wl-top"><h1>Green<br>Lanes</h1><p>Motorbike rides on legal byways in England and Wales, and road rides through Scotland.</p></div>
+    <div class="wl-cta">
       <button class="btn primary" id="wlCarry" hidden></button>
-      <button class="btn primary" id="wlMap">▦ Open the map</button>
+      <button class="btn primary" id="wlRides">Find a ride</button>
+      <button class="btn" id="wlMap">▦ Open the map</button>
     </div>
-    <h2>Plan your own</h2>
-    <div class="own">
-      <button class="btn" id="wlLoop"><span class="ic" aria-hidden="true">⟲</span>Loop</button>
-      <button class="btn" id="wlDraw"><span class="ic" aria-hidden="true">✎</span>Draw</button>
-      <button class="btn" id="wlTour"><span class="ic" aria-hidden="true">⛺</span>Tour</button>
-      <button class="btn" id="wlLanes"><span class="ic" aria-hidden="true">⌕</span>Find lanes</button>
-    </div>
-    <h2>Or pick an area</h2>
-    <div class="wl-grid" id="wlGrid" role="list" aria-label="Riding areas"></div>
+  </div>
+  <div class="wl-inner">
+    <div class="wl-facts" id="wlFacts"></div>
+    <p class="small muted" id="wlLoading">Loading the lane map…</p>
+    <section class="wl-sec" id="wlTripsSec" hidden>
+      <h2>Big trips</h2>
+      <p class="small muted">Several days, with somewhere to stay each night.</p>
+      <div class="wl-strip" id="wlTrips"></div>
+    </section>
+    <section class="wl-sec" id="wlAreasTop">
+      <div class="wl-head"><h2>Where to ride</h2><button class="btn quiet" id="wlNear">📍 Nearest first</button></div>
+      <div id="wlAreas"></div>
+    </section>
+    <section class="wl-sec">
+      <h2>Plan your own</h2>
+      <div class="wl-own">
+        <button class="wl-tile" id="wlLoop"><span class="ic" aria-hidden="true">⟲</span><b>Loop</b><span>A round trip from a town, with lanes on the way</span></button>
+        <button class="wl-tile" id="wlDraw"><span class="ic" aria-hidden="true">✎</span><b>Draw</b><span>Sketch roughly where you want to go</span></button>
+        <button class="wl-tile" id="wlTour"><span class="ic" aria-hidden="true">⛺</span><b>Tour</b><span>Several days, with places to stay</span></button>
+        <button class="wl-tile" id="wlLanes"><span class="ic" aria-hidden="true">⌕</span><b>Find lanes</b><span>Search by name, or find the longest</span></button>
+      </div>
+    </section>
     <p class="small"><a href="about.html">How it works and where the data comes from</a></p>
   </div>
 </section>
 <!-- The start screen shows first, from the small area files, while the lane data (several MB) loads behind it. -->
-<script src="data/regions.js?v=d1a0b3f7" onerror="window.REGIONS=[];window.TOUR_PRESETS=[]"></script>
-<script src="data/region-stats.js?v=ef91d757" onerror="window.REGION_STATS=null"></script>
+<script src="data/regions.js?v=96f2904e" onerror="window.REGIONS=[];window.TOUR_PRESETS=[]"></script>
+<script src="data/region-stats.js?v=635c4fc6" onerror="window.REGION_STATS=null"></script>
 <script>
 (function(){
   document.documentElement.classList.add("booting");
-  var R = window.REGIONS || [], S = window.REGION_STATS || {}, e = function(t){ return String(t).replace(/[&<>"]/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-  var img = function(r, lazy){ return '<img src="img/regions/' + r.slug + '.jpg" alt="Poster of ' + e(r.name) + '" loading="' + (lazy ? "lazy" : "eager") + '" onerror="this.remove()">'; };
-  var pick = R[Math.floor(Math.random() * R.length)];
-  if (pick) document.getElementById("wlHero").innerHTML = img(pick, false);
-  document.getElementById("wlGrid").innerHTML = R.map(function(r){ var n = (S[r.slug] || {}).rides || 0;
-    return '<button class="rcard" role="listitem" data-slug="' + r.slug + '"><div class="poster">' + img(r, true) + '</div><div class="cap"><b>' + e(r.name) + '</b><span>' + (n ? n + " ride" + (n > 1 ? "s" : "") : "Plan your own") + '</span></div></button>'; }).join("");
+  var R = window.REGIONS || [], S = window.REGION_STATS || {}, A = S._all || {}, e = function(t){ return String(t).replace(/[&<>"]/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var card = function(r){ var st = S[r.slug] || {}, n = st.rides || 0;
+    var sub = r.kind === "road" ? (n ? n + " road ride" + (n > 1 ? "s" : "") : "Road riding") : (n ? n + " ride" + (n > 1 ? "s" : "") : "Plan your own") + (st.laneKm ? " · " + st.laneKm + " km of lanes" : "");
+    return '<button class="rcard" data-slug="' + r.slug + '"><div class="poster"><img src="img/regions/' + r.slug + '.jpg" alt="Poster of ' + e(r.name) + '" loading="lazy" onerror="this.remove()"></div><div class="cap"><b>' + e(r.name) + '</b><span>' + sub + '</span><i class="dist"></i></div></button>'; };
+  // the areas in a row per country, England, Wales, then Scotland
+  window.renderAreas = function(order){
+    var box = document.getElementById("wlAreas");
+    if (order) { box.innerHTML = '<div class="wl-strip">' + order.map(card).join("") + '</div>'; return; }
+    box.innerHTML = ["England", "Wales", "Scotland"].map(function(c){ var rs = R.filter(function(r){ return (r.country || "England") === c; }); if (!rs.length) return "";
+      return '<h3 class="wl-country">' + c + (c === "Scotland" ? ' <span>road riding</span>' : "") + '</h3><div class="wl-strip">' + rs.map(card).join("") + '</div>'; }).join("");
+  };
+  renderAreas();
+  var fmt = function(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); };
+  document.getElementById("wlFacts").innerHTML = [[A.laneKm ? fmt(A.laneKm) : "7,500", "km of legal lanes"], [A.rides || "30+", "ready-made rides"], [A.trips || 8, "big trips"], ["No signal", "saved on your phone"]]
+    .map(function(f){ return '<div><b>' + f[0] + '</b><span>' + f[1] + '</span></div>'; }).join("");
 })();
 </script>
 <div id="app">
   <div id="map" aria-label="Map"></div>
 
   <div class="mapui" id="searchWrap">
+    <button class="tool" id="btnSearch" aria-label="Search for a place" aria-expanded="false"><span class="ic">⌕</span>Search</button>
     <form id="searchForm" role="search">
-      <input id="q" type="search" placeholder="Town, village or postcode" aria-label="Search for a place" autocomplete="off">
+      <input id="q" type="text" inputmode="search" enterkeyhint="search" placeholder="Town, village or postcode" aria-label="Search for a place" autocomplete="off">
       <button type="submit">Go</button>
+      <button type="button" id="searchClose" aria-label="Close search">✕</button>
     </form>
     <div id="results" hidden></div>
     <div id="poiWrap">
@@ -396,9 +654,13 @@ html:not(.booting) #wlLoading{display:none}
     <button class="tool" id="btnLocate" aria-label="Show where I am"><span class="ic">◎</span>Me</button>
   </div>
 
-  <div class="mapui" id="banner" hidden><span id="bannerText"></span><button class="btn" id="bannerMe" hidden>Use my location</button><button class="btn" id="bannerMove" hidden>✋ Move map</button><button class="btn" id="bannerUndo" hidden>↶ Undo</button><button class="btn" id="bannerDone" hidden>✓ Done</button><button class="btn" id="bannerCancel">Cancel</button></div>
-  <div class="mapui" id="zoomHint" hidden>Green shading shows where the lanes are. Tap it to zoom in.</div>
+  <div class="mapui" id="banner" hidden><span id="bannerText"></span><button class="btn" id="bannerMe" hidden>Use my location</button><button class="btn" id="bannerSearch" hidden>⌕ Search</button><button class="btn" id="bannerMove" hidden>✋ Move map</button><button class="btn" id="bannerUndo" hidden>↶ Undo</button><button class="btn" id="bannerDone" hidden>✓ Done</button><button class="btn" id="bannerCancel">Cancel</button></div>
+  <div class="mapui" id="zoomHint" hidden>Green shading is where the lanes are: tap to zoom in</div>
+  <div class="mapui" id="scotHint" hidden><span>Scotland has no byways open to motor vehicles, so there's no green shading here. The rides here are road rides.</span><button class="btn primary" id="scotGo">Road rides near here</button><button class="btn quiet" id="scotX" aria-label="Close">✕</button></div>
   <div id="status" hidden role="status" aria-live="polite"></div>
+  <div id="undoBar" hidden role="status"><span id="undoText"></span><button class="btn" id="undoGo">Undo</button></div>
+  <div id="workBar" hidden role="status" aria-live="polite"><span class="spin" aria-hidden="true"></span><span id="workText"></span><i id="workFill"></i></div>
+  <div id="updateBar" hidden role="status"><span>A new version of the planner is ready.</span><button class="btn primary" id="updateGo">Update</button><button class="btn quiet" id="updateLater">Later</button></div>
   <div class="mapui" id="queueChip" hidden></div>
 
   <!-- map key and layers -->
@@ -439,14 +701,16 @@ html:not(.booting) #wlLoading{display:none}
   <!-- help -->
 
   <!-- the sheet: one view at a time -->
+  <button id="sideToggle" aria-label="Hide the panel" aria-expanded="true">▶</button>
   <section id="sheet" data-state="peek" aria-label="Planner">
     <nav id="tabbar" aria-label="Sections">
+      <button data-tab="home"><span class="ti" aria-hidden="true">⌂</span>Home</button>
       <button data-tab="explore" aria-current="page"><span class="ti" aria-hidden="true">◈</span>Explore</button>
       <button data-tab="plan"><span class="ti" aria-hidden="true">✎</span>Plan</button>
       <button data-tab="saved"><span class="ti" aria-hidden="true">★</span>Saved</button>
       <button data-tab="help"><span class="ti" aria-hidden="true">?</span>Help</button>
     </nav>
-    <button id="sheetHandle" aria-label="Show more"><span id="handleText">Pull up for settings</span></button>
+    <button id="sheetHandle" aria-label="Show more"><span class="tab" aria-hidden="true"><i></i></span><span id="handleText">Pull up for settings</span></button>
     <div class="sheet-body" id="sheetBody">
 
       <div id="vStart" class="view" hidden>
@@ -473,11 +737,21 @@ html:not(.booting) #wlLoading{display:none}
           <li><b>Explore</b> the riding areas and ride a ready-made route or trip.</li>
           <li><b>Plan</b> your own: a <i>Loop</i> from a start, <i>Draw</i> roughly where you want to go, a multi-day <i>Tour</i>, or <i>Find lanes</i>.</li>
                 <li><b>Change it:</b> tap a green lane to add it, tap a pink one to take it out, or drag ○ onto a lane. To stop somewhere, tap its icon and choose Add to route, or drag ○ onto the icon.</li>
-          <li><b>Show</b> (under the search box) puts tea, food, toilets, fuel, beauty spots and places to stay on the map and in the GPX.</li>
+          <li><b>Show</b> (at the top of the map) puts tea, food, toilets, fuel, beauty spots and places to stay on the map and in the GPX.</li>
           <li><b>GPX</b> sends the route to your sat nav or phone app. <b>Saved</b> keeps what you have open and what you save.</li>
         </ol>
         <p class="small">On the normal map: green is a byway, open to motorbikes; amber is an unclassified road, usually open; dashed green is a byway from the council's record; red dots are closed; grey dots are restricted byways, with no motorbikes. Satellite and Topo use their own colours, shown in the Map key.</p>
         <div class="note"><b>Before you ride:</b> lanes close for repairs and for the winter. Check each lane on the <a href="https://www.greenroadmap.org.uk/" target="_blank" rel="noopener">TRF Green Road Map</a> or <a href="https://www.trailwise2.co.uk/" target="_blank" rel="noopener">TrailWise</a>, and obey signs on the ground.</div>
+        <h2>With no signal</h2>
+        <p class="small" id="offlineState">Checking whether this phone has the app saved…</p>
+        <p class="small" id="offlineIos" hidden>On an iPhone, add the planner to your Home Screen (Share, then Add to Home Screen). Safari clears saved data for websites that haven't been opened for a week, but not for Home Screen apps.</p>
+        <ul class="small">
+          <li>The app, the lanes, the places and your Saved routes work with no signal.</li>
+          <li>To plan or change a route with no signal, save a route near where you're riding first, with <b>Save for no signal</b> on the route screen. That keeps the roads within about 12 km of it.</li>
+          <li>The map picture needs a signal. With none, you get a plain road map drawn from the saved roads.</li>
+          <li>Place search needs a signal. With none, tap the map to set a start.</li>
+          <li>Ride mode shows where you are on the route, but only while the screen is on. For the ride itself, load the GPX into a sat nav or a GPS app.</li>
+        </ul>
         <p><button class="btn" id="helpHome">⌂ Start screen</button></p>
         <p><a href="about.html">How it works, where the data comes from, and how complete it is</a></p>
         <p class="small muted">Lanes, stops and places come from OpenStreetMap, which volunteers keep up to date, so it has gaps. Roads come from the free BRouter and OSRM servers, which ask users to keep requests modest, so planning takes a few seconds.</p>
@@ -493,13 +767,8 @@ html:not(.booting) #wlLoading{display:none}
       </div>
 
       <div id="vLanes" class="view" hidden>
-        <button class="btn quiet back" id="lanesBack">← Back</button>
-        <h2>Find lanes</h2>
-        <details class="settingsBox" id="classicBox">
-          <summary>Well-known lanes: open or closed?</summary>
-          <ul class="list" id="classicList"></ul>
-        </details>
-        <div class="field"><input id="laneQ" type="search" placeholder="Name or number, e.g. Ridgeway, BOAT 12" aria-label="Search lanes by name or number" autocomplete="off"></div>
+        <div class="vhead"><button class="btn quiet back" id="lanesBack">← Back</button><h2>Find lanes</h2></div>
+        <div class="field"><input id="laneQ" type="text" inputmode="search" enterkeyhint="search" placeholder="Name or number, e.g. Ridgeway, BOAT 12" aria-label="Search lanes by name or number" autocomplete="off"></div>
         <div class="seg" id="laneSort" role="group" aria-label="Which lanes">
           <button data-sort="here" aria-pressed="true">Longest here</button>
           <button data-sort="all" aria-pressed="false">Longest anywhere</button>
@@ -508,25 +777,28 @@ html:not(.booting) #wlLoading{display:none}
         <label class="check"><input type="checkbox" id="laneBoatOnly"> Byways only (no unclassified roads)</label>
         <p class="small muted" id="laneCount"></p>
         <ul class="list" id="laneResults"></ul>
+        <details class="settingsBox" id="classicBox">
+          <summary>Well-known lanes: open or closed?</summary>
+          <ul class="list" id="classicList"></ul>
+        </details>
       </div>
 
       <div id="vRegion" class="view" hidden>
-        <button class="btn quiet back" id="regionBack">← All areas</button>
-        <div class="poster big" id="regionPoster"></div>
-        <h2 id="regionName"></h2>
+        <div class="vhead"><button class="btn quiet back" id="regionBack">← All areas</button><h2 id="regionName"></h2></div>
         <p class="small" id="regionLine"></p>
-        <div class="bigstats three" id="regionStats"></div>
         <h3>Ready-made rides</h3>
         <div id="regionRides" class="stack"></div>
-        <div class="row2">
+        <div class="row2" id="regionPlanOwn">
           <button class="btn primary" id="regionLoop">⟲ Plan my own loop</button>
           <button class="btn" id="regionDraw">✎ Draw a route</button>
         </div>
+        <p class="small muted" id="regionRoadNote" hidden>Scotland has no byways open to motor vehicles: the right to roam there doesn't cover them, and forest and estate tracks need the landowner's permission. These rides are on public roads.</p>
+        <div class="bigstats three" id="regionStats"></div>
+        <div class="poster banner" id="regionPoster"></div>
       </div>
 
       <div id="vIdeas" class="view" hidden>
-        <button class="btn quiet back" id="ideasBack">← Back</button>
-        <h2 id="ideasTitle">Loop from a place</h2>
+        <div class="vhead"><button class="btn quiet back" id="ideasBack">← Back</button><h2 id="ideasTitle">Loop from a place</h2></div>
         <div id="loopCtl" class="startline">
           <span id="startText" class="grow">Start: tap the map</span>
           <button class="btn quiet" id="changeStart">Change start</button>
@@ -536,6 +808,7 @@ html:not(.booting) #wlLoading{display:none}
             <button data-shape="loop" aria-pressed="true">⟲ Loop back to start</button>
             <button data-shape="line" aria-pressed="false">→ One way</button>
           </div>
+          <label class="check"><input type="checkbox" id="followLine" checked> <span><b>Keep to my line</b><br><span class="small muted">Roads follow what you drew, round a lake or over a pass, in the direction you drew it. Off: the line only says where to look for lanes.</span></span></label>
           <div class="row3">
             <button class="btn quiet" id="drawMore">✎ Draw more</button>
             <button class="btn quiet" id="undoStroke">↶ Undo</button>
@@ -572,9 +845,8 @@ html:not(.booting) #wlLoading{display:none}
       </div>
 
       <div id="vTour" class="view" hidden>
-        <button class="btn quiet back" id="tourBack">← Back</button>
+        <div class="vhead"><button class="btn quiet back" id="tourBack">← Back</button><h2 id="tourSetupTitle">Plan a tour</h2><input class="namebox" id="tourName" aria-label="Tour name"></div>
         <div id="tourSetup" class="view">
-          <h2>Plan a tour</h2>
           <p class="small muted">Pick a start and a finish. It plans each day's lanes and finds somewhere to stay each night.</p>
           <div class="field"><label for="tStart"><b>Start</b></label>
             <div class="line"><input id="tStart" placeholder="Town or postcode"><button class="btn quiet" id="tStartMap">Tap map</button></div>
@@ -583,6 +855,8 @@ html:not(.booting) #wlLoading{display:none}
             <div class="line"><input id="tEnd" placeholder="Town or postcode"><button class="btn quiet" id="tEndMap">Tap map</button></div>
             <span class="picked" id="tEndPicked">Not set</span>
             <label class="check"><input type="checkbox" id="tRound"><span>Come back to the start by a different way</span></label></div>
+          <button class="btn primary wide" id="tourGo">Plan my tour</button>
+          <p class="small muted" id="tourEst"></p>
           <div class="box">
             <div class="setting-top"><label>Riding each day</label>
               <div class="stepper"><button id="dhMinus" aria-label="Fewer hours">−</button><output id="dhVal">6 h</output><button id="dhPlus" aria-label="More hours">+</button></div></div>
@@ -592,11 +866,8 @@ html:not(.booting) #wlLoading{display:none}
               <div class="chips" id="sleepChips"></div></div>
           </div>
           <div id="tourSettingsSlot"></div>
-          <button class="btn primary wide" id="tourGo">Plan my tour</button>
-          <p class="small muted" id="tourEst"></p>
         </div>
         <div id="tourResult" class="view" hidden>
-          <input class="namebox" id="tourName" aria-label="Tour name">
           <div class="bigstats">
             <div><b id="tsDays">–</b><span>days</span></div>
             <div><b id="tsKm">–</b><span>km</span></div>
@@ -606,16 +877,15 @@ html:not(.booting) #wlLoading{display:none}
           <p class="small" id="tourLine" hidden></p>
           <div class="note" id="tourNotes" hidden></div>
           <button class="btn pink wide" id="tourGpx">⬇ Download tour GPX (all days)</button>
-          <p class="small muted">Tap a day to see it. The night stops are suggestions: tap Change to pick another place.</p>
+          <p class="small muted" id="tourDayHint">Tap a day to see it. The night stops are suggestions: tap Change to pick another place.</p>
           <div id="dayList" class="view"></div>
-          <div class="row3"><button class="btn quiet" id="tourReplan">↻ Re-plan</button><button class="btn quiet" id="tourSave">★ Save</button><button class="btn quiet" id="tourNew">✕ New</button></div>
+          <div class="row3"><button class="btn quiet" id="tourReplan">↻ Re-plan</button><button class="btn quiet" id="tourSave">★ Save</button><button class="btn quiet" id="tourNew">+ New tour</button></div>
         </div>
       </div>
 
       <div id="vRoute" class="view" hidden>
-        <button class="btn quiet back" id="routeBack" hidden>← Change the plan</button>
-        <div class="editing" id="editingBar" hidden><span id="editingText"></span><button class="btn" id="editingSave">Save to tour</button></div>
-        <input class="namebox" id="routeName" aria-label="Route name">
+        <div class="editing" id="editingBar" hidden><button class="btn quiet" id="editingBack">← Tour</button><span id="editingText"></span><button class="btn primary" id="editingSave">Save to tour</button></div>
+        <div class="vhead"><button class="btn quiet back" id="routeBack" hidden>← Change the plan</button><input class="namebox" id="routeName" aria-label="Route name"></div>
         <div class="bigstats">
           <div><b id="stTime">–</b><span>riding</span></div>
           <div><b id="stKm">–</b><span>km</span></div>
@@ -623,11 +893,13 @@ html:not(.booting) #wlLoading{display:none}
           <div><b id="stTwist">–</b><span>roads</span></div>
         </div>
         <div class="acts4">
+          <button class="btn primary" id="rideBtn" aria-label="Ride this route"><span class="ic" aria-hidden="true">▶</span>Ride</button>
           <button class="btn pink" id="gpxBtn" aria-label="Download GPX"><span class="ic" aria-hidden="true">⬇</span>GPX</button>
-          <button class="btn quiet" id="revBtn" aria-label="Reverse the route"><span class="ic" aria-hidden="true">⇄</span>Reverse</button>
           <button class="btn quiet" id="saveBtn" aria-label="Save the route"><span class="ic" aria-hidden="true">★</span>Save</button>
           <button class="btn quiet" id="newBtn" aria-label="New route"><span class="ic" aria-hidden="true">＋</span>New</button>
         </div>
+        <button class="btn quiet wide" id="offlineBtn">⤓ Save for no signal</button>
+        <p class="small" id="offlineNote" hidden aria-live="polite"></p>
         <p class="small muted" id="routeStatus" aria-live="polite"></p>
         <div class="confirm" id="newConfirm" hidden role="alertdialog" aria-labelledby="newConfirmText">
           <p id="newConfirmText"><b>Start a new route?</b> This one will be cleared.</p>
@@ -640,6 +912,9 @@ html:not(.booting) #wlLoading{display:none}
         <div class="note" id="routeWarn"></div>
         <details class="settingsBox" id="routeSettings">
           <summary>Route settings</summary>
+          <div class="row3"><button class="btn quiet" id="rStartBtn">⚑ Set where it starts</button><label class="check"><input type="checkbox" id="rLoop"> <span>Finish back at the start</span></label></div>
+          <button class="btn quiet" id="revBtn" aria-label="Reverse the route">⇄ Ride it the other way round</button>
+          <button class="btn quiet" id="backBtn">⇆ Come back the same way</button>
           <div class="setting">
             <label for="twisty2"><b>Roads between lanes</b></label>
             <input type="range" id="twisty2" min="0" max="100" step="5" value="60">
@@ -655,7 +930,8 @@ html:not(.booting) #wlLoading{display:none}
           <button data-rt="stops" aria-pressed="false">Stops</button>
         </div>
         <div id="rtLanes" class="view">
-          <p class="small muted">Tap a lane to add it · drag ○ onto a lane to reroute</p>
+          <p class="small muted">Tap a lane to add it · zoom in and drag ○ onto a lane to reroute</p>
+          <button class="btn quiet" id="nearBtn" hidden></button>
           <ul class="list" id="laneList"></ul>
         </div>
         <div id="rtStops" class="view" hidden>
@@ -678,15 +954,41 @@ html:not(.booting) #wlLoading{display:none}
     <button class="btn quiet" id="busyCancel">Cancel</button>
   </div>
 </div>
+
+<!-- Ride this route: a light riding view over the map (js/ride.js). Portrait: panels top and bottom; landscape: panels
+     on the left, buttons down the right edge. -->
+<section id="ride" hidden aria-label="Riding">
+  <header id="rideTop" class="ride-panel" aria-live="polite">
+    <div class="rt-row"><span id="rideNextLabel" class="rt-label">Next lane</span><span id="rideNextDist"></span></div>
+    <span class="rt-icons"><button class="ride-ico" id="rideSignal" hidden aria-label="No signal: about the map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h2v-3H3zm5 0h2v-6H8zm5 0h2V10h-2zm5 0h2V5h-2z" fill="currentColor" opacity=".35"/><path d="M3 3l18 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button><button class="ride-ico" id="rideGpsIco" aria-label="GPS: how good the position is"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="currentColor" stroke-width="2"/></svg></button></span>
+    <div class="rt-main"><b id="rideNextName">–</b></div>
+    </header>
+  <div id="rideFloat"><div id="rideMsg" class="rt-msg" hidden><span id="rideMsgText"></span><button class="btn" id="rideMsgGo" hidden></button></div>
+    <div id="rideOff" class="ride-off" hidden role="alert"><b>Off the route</b> <span id="rideOffDist"></span><button class="btn" id="rideBackTo">Way back</button></div></div>
+  <div id="rideBottom" class="ride-panel">
+    <div class="ride-stats"><div><b id="rideDone">0.0</b><span>km ridden</span></div><div><b id="rideLeft">–</b><span>km left</span></div><div><b id="rideTime">–</b><span>to go</span></div></div>
+    <div class="ride-next2"><span id="rideStop"></span><span id="rideFuel"></span></div>
+  </div>
+  <nav id="rideActions" aria-label="Ride controls">
+    <button class="ride-btn danger" id="rideEnd"><span aria-hidden="true">■</span><small>End</small></button>
+    <button class="ride-btn" id="ridePractice" aria-label="Preview: watch the dot ride the route at ten times speed"><span aria-hidden="true">▶</span><small>Preview</small></button>
+    <button class="ride-btn" id="rideRecentre" aria-label="Follow my position"><span aria-hidden="true">◎</span><small>Follow</small></button>
+    <button class="ride-btn" id="rideZoomOut" aria-label="Zoom out"><span aria-hidden="true">−</span><small>Out</small></button>
+    <button class="ride-btn" id="rideZoomIn" aria-label="Zoom in"><span aria-hidden="true">+</span><small>In</small></button>
+  </nav>
+</section>
+<button id="offlineBadge" hidden aria-label="No signal: about the map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h2v-3H3zm5 0h2v-6H8zm5 0h2V10h-2zm5 0h2V5h-2z" fill="currentColor" opacity=".35"/><path d="M3 3l18 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="data/osm-lanes.js?v=a10797ab"></script>
 <script src="data/council-flags.js?v=0caaf474" onerror="window.COUNCIL_FLAGS=null"></script>
 <script src="data/council-boats.js?v=d29ae6d4" onerror="window.COUNCIL_BOATS=null"></script>
 <script src="data/closures.js?v=613bc2dd" onerror="window.CLOSURES=null"></script>
 <script src="data/classics.js?v=06d1a86d" onerror="window.CLASSICS=[]"></script>
-<script src="data/featured.js?v=1438cd20" onerror="window.FEATURED=null"></script>
+<script src="data/featured.js?v=5f047364" onerror="window.FEATURED=null"></script>
 
 <script src="js/plan.js?v=89dd517b"></script>
-<script src="js/app.js?v=0a6dc0b8"></script>
+<script src="js/app.js?v=1e361fc9"></script>
+<script src="js/offline.js?v=4ba26330"></script>
+<script src="js/ride.js?v=92d361a0"></script>
 </body>
 </html>
