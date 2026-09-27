@@ -63,7 +63,9 @@ const busy = {
 };
 
 /* ---------- map ---------- */
-const map = L.map("map", { preferCanvas: true, renderer: L.canvas({ tolerance: 10 }), zoomControl: false }).setView([52.6, -2.3], 7);
+// the whole of Britain, Scotland included: a zoom out on a phone's narrow screen
+const GB_CENTRE = [54.4, -3.2], gbZoom = () => innerWidth <= 820 ? 5 : 6;
+const map = L.map("map", { preferCanvas: true, renderer: L.canvas({ tolerance: 10 }), zoomControl: false }).setView(GB_CENTRE, gbZoom());
 L.control.zoom({ position: "bottomright" }).addTo(map);
 map.createPane("route"); map.getPane("route").style.zIndex = 450; map.getPane("route").style.pointerEvents = "none";
 const routeRenderer = L.svg({ pane: "route" });
@@ -654,7 +656,7 @@ const TAB_OF = { plan: "explore", region: "explore", start: "plan", saved: "save
 const TAB_VIEW = { explore: "plan", plan: "start", saved: "saved", help: "help" };
 document.querySelectorAll("#tabbar button").forEach(b => b.onclick = () => {
   const v = TAB_VIEW[b.dataset.tab]; stopModes();
-  if (v === "plan" && view === "region") fly([52.6, -2.3], 7);
+  if (v === "plan" && view === "region") fly(GB_CENTRE, gbZoom());
   showView(v, v === "plan" ? "peek" : "mid");
 });
 function showView(v, sheetState){
@@ -1287,7 +1289,13 @@ function bendiness(lines){
 const bendLabel = b => !b ? "–" : b < 90 ? "Straight" : b < 160 ? "Bendy" : "Twisty";
 function drawBuilt(layer, t, b, bold, numbers = bold, col = "#c2185b"){
   const R = routeRenderer, op = bold ? 1 : .45, numPlaced = [];
-  if (b) for (const s of b.segs) if (s.type === "road") {
+  // a road ride (Scotland: only waypoints, no lanes) is all road, so its roads are the route itself: drawn solid, not as links
+  const roadRide = t.items.length && t.items.every(it => it.via);
+  if (b && roadRide) for (const s of b.segs) if (s.type === "road") {
+    if (bold) L.polyline(s.coords, { color: "#fff", weight: 9, interactive: false, renderer: R }).addTo(layer);
+    L.polyline(s.coords, { color: col, weight: bold ? 5 : 3, opacity: op, interactive: false, renderer: R }).addTo(layer);
+  }
+  if (b && !roadRide) for (const s of b.segs) if (s.type === "road") {
     if (s.lanes) { if (bold) L.polyline(s.coords, { color: "#fff", weight: 9, interactive: false, renderer: R }).addTo(layer); L.polyline(s.coords, { color: col, weight: bold ? 5 : 3, opacity: op, interactive: false, renderer: R }).addTo(layer); }
     else L.polyline(s.coords, { color: col, weight: bold ? 4 : 2.5, opacity: bold ? .9 : .4, dashArray: s.ok === false ? "2 7" : "9 6", interactive: false, renderer: R }).addTo(layer);
   }
@@ -1961,28 +1969,40 @@ function openRegion(slug){
   $("#regionPoster").innerHTML = posterHtml(r, false);   // lazy loading missed it as the panel opened
   $("#regionName").textContent = r.name + (r.sub ? " " + r.sub : "");
   $("#regionLine").textContent = r.line;
-  const rides = featuredIn(slug);
-  $("#regionStats").innerHTML = `<div><b>${Math.round(regionLaneKm(r) / 1000)}</b><span>km of lanes</span></div><div><b>${rides.length}</b><span>rides</span></div><div><b>${esc(r.starts[0].name)}</b><span>start</span></div>`;
+  const rides = featuredIn(slug), road = r.kind === "road", trips = (feat()?.tours || []).filter(t => t.region === slug);
+  // Scottish areas are for road riding: there are no byways to count or to plan loops from
+  $("#regionStats").innerHTML = (road ? `<div><b>Roads</b><span>no byways</span></div>` : `<div><b>${Math.round(regionLaneKm(r) / 1000)}</b><span>km of lanes</span></div>`)
+    + `<div><b>${rides.length + trips.length}</b><span>rides</span></div><div><b>${esc(r.starts[0].name)}</b><span>start</span></div>`;
+  $("#regionPlanOwn").hidden = road; $("#regionRoadNote").hidden = !road;
   const box = $("#regionRides"); box.innerHTML = rides.length ? "" : `<p class="small muted">No ready-made rides here yet. Plan your own below.</p>`;
   regionRidesNow = rides; regionPick = -1; drawRegionRides();
   rides.forEach((rd, i) => {
-    const b = rd.built, pct = b.total ? Math.round(100 * b.off / b.total) : 0;
+    const b = rd.built, pct = b.total ? Math.round(100 * b.off / b.total) : 0, isRoad = rd.kind === "road";
     const c = document.createElement("div"); c.className = "card"; c.style.setProperty("--c", IDEA_COLORS[i % IDEA_COLORS.length]);
     c.setAttribute("aria-pressed", "false");
     c.innerHTML = `<div class="top"><h3><span class="inum">${i + 1}</span>${esc(rd.name)}</h3></div>
-      <div class="stats"><span><b>${hm(b.hours)}</b> riding</span><span><b>${km(b.total)}</b> km</span><span><b>${pct}%</b> lanes</span></div>
-      <div>${rd.byways ? `<span class="chip" style="background:var(--boat)">Byways only</span>` : `<span class="chip" style="background:var(--ucr)">Includes unclassified roads</span>`} <span class="small muted">from ${esc(rd.startName)}</span></div>`;
+      <div class="stats"><span><b>${hm(b.hours)}</b> riding</span><span><b>${km(b.total)}</b> km</span>${isRoad ? `<span>${rd.trip.loop ? "loop" : "one way"}</span>` : `<span><b>${pct}%</b> lanes</span>`}</div>
+      <div>${isRoad ? `<span class="chip" style="background:#5b6b8c">Road ride</span>` : rd.byways ? `<span class="chip" style="background:var(--boat)">Byways only</span>` : `<span class="chip" style="background:var(--ucr)">Includes unclassified roads</span>`} <span class="small muted">from ${esc(rd.startName)}</span></div>`;
     const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Ride this"; go.setAttribute("aria-label", "Ride " + rd.name);
     go.onclick = () => loadFeaturedRide(rd);
     c.querySelector(".top").append(go);
     c.onclick = e => { if (e.target !== go) pickRegionRide(i); };
     box.append(c);
   });
+  // the area's big trips (the NC500 on the West Highlands page)
+  for (const t of trips) {
+    const c = document.createElement("div"); c.className = "card";
+    const tk = t.tour.days.reduce((a, d) => a + (d.built?.total || 0), 0);
+    c.innerHTML = `<div class="top"><h3>${esc(t.name)}</h3></div><div class="stats"><span><b>${t.tour.days.length}</b> days</span><span><b>${km(tk)}</b> km</span></div><div><span class="chip" style="background:#6d28d9">Big trip</span></div>`;
+    const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Open"; go.setAttribute("aria-label", "Open " + t.name);
+    go.onclick = () => loadFeaturedTour(t); c.querySelector(".top").append(go); c.onclick = e => { if (e.target !== go) loadFeaturedTour(t); };
+    box.append(c);
+  }
   fly(r.centre, r.zoom);
   $("#regionLoop").onclick = () => { loopStart = r.starts[0].at; loopStartName = r.starts[0].name; lastKind = "loop"; ideas = []; picked = -1; ideaRun++; openIdeas(); runIdeas(); };
   $("#regionDraw").onclick = () => { map.setView(r.centre, r.zoom); lastKind = "draw"; strokes = []; shapeChoice = null; ideas = []; picked = -1; ideaRun++; openIdeas(); startDrawing(); };
 }
-$("#regionBack").onclick = () => { showView("plan", "peek"); fly([52.6, -2.3], 7); };
+$("#regionBack").onclick = () => { showView("plan", "peek"); fly(GB_CENTRE, gbZoom()); };
 // Opening a ready-made ride or tour replaces the current one, so anything the rider planned goes to Saved first.
 const featNames = () => new Set([...(feat()?.rides || []).map(r => r.name), ...(feat()?.tours || []).map(t => t.name)]);
 function keepCurrent(){
@@ -2147,24 +2167,55 @@ addEventListener("pagehide", () => store.set("lastView", view));
 
 /* ---------- start screen: shown once per visit ---------- */
 function showWelcome(){
-  const pick = REGION_LIST[Math.floor(Math.random() * REGION_LIST.length)];
-  if (!$("#wlHero img")) $("#wlHero").innerHTML = pick ? posterHtml(pick, false) : "";   // keep the poster shown while loading
-  const g = $("#wlGrid"); g.innerHTML = "";
-  for (const r of REGION_LIST) {
-    const n = featuredIn(r.slug).length, b = document.createElement("button");
-    b.className = "rcard"; b.setAttribute("role", "listitem");
-    b.innerHTML = `<div class="poster">${posterHtml(r)}</div><div class="cap"><b>${esc(r.name)}</b><span>${n ? `${n} ride${n > 1 ? "s" : ""}` : "Plan your own"}</span></div>`;
-    b.onclick = () => { closeWelcome(); openRegion(r.slug); };
-    g.append(b);
-  }
+  // big trips: a sketch of each one's line, drawn from the tour data
+  const trips = (feat()?.tours || []).filter(t => t.tour?.line?.length > 1);
+  $("#wlTripsSec").hidden = !trips.length;
+  const box = $("#wlTrips"); box.innerHTML = "";
+  trips.sort((a, b) => b.tour.days.length - a.tour.days.length).forEach(t => {
+    const tk = t.tour.days.reduce((a, d) => a + (d.built?.total || 0), 0), b = document.createElement("button");
+    b.className = "tcard"; b.setAttribute("aria-label", `${t.name}, ${t.tour.days.length} days`);
+    b.innerHTML = `${routeSketch(t.tour.days.flatMap(d => d.built?.segs?.flatMap(sg => sg.coords) || []), t.tour.round)}<div class="cap"><b>${esc(t.name)}</b><span>${t.tour.days.length} day${t.tour.days.length > 1 ? "s" : ""} · ${km(tk)} km${t.kind === "road" ? " · roads" : " · lanes"}</span></div>`;
+    b.onclick = () => { closeWelcome(); loadFeaturedTour(t); };
+    box.append(b);
+  });
   const carry = view === "tour" && tour ? tour.name || "your tour" : view === "route" && trip.items.length ? trip.name || "your route" : null;
-  $("#wlCarry").hidden = !carry; $("#wlMap").hidden = !!carry;
+  $("#wlCarry").hidden = !carry;
   if (carry) $("#wlCarry").textContent = "Carry on: " + carry;
+  $("#wlLoading").hidden = true;
   $("#welcome").hidden = false; $("#welcome").scrollTop = 0;
 }
+// A route's shape as a small drawing for a card: the line in the route colour on the poster paper, with its start marked
+function routeSketch(pts, round){
+  if (pts.length < 2) return "";
+  const step = Math.max(1, Math.floor(pts.length / 400)), P = pts.filter((_, i) => i % step === 0).concat([pts.at(-1)]);
+  const k = Math.cos(P[0][0] * Math.PI / 180), xs = P.map(p => p[1] * k), ys = P.map(p => -p[0]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), W = 300, H = 200, pad = 22;
+  const sc = Math.min((W - 2 * pad) / (x1 - x0 || 1), (H - 2 * pad) / (y1 - y0 || 1)), ox = (W - sc * (x1 - x0)) / 2, oy = (H - sc * (y1 - y0)) / 2;
+  const d = P.map((p, i) => `${i ? "L" : "M"}${(ox + sc * (xs[i] - x0)).toFixed(1)} ${(oy + sc * (ys[i] - y0)).toFixed(1)}`).join("");
+  const [sx, sy] = d.slice(1).split("L")[0].split(" "), [ex, ey] = d.split("L").at(-1).split(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="${d}" fill="none" stroke="#fffdf6" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#c2185b" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>`
+    + `<circle cx="${sx}" cy="${sy}" r="7" fill="#1f1d18" stroke="#fffdf6" stroke-width="2.5"/>${round ? "" : `<circle cx="${ex}" cy="${ey}" r="6" fill="#fffdf6" stroke="#1f1d18" stroke-width="3"/>`}</svg>`;
+}
+// tapping an area card (the cards are drawn before the app loads, so one handler serves them all)
+$("#wlAreas").addEventListener("click", e => { const c = e.target.closest(".rcard"); if (c) { closeWelcome(); openRegion(c.dataset.slug); } });
+$("#wlRides").onclick = () => $(trips0() ? "#wlTripsSec" : "#wlAreasTop").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+const trips0 = () => !$("#wlTripsSec").hidden;
+// nearest areas first, with the distance on each card
+$("#wlNear").onclick = () => {
+  const btn = $("#wlNear");
+  if (btn.dataset.on) { delete btn.dataset.on; btn.textContent = "📍 Nearest first"; renderAreas(); return; }
+  if (!navigator.geolocation) { status("This browser can't read your location."); return; }
+  btn.textContent = "Finding you…";
+  navigator.geolocation.getCurrentPosition(pos => {
+    const me = [pos.coords.latitude, pos.coords.longitude], d = r => hav(me, r.starts[0].at);
+    renderAreas([...REGION_LIST].sort((a, b) => d(a) - d(b)));
+    for (const c of $("#wlAreas").querySelectorAll(".rcard")) { const r = regionBySlug(c.dataset.slug); c.querySelector(".dist").textContent = `${Math.round(d(r) / 1000)} km away`; }
+    btn.dataset.on = "1"; btn.textContent = "By country";
+  }, () => { btn.textContent = "📍 Nearest first"; status("Couldn't get your location. Check that location is on for this site."); }, { timeout: 15000, maximumAge: 600000 });
+};
 function closeWelcome(){ $("#welcome").hidden = true; try { sessionStorage.setItem("glp:welcomed", "1"); } catch (e) {} map.invalidateSize(); }
 $("#wlCarry").onclick = closeWelcome;
-$("#wlMap").onclick = () => { closeWelcome(); showView("plan", phone() ? "min" : "peek"); map.setView([52.6, -2.3], 7); };
+$("#wlMap").onclick = () => { closeWelcome(); showView("plan", phone() ? "min" : "peek"); map.setView(GB_CENTRE, gbZoom()); };
 $("#wlLoop").onclick = () => { closeWelcome(); $("#goLoop").click(); };
 $("#wlDraw").onclick = () => { closeWelcome(); $("#goDraw").click(); };
 $("#wlTour").onclick = () => { closeWelcome(); $("#goTour").click(); };

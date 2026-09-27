@@ -147,8 +147,11 @@ const Offline = (() => {
     if (on === showing) return; showing = on;
     document.documentElement.classList.toggle("noSignalMap", on);
     if (on) roads.addTo(map); else map.removeLayer(roads);
-    $("#noSignalNote").hidden = !on;
+    $("#offlineBadge").hidden = !on; $("#rideSignal").hidden = !on;
   }
+  // the badge says what's going on only when asked, so it doesn't sit over the map
+  const aboutNoSignal = () => status("No signal. The map picture needs one, so this is a plain map drawn from the roads saved on this phone. Routes you've saved still open, change and ride.", 7000);
+  $("#offlineBadge").onclick = aboutNoSignal;
   // map pictures failing to load (three within ten seconds) means no signal: switch to the plain map
   for (const layer of Object.values(bases)) {
     layer.on("tileerror", () => { const now = Date.now(); errs = errs.filter(t => now - t < 10000); errs.push(now); if (errs.length >= 3) useRoads(true); });
@@ -185,5 +188,5 @@ const Offline = (() => {
     refreshButton();
   };
 
-  return { saveRoute, estimate, refreshButton, covered, kept, keptBuilt, keptNames, forget, useRoads, get showingRoads(){ return showing; } };
+  return { aboutNoSignal, saveRoute, estimate, refreshButton, covered, kept, keptBuilt, keptNames, forget, useRoads, get showingRoads(){ return showing; } };
 })();

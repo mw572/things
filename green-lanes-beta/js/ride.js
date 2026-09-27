@@ -2,11 +2,13 @@
    Where you are on the route, the next lane and how far to it, the next stop and fuel, what's ridden and what's left,
    and a warning when you leave the route. It is a help, not a sat nav: a web page only follows you while the screen is
    on and the page is open, and it gives no spoken directions. The GPX in a sat nav or GPS app stays the main way to
-   follow the route; the ride screen says so. */
+   follow the route; the ride screen says so when it opens.
+   Until you're on the route (you open it at home, or on the way there) it shows the whole route and where you are,
+   with the distance to the route, instead of zooming to you and losing the route off the screen. */
 const Ride = (() => {
-  const OFF_M = 60, OFF_S = 10, AHEAD_M = 6000, BEHIND_M = 400;
-  let on = false, line = [], cum = [], lanes = [], total = 0, along = 0, watch = null, lock = null, follow = true;
-  let offSince = null, lastFix = null, heading = null, practice = null, backLine = null, zoomBefore = null;
+  const OFF_M = 60, OFF_S = 10, AHEAD_M = 6000, BEHIND_M = 400, JOIN_M = 150, WAY_KM = 80;
+  let on = false, line = [], cum = [], lanes = [], places = [], total = 0, along = 0, watch = null, lock = null, follow = true, joined = false;
+  let offSince = null, lastFix = null, heading = null, practice = null, backLine = null, zoomBefore = null, msgTimer = null, toStartShown = false;
   const layer = L.layerGroup(), me = L.marker([0, 0], { interactive: false, zIndexOffset: 2000, icon: L.divIcon({ className: "", iconSize: [0, 0], html: `<div class="ride-me"><i></i></div>` }) });
   const ridden = L.polyline([], { color: "#6b6b6b", weight: 7, opacity: .85, interactive: false, renderer: routeRenderer });
 
@@ -18,6 +20,10 @@ const Ride = (() => {
       for (const p of s.coords) { if (line.length) d += hav(line.at(-1), p); line.push(p); cum.push(d); }
     }
     total = d;
+    // a road ride (Scotland) has no lanes: its named waypoints (passes, glens, villages) are what the screen counts down to
+    places = []; let from = 0;
+    for (const it of t.items) if (it.via && it.name && it.name !== "Via point") { const [, at] = nearest(it.coords[0], from); places.push({ at, name: it.name }); from = at; }
+    if (!t.loop && t.finish) places.push({ at: total, name: "the finish" });
   }
   // nearest point on the line to p, searching only between two distances along it: [metres off, distance along, point].
   // With `near` set, a match further from where you were costs a little, so where a route comes back along the same
@@ -38,13 +44,41 @@ const Ride = (() => {
   const pointAt = d => { let i = cum.findIndex(c => c >= d); if (i <= 0) return line[Math.max(0, i)]; const t = (d - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [line[i - 1][0] + (line[i][0] - line[i - 1][0]) * t, line[i - 1][1] + (line[i][1] - line[i - 1][1]) * t]; };
   const kmTxt = m => m < 950 ? `${Math.round(m / 50) * 50} m` : `${(m / 1000).toFixed(m < 9950 ? 1 : 0)} km`;
 
+  // one line of text under the lane name, for whatever matters now; `go` adds a button
+  function msg(text, go, ms){
+    clearTimeout(msgTimer);
+    $("#rideMsg").hidden = !text; $("#rideMsgText").textContent = text || "";
+    const b = $("#rideMsgGo"); b.hidden = !go; if (go) { b.textContent = go.label; b.onclick = go.run; }
+    if (text && ms) msgTimer = setTimeout(() => msg(""), ms);
+    layoutChrome();
+  }
+  // the map's credit line sits just above the bottom panel (portrait) or beside the buttons (landscape), never over the middle
+  function layoutChrome(){
+    requestAnimationFrame(() => { if (!on) return; const v = visibleBox(), m = map.getSize(), el = map.getContainer().querySelector(".leaflet-bottom.leaflet-right");
+      if (el) { el.style.bottom = Math.max(0, m.y - v.y1) + "px"; el.style.right = Math.max(0, m.x - v.x1) + "px"; } });
+  }
+  function gpsIcon(acc){
+    const el = $("#rideGpsIco"); el.classList.remove("good", "weak", "bad");
+    el.classList.add(acc == null ? "bad" : acc <= 25 ? "good" : acc <= 60 ? "weak" : "bad");
+    el.dataset.acc = acc == null ? "" : Math.round(acc);
+  }
+  $("#rideGpsIco").onclick = () => { const a = $("#rideGpsIco").dataset.acc; msg(a ? `GPS is good to about ${a} m.${+a > 60 ? " That's weak: the dot may wander until the sky is clearer." : ""}` : "No GPS position yet. Outdoors with a clear view of the sky works best.", null, 6000); };
+  $("#rideSignal").onclick = () => msg("No signal. The map picture needs one, so this is a plain map drawn from the roads saved on this phone. The route and your position still work.", null, 8000);
+
   function fix(p, acc, hdg, speed){
+    if (!on || !line.length) return;   // a late GPS reading after End
     // where along the route you should be now: as far on from the last match as you've moved since the last fix
     const moved = lastFix && offSince == null ? Math.min(2000, hav(lastFix.p, p)) : 0;
-    lastFix = { p, acc, t: Date.now() };
+    lastFix = { p, acc, t: Date.now() }; gpsIcon(acc);
     if (hdg != null && !isNaN(hdg) && (speed == null || speed > 1.5)) heading = hdg;
     me.setLatLng(p).addTo(layer);
     const arrow = me.getElement()?.querySelector("i"); if (arrow) { arrow.style.display = heading == null ? "none" : ""; arrow.parentElement.style.transform = heading == null ? "" : `rotate(${heading}deg)`; }
+    if (!joined) {   // not on the route yet: show the route and you, and how far it is
+      // the earliest part of the route that's close: on a loop the start and the finish are the same place
+      const [off, a, q] = nearest(p, 0, Infinity, 0);
+      if (off <= JOIN_M) { joined = true; along = a; follow = true; followBtn(); clearBack(); msg(""); }
+      else { toStart(p, off, q); return; }
+    }
     // match to the stretch just ahead first, so a loop or an out-and-back doesn't jump to the wrong side
     let [off, a] = nearest(p, along - BEHIND_M, along + AHEAD_M, along + moved, moved);
     if (off > OFF_M) { const g = nearest(p); if (g[0] < OFF_M) [off, a] = g; }
@@ -54,85 +88,121 @@ const Ride = (() => {
     else if (Date.now() - offSince > OFF_S * 1000) { $("#rideOff").hidden = false; $("#rideOffDist").textContent = `${kmTxt(off)} from it`; navigator.vibrate?.(200); }
     ridden.setLatLngs(line.filter((_, i) => cum[i] <= along).concat([pointAt(along)])).bringToFront();   // the route is redrawn on zoom: keep this over it
     if (follow) centre(p);
-    panel(); fitChrome();
-    $("#rideGps").textContent = acc ? `GPS within ${Math.round(acc)} m${acc > 50 ? ": weak, the position may wander" : ""}` : "";
+    panel();
   }
-  function panel(){
-    const lane = lanes.find(l => along < l.at + l.len);
-    if (!lane) { $("#rideNextLabel").textContent = "No more lanes"; $("#rideNextName").textContent = "Roads to the finish"; $("#rideNextDist").textContent = ""; }
-    else if (along >= lane.at) { $("#rideNextLabel").textContent = "On the lane"; $("#rideNextName").textContent = lane.name; $("#rideNextDist").textContent = `${kmTxt(lane.at + lane.len - along)} to its end`; }
-    else { $("#rideNextLabel").textContent = `Next lane (${lanes.indexOf(lane) + 1} of ${lanes.length})`; $("#rideNextName").textContent = lane.name; $("#rideNextDist").textContent = `in ${kmTxt(lane.at - along)}`; }
+  // before you reach the route: the whole route and you on the map, the distance to the nearest point of it, and a
+  // way there if it's within reach of the phone's router
+  function toStart(p, off, q){
+    $("#rideNextLabel").textContent = "Not on the route yet";
+    $("#rideNextName").textContent = off < 2000 ? "The route is close" : "Head for the route";
+    $("#rideNextDist").textContent = `${kmTxt(off)} away`;
+    const near = off / 1000 <= WAY_KM;
+    if (!backLine) msg(near ? "The map follows you once you reach the route." : "The map follows you once you reach the route. Tap Preview to see how the screen works.",
+      near ? { label: "Show the way there", run: () => { $("#rideMsgGo").textContent = "Finding it…"; wayTo(p, q).then(r => msg(r ? `${kmTxt(r.len)} by road to the route.` : "No way found from here on the roads saved on this phone.")); } } : null);
+    panel(true);
+    // fit once the panel has its final height, so none of the route ends up under it
+    if (!toStartShown) { toStartShown = true; follow = false; followBtn(); requestAnimationFrame(() => fitVisible(L.latLngBounds(line).extend(p))); }
+  }
+  function panel(beforeStart){
+    if (!beforeStart && !lanes.length && places.length) {
+      const nx = places.find(q => q.at > along + 50), i = places.indexOf(nx);
+      if (!nx) { $("#rideNextLabel").textContent = "Nearly there"; $("#rideNextName").textContent = trip.loop ? "Back to the start" : "The finish"; $("#rideNextDist").textContent = kmTxt(Math.max(0, total - along)); }
+      else { $("#rideNextLabel").textContent = `Next · ${i + 1} of ${places.length}`; $("#rideNextName").textContent = nx.name; $("#rideNextDist").textContent = `in ${kmTxt(nx.at - along)}`; }
+    } else if (!beforeStart) {
+      const lane = lanes.find(l => along < l.at + l.len);
+      if (!lane) { $("#rideNextLabel").textContent = "No more lanes"; $("#rideNextName").textContent = "Roads to the finish"; $("#rideNextDist").textContent = ""; }
+      else if (along >= lane.at) { $("#rideNextLabel").textContent = "On the lane"; $("#rideNextName").textContent = lane.name; $("#rideNextDist").textContent = `${kmTxt(lane.at + lane.len - along)} to go`; }
+      else { $("#rideNextLabel").textContent = `Next lane · ${lanes.indexOf(lane) + 1} of ${lanes.length}`; $("#rideNextName").textContent = lane.name; $("#rideNextDist").textContent = `in ${kmTxt(lane.at - along)}`; }
+    }
     const left = Math.max(0, total - along);
     $("#rideDone").textContent = (along / 1000).toFixed(1); $("#rideLeft").textContent = (left / 1000).toFixed(left < 9950 ? 1 : 0);
     $("#rideTime").textContent = built ? hm(built.hours * left / (total || 1)) : "–";
     const ahead = (routeStops || []).filter(r => r.along > along && stops?.[r.i]);
     const stop = ahead.find(r => stops[r.i].code !== "fuel" && groupOn(stops[r.i].code)), fuel = ahead.find(r => stops[r.i].code === "fuel");
-    $("#rideStop").textContent = stop ? `Next stop: ${stops[stop.i].name || CODE[stops[stop.i].code]?.one || "stop"}, in ${kmTxt(stop.along - along)}` : "";
-    $("#rideFuel").textContent = fuel ? `Fuel: ${stops[fuel.i].name || "filling station"}, in ${kmTxt(fuel.along - along)}` : (routeStops?.length ? "No more fuel near the route" : "");
+    const icon = { cafe: "☕", pub: "🍺", restaurant: "🍴", toilet: "🚻", view: "⛰", water: "💧", castle: "🏰", picnic: "🧺", hotel: "🛏", guest: "🛏", hostel: "🛏", camp: "⛺" };
+    $("#rideStop").textContent = stop ? `${icon[stops[stop.i].code] || "•"} ${stops[stop.i].name || CODE[stops[stop.i].code]?.one || "Stop"} · ${kmTxt(stop.along - along)}` : "";
+    $("#rideFuel").textContent = fuel ? `⛽ ${stops[fuel.i].name || "Fuel"} · ${kmTxt(fuel.along - along)}` : (routeStops?.length ? "⛽ No more fuel near the route" : "");
   }
 
-  // the way back: the phone's router from here to the route a little ahead, drawn dashed
+  // a way on the roads, drawn dashed: back to the route when you've left it, or to it before you start
   function clearBack(){ if (backLine) { layer.removeLayer(backLine); backLine = null; } }
+  async function wayTo(from, target){
+    const r = await localRouter.route(from, target, 0);
+    clearBack();
+    if (!r?.coords?.length) return null;
+    backLine = L.polyline([from, ...r.coords, target], { color: "#1a73e8", weight: 6, dashArray: "10 8", interactive: false, renderer: routeRenderer }).addTo(layer);
+    follow = false; followBtn(); fitVisible(backLine.getBounds().extend(from)); return r;
+  }
   $("#rideBackTo").onclick = async () => {
     if (!lastFix) return;
     const [, a] = nearest(lastFix.p, along - BEHIND_M, along + AHEAD_M), target = pointAt(Math.min(total, a + 300));
     $("#rideBackTo").disabled = true; $("#rideBackTo").textContent = "Finding it…";
-    const r = await localRouter.route(lastFix.p, target, 0);
+    const r = await wayTo(lastFix.p, target);
     $("#rideBackTo").disabled = false; $("#rideBackTo").textContent = "Show the way back";
-    clearBack();
-    if (!r?.coords?.length) { $("#rideOffDist").textContent += ". No way back found from here: head for the nearest road."; return; }
-    backLine = L.polyline([lastFix.p, ...r.coords, target], { color: "#1a73e8", weight: 6, dashArray: "10 8", interactive: false, renderer: routeRenderer }).addTo(layer);
-    follow = false; $("#rideRecentre").hidden = false; map.fitBounds(backLine.getBounds().pad(0.2), { animate: false });
-    $("#rideOffDist").textContent = `${kmTxt(r.len)} by road to rejoin`;
+    $("#rideOffDist").textContent = r ? `${kmTxt(r.len)} by road to rejoin` : "No way back found from here: head for the nearest road.";
   };
 
   // keep the screen on while riding, and take the lock back when the phone wakes the page again
-  async function wake(){ try { if (on && document.visibilityState === "visible" && "wakeLock" in navigator) { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; }); } } catch { lock = null; } awakeNote(); }
-  function awakeNote(){ $("#rideAwake").textContent = "wakeLock" in navigator ? (lock ? "" : "The screen may turn off: tap the map now and then, or turn auto-lock off.") : "This phone won't let a web page keep the screen on. Turn auto-lock off in Settings while riding."; }
-  document.addEventListener("visibilitychange", () => { if (on && document.visibilityState === "visible") { wake(); } });
+  async function wake(){ try { if (on && document.visibilityState === "visible" && "wakeLock" in navigator) { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; }); } } catch { lock = null; } }
+  document.addEventListener("visibilitychange", () => { if (on && document.visibilityState === "visible") wake(); });
 
   function gpsError(e){
-    $("#rideGps").textContent = e.code === 1 ? "Location is off for this page. Turn it on in the phone's settings (Location, then your browser) to see where you are."
-      : "Looking for GPS… Outdoors with a clear sky works best.";
+    gpsIcon(null);
+    msg(e.code === 1 ? "Location is off for this page. Turn it on in the phone's settings (Location, then your browser) to see where you are." : "Looking for GPS… Outdoors with a clear view of the sky works best.");
   }
 
   function start(){
     if (!built || built.provisional || on) return;
-    prepare(built, trip); on = true; along = 0; follow = true; offSince = null; heading = null; lastFix = null;
+    prepare(built, trip); on = true; along = 0; follow = true; joined = false; toStartShown = false; offSince = null; heading = null; lastFix = null;
     zoomBefore = { c: map.getCenter(), z: map.getZoom() };
-    document.body.classList.add("riding"); $("#ride").hidden = false; $("#rideOff").hidden = true; $("#rideRecentre").hidden = true;
+    document.body.classList.add("riding"); $("#ride").hidden = false; $("#rideOff").hidden = true;
+    $("#rideSignal").hidden = !(typeof Offline !== "undefined" && Offline.showingRoads);
     layer.addTo(map); ridden.addTo(layer); map.invalidateSize();
-    map.fitBounds(L.latLngBounds(line).pad(0.05), { animate: false });
-    panel(); $("#rideGps").textContent = "Waiting for GPS… This screen helps alongside the GPX in your sat nav or GPS app, not instead of it.";
+    fitVisible(L.latLngBounds(line)); layoutChrome();
+    $("#rideNextLabel").textContent = "Ride this route"; $("#rideNextName").textContent = trip.name || "Your route"; $("#rideNextDist").textContent = "";
+    panel(true); gpsIcon(null); followBtn();
+    msg("Finding where you are. This screen helps alongside the GPX in your sat nav or GPS app, not instead of it.");
     if ("geolocation" in navigator) watch = navigator.geolocation.watchPosition(pos => { if (!practice) fix([pos.coords.latitude, pos.coords.longitude], pos.coords.accuracy, pos.coords.heading, pos.coords.speed); }, gpsError, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
-    else $("#rideGps").textContent = "This browser can't read the phone's location.";
-    wake();
-    $("#rideSaved").hidden = true;
-    if (typeof Offline !== "undefined") Offline.covered(built).then(ok => { $("#rideSaved").hidden = ok !== false; fitChrome(); });
-    fitChrome();
+    else msg("This browser can't read the phone's location. Tap Preview to see how the ride screen works.");
+    // what can go wrong later is said once, a few seconds in, when nothing more urgent is showing
+    wake().then(() => setTimeout(() => { if (on && !lock && $("#rideMsg").hidden) msg("wakeLock" in navigator ? "The screen may turn off: turn auto-lock off in Settings while riding." : "This phone won't let a web page keep the screen on. Turn auto-lock off in Settings while riding.", null, 8000); }, 4000));
+    if (typeof Offline !== "undefined") Offline.covered(built).then(ok => { if (ok === false) setTimeout(() => { if (on && $("#rideMsg").hidden) msg("This route isn't saved for no signal: if the signal drops, the map may go blank.", null, 8000); }, 9000); });
   }
-  // put you in the middle of the map you can see, between the two panels, not the middle of the screen
+  // the part of the map you can see: between the panels, which are above and below in portrait, left and right in landscape
+  function visibleBox(){
+    const m = map.getContainer().getBoundingClientRect(), side = matchMedia("(orientation:landscape) and (max-height:560px)").matches;
+    const top = $("#rideTop").getBoundingClientRect(), bot = $("#rideBottom").getBoundingClientRect(), act = $("#rideActions").getBoundingClientRect();
+    return side ? { x0: top.right - m.left, x1: act.left - m.left, y0: 0, y1: m.height }
+                : { x0: 0, x1: m.width, y0: top.bottom - m.top, y1: Math.min(bot.top, act.top) - m.top };
+  }
+  function fitVisible(bounds){
+    const v = visibleBox(), m = map.getSize();
+    map.fitBounds(bounds, { paddingTopLeft: [v.x0 + 24, v.y0 + 24], paddingBottomRight: [m.x - v.x1 + 24, m.y - v.y1 + 24], animate: false, maxZoom: 15 });
+  }
+  // put you in the middle of the map you can see, not the middle of the screen
   function centre(p){
-    const z = Math.max(map.getZoom(), 14), h = map.getSize().y;
-    const top = $("#rideTop").getBoundingClientRect().bottom, bottom = $("#rideBottom").getBoundingClientRect().top;
-    const dy = h / 2 - (top + bottom) / 2;
-    map.setView(map.unproject(map.project(p, z).add([0, dy]), z), z, { animate: false });
+    const z = Math.max(map.getZoom(), 14), s = map.getSize(), v = visibleBox();
+    const dx = s.x / 2 - (v.x0 + v.x1) / 2, dy = s.y / 2 - (v.y0 + v.y1) / 2;
+    map.setView(map.unproject(map.project(p, z).add([dx, dy]), z), z, { animate: false });
   }
-  // keep the map's own controls and credits clear of the bottom panel, whose height changes with what it shows
-  function fitChrome(){ requestAnimationFrame(() => document.documentElement.style.setProperty("--ride-bottom", $("#rideBottom").offsetHeight + 14 + "px")); }
+  function followBtn(){ $("#rideRecentre").classList.toggle("on", follow); $("#rideRecentre").setAttribute("aria-pressed", follow); }
+  addEventListener("resize", () => { if (!on) return; map.invalidateSize(); layoutChrome(); if (follow && lastFix && joined) centre(lastFix.p); else if (!joined) fitVisible(lastFix ? L.latLngBounds(line).extend(lastFix.p) : L.latLngBounds(line)); });
   function end(){
     if (!on) return; on = false;
     if (watch != null) navigator.geolocation.clearWatch(watch); watch = null;
-    stopPractice(); lock?.release().catch(() => {}); lock = null;
+    stopPractice(); lock?.release().catch(() => {}); lock = null; msg("");
     layer.clearLayers(); map.removeLayer(layer); clearBack();
     document.body.classList.remove("riding"); $("#ride").hidden = true; map.invalidateSize();
+    const cr = map.getContainer().querySelector(".leaflet-bottom.leaflet-right"); if (cr) cr.style.bottom = cr.style.right = "";
     if (zoomBefore) map.setView(zoomBefore.c, zoomBefore.z, { animate: false });
   }
-  // a practice run moves the dot along the route at 60 km/h, ten times faster than real, to see how it works
-  function stopPractice(){ clearInterval(practice); practice = null; $("#ridePractice").textContent = "Practice run"; }
+  // Preview: the dot rides the route at 60 km/h, ten times faster than real, so you can see how the screen works
+  function stopPractice(){ clearInterval(practice); practice = null; const b = $("#ridePractice"); b.classList.remove("on"); b.querySelector("span").textContent = "▶"; b.querySelector("small").textContent = "Preview"; }
   $("#ridePractice").onclick = () => {
-    if (practice) return stopPractice();
-    let d = along; $("#ridePractice").textContent = "Stop practice";
+    if (practice) { stopPractice(); msg("Preview stopped. Your own position takes over again.", null, 4000); return; }
+    if (!joined) { joined = true; along = 0; clearBack(); }
+    let d = along; follow = true; followBtn(); $("#ridePractice").classList.add("on"); $("#ridePractice").querySelector("span").textContent = "❚❚"; $("#ridePractice").querySelector("small").textContent = "Stop";
+    msg("Preview: the dot rides the route at ten times speed, so you can see how this screen works.", null, 6000);
     practice = setInterval(() => {
       d += 60 / 3.6 * 10 * 0.5; if (d >= total) { d = total; stopPractice(); }
       const p = pointAt(d), q = pointAt(Math.min(total, d + 30));
@@ -142,8 +212,8 @@ const Ride = (() => {
   $("#rideEnd").onclick = end;
   $("#rideZoomIn").onclick = () => map.zoomIn();
   $("#rideZoomOut").onclick = () => map.zoomOut();
-  $("#rideRecentre").onclick = () => { follow = true; $("#rideRecentre").hidden = true; if (lastFix) centre(lastFix.p); };
-  map.on("dragstart", () => { if (on) { follow = false; $("#rideRecentre").hidden = false; } });
+  $("#rideRecentre").onclick = () => { follow = true; followBtn(); if (lastFix && joined) centre(lastFix.p); else if (lastFix) { toStartShown = false; fix(lastFix.p, lastFix.acc); } };
+  map.on("dragstart", () => { if (on) { follow = false; followBtn(); } });
   $("#rideBtn").onclick = start;
-  return { start, end, fix, get on(){ return on; }, get along(){ return along; }, get locked(){ return !!lock; } };
+  return { start, end, fix, get on(){ return on; }, get along(){ return along; }, get joined(){ return joined; }, get locked(){ return !!lock; } };
 })();
