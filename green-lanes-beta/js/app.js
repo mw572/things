@@ -67,6 +67,7 @@ const busy = {
 const GB_CENTRE = [54.4, -3.2], gbZoom = () => innerWidth <= 820 ? 5 : 6;
 const map = L.map("map", { preferCanvas: true, renderer: L.canvas({ tolerance: 10 }), zoomControl: false }).setView(GB_CENTRE, gbZoom());
 L.control.zoom({ position: "bottomright" }).addTo(map);
+map.attributionControl.setPosition("bottomleft");   // the map's credits: small, in the bottom-left corner
 map.createPane("route"); map.getPane("route").style.zIndex = 450; map.getPane("route").style.pointerEvents = "none";
 const routeRenderer = L.svg({ pane: "route" });
 // Map moves fly unless the rider has asked their phone for less motion
@@ -365,13 +366,15 @@ const regionPinLayer = L.layerGroup(), regionRideLayer = L.layerGroup().addTo(ma
 })();
 // The shading stays on while the lane lines are still too thin to read (to zoom 10), fading as they take over.
 var restyleZones = () => { const c = css("--l-zone"); zoneLayer.eachLayer(l => l.setStyle({ fillColor: c })); };   // shading colour follows the base map
+let hintDone = false, hintTimer = null;   // the green-shading hint
 function drawZones(){
   const z = map.getZoom(), browse = ["plan", "region", "lanes"].includes(view) || (view === "ideas" && lastKind === "draw");
   const on = $("#tZones").checked && z <= 10 && browse;
   on ? zoneLayer.addTo(map) : map.removeLayer(zoneLayer);
   map.getPane("zones").style.opacity = z <= 8 ? 1 : z <= 9 ? .6 : .35;
   if (view === "plan" && map.getZoom() <= 8) { if (typeof drawRegionPins === "function" && REGION_LIST.length) drawRegionPins(); regionPinLayer.addTo(map); } else map.removeLayer(regionPinLayer);
-  $("#zoomHint").hidden = !(on && z <= 8 && view === "plan" && !drawing && !picking && !(phone() && sheet.dataset.state === "open"));
+  $("#zoomHint").hidden = hintDone || !(on && z <= 8 && view === "plan" && !drawing && !picking && !(phone() && sheet.dataset.state === "open"));
+  if (!$("#zoomHint").hidden && !hintTimer) hintTimer = setTimeout(() => { hintDone = true; $("#zoomHint").hidden = true; }, 6000);   // said once, then out of the way
 }
 // Tapping a green patch when zoomed out takes you in to see its lanes.
 map.on("click", e => {
@@ -641,13 +644,27 @@ function minLabel(){
 }
 function stepSheet(dir){ const o = SHEET_ORDER(), i = Math.max(0, o.indexOf(sheet.dataset.state)); setSheet(o[Math.min(o.length - 1, Math.max(0, i + dir))]); }
 // Swipe the handle up or down to move between positions; a tap moves up one, or back to the preview from full.
-let handleY = null;
-$("#sheetHandle").addEventListener("pointerdown", e => { handleY = e.clientY; $("#sheetHandle").setPointerCapture?.(e.pointerId); });
+// The panel follows your finger while you drag its tab, then settles at the nearest position; a tap moves it up a step.
+let handleY = null, startH = 0;
+$("#sheetHandle").addEventListener("pointerdown", e => { handleY = e.clientY; startH = sheet.getBoundingClientRect().height; $("#sheetHandle").setPointerCapture?.(e.pointerId); });
+$("#sheetHandle").addEventListener("pointermove", e => {
+  if (handleY == null || !phone()) return; const dy = e.clientY - handleY; if (Math.abs(dy) < 6) return;
+  sheet.classList.add("dragging"); sheet.style.height = Math.max(54, Math.min(innerHeight * 0.9, startH - dy)) + "px";
+});
 $("#sheetHandle").addEventListener("pointerup", e => {
   if (handleY == null) return; const dy = e.clientY - handleY; handleY = null;
+  const dragged = sheet.classList.contains("dragging"); sheet.classList.remove("dragging");
+  if (dragged) {   // settle on whichever position is nearest to where it was let go, leaning the way it was moving
+    const h = sheet.getBoundingClientRect().height - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tabbar-h")) || 0) + (dy < 0 ? -40 : 40);
+    const opts = SHEET_ORDER().map(st => [st, st === "min" ? 54 : st === "open" ? innerHeight * 0.78 : (PEEK[view] || 176)]);
+    sheet.style.height = ""; setSheet(opts.reduce((a, o) => Math.abs(o[1] - h) < Math.abs(a[1] - h) ? o : a)[0]); return;
+  }
   if (dy < -25) stepSheet(1); else if (dy > 25) stepSheet(-1);
   else sheet.dataset.state === "open" ? setSheet("min") : stepSheet(1);   // a tap: up a step, or from full height down to the bar
 });
+$("#sheetHandle").addEventListener("pointercancel", () => { handleY = null; sheet.classList.remove("dragging"); sheet.style.height = ""; });
+// once the panel's content scrolls, the tab casts a shadow, so the content reads as sliding under it
+$("#sheetBody").addEventListener("scroll", () => sheet.classList.toggle("scrolled", $("#sheetBody").scrollTop > 2), { passive: true });
 // Moving the map on a phone tucks the panel away so the map gets the screen.
 map.on("dragstart", () => { if (phone() && !drawing && !picking && sheet.dataset.state !== "min") setSheet("min"); });
 let lastBrowse = "plan";   // the tab screen you were on before a doing screen, where its back arrow returns
@@ -655,6 +672,7 @@ function goBack(){ if (lastBrowse === "region" && regionOpen) openRegion(regionO
 const TAB_OF = { plan: "explore", region: "explore", start: "plan", saved: "saved", help: "help" };
 const TAB_VIEW = { explore: "plan", plan: "start", saved: "saved", help: "help" };
 document.querySelectorAll("#tabbar button").forEach(b => b.onclick = () => {
+  if (b.dataset.tab === "home") { stopModes(); showWelcome(); return; }   // back to the start screen
   const v = TAB_VIEW[b.dataset.tab]; stopModes();
   if (v === "plan" && view === "region") fly(GB_CENTRE, gbZoom());
   showView(v, v === "plan" ? "peek" : "mid");
@@ -697,14 +715,16 @@ function stopModes(){
   picking = null; drawing = false; painting = null;
   if (liveLine) { map.removeLayer(liveLine); liveLine = null; }
   map.dragging.enable(); map.getContainer().style.cursor = ""; map.getContainer().style.touchAction = "";
-  setBanner(null); drawZones();
+  setBanner(null); drawZones(); $("#bannerSearch").hidden = true;
 }
 function pickSpot(text, then){
   stopModes(); picking = then; map.getContainer().style.cursor = "crosshair";
-  setBanner(text + ", or search above", { me: true }); setSheet(phone() ? "min" : "peek");   // give the map the screen while you choose
+  setBanner(text + (phone() ? ", or search" : ", or search above"), { me: true }); setSheet(phone() ? "min" : "peek");   // give the map the screen while you choose
+  $("#bannerSearch").hidden = !phone();
   if (map.getZoom() < 9) status("Zoom in a little so you can tap the right spot", 6000);
 }
 $("#bannerCancel").onclick = stopModes;
+$("#bannerSearch").onclick = openSearch;
 $("#bannerMe").onclick = () => { const then = picking; locate(p => { stopModes(); then?.(p); }); };
 map.on("click", e => { if (!picking) return; const then = picking; stopModes(); then([e.latlng.lat, e.latlng.lng]); });
 
@@ -1910,7 +1930,8 @@ function renderExplore(){
     const tot = t.tour.days.reduce((a, d) => a + (d.built?.total || 0), 0), off = t.tour.days.reduce((a, d) => a + (d.built?.off || 0), 0);
     const c = document.createElement("div"); c.className = "card tcard";
     const road = t.kind === "road", nd = t.tour.days.length;
-    c.innerHTML = `<div><h3>${esc(t.name)}</h3><div class="stats"><span>${nd > 1 ? `<b>${nd}</b> days, ${nd - 1} night${nd > 2 ? "s" : ""}` : "<b>1</b> day"}</span><span><b>${km(tot)}</b> km</span>${road ? `<span>road trip${t.country && t.country !== "England" ? ", " + esc(t.country) : ""}</span>` : `<span><b>${tot ? Math.round(100 * off / tot) : 0}%</b> lanes</span>`}</div>${t.line ? `<p class="small muted" style="margin-top:4px">${esc(t.line)}</p>` : ""}</div>`;
+    // the route's shape and its name side by side, the description the full width underneath
+    c.innerHTML = `<div class="sk">${routeSketch(t.tour.days.flatMap(d => d.built?.segs?.flatMap(sg => sg.coords) || []), t.tour.round)}</div><div class="th"><h3>${esc(t.name)}</h3><div class="stats"><span>${nd > 1 ? `<b>${nd}</b> days, ${nd - 1} night${nd > 2 ? "s" : ""}` : "<b>1</b> day"}</span><span><b>${km(tot)}</b> km</span>${road ? `<span>road trip${t.country && t.country !== "England" ? ", " + esc(t.country) : ""}</span>` : `<span><b>${tot ? Math.round(100 * off / tot) : 0}%</b> lanes</span>`}</div></div>${t.line ? `<p class="small muted td">${esc(t.line)}</p>` : ""}`;
     const go = document.createElement("button"); go.className = "btn primary"; go.textContent = "Open"; go.setAttribute("aria-label", "Open " + t.name);
     go.onclick = e => { e.stopPropagation(); loadFeaturedTour(t); };
     c.onclick = () => loadFeaturedTour(t);
@@ -2099,6 +2120,11 @@ document.querySelectorAll("#laneSort button").forEach(bt => bt.onclick = () => {
 map.on("moveend", () => { if (view !== "lanes") return; if (laneJump) { laneJump = false; return; } if (laneSort !== "all") renderLaneFinder(); });
 
 /* ---------- search ---------- */
+// On a phone, search is a button in the corner that opens the search bar, so the map keeps the screen until you need it
+function openSearch(){ $("#searchWrap").classList.add("open"); $("#btnSearch").setAttribute("aria-expanded", "true"); setTimeout(() => $("#q").focus(), 30); }
+function closeSearch(){ $("#searchWrap").classList.remove("open"); $("#btnSearch").setAttribute("aria-expanded", "false"); $("#results").hidden = true; }
+$("#btnSearch").onclick = openSearch;
+$("#searchClose").onclick = closeSearch;
 $("#searchForm").onsubmit = async e => {
   e.preventDefault(); const q = $("#q").value.trim(); if (!q) return;
   $("#q").blur(); $("#results").hidden = true; status("Searching…", 0);   // a new search clears the last one's list
@@ -2108,7 +2134,7 @@ $("#searchForm").onsubmit = async e => {
   if (!r.ok || !d.length) { status(r.ok ? `Couldn't find “${q}”` : "Place search isn't answering. Try again in a minute."); return; }
   // while choosing a start or finish, picking a place from search sets it there; otherwise it just moves the map
   const go = p => {
-    $("#results").hidden = true; const at = [+p.lat, +p.lon];
+    $("#results").hidden = true; closeSearch(); const at = [+p.lat, +p.lon];
     if (picking) { const then = picking; stopModes(); map.setView(at, 11); then(at, p.display_name.split(",")[0]); }
     else map.setView(at, 12);
   };
@@ -2118,6 +2144,27 @@ $("#searchForm").onsubmit = async e => {
   const box = $("#results"); box.innerHTML = ""; box.hidden = false;
   for (const p of d) { const b = document.createElement("button"); b.textContent = label(p); b.onclick = () => go(p); box.append(b); }
 };
+
+/* ---------- something is being worked out: say so at the top of the map ----------
+   The screens already write progress into their own notes ("Checking roads for idea 2 of 4…"), but those can be
+   down the panel or behind it when it's lowered. This bar repeats whichever one is running, over the map, with a
+   spinner and, where the note counts ("2 of 4"), how far along it is. */
+const WORK_FROM = ["#routeStatus", "#ideasNote", "#offlineNote", "#status", "#queueChip", "#stopList li"];
+function syncWork(){
+  let src = null;
+  if ($("#busy").hidden) for (const sel of WORK_FROM) {
+    const el = $(sel); if (!el || el.hidden || el.closest(".view[hidden]") || el.closest("[hidden]")) continue;
+    if (/…\s*$/.test(el.textContent.trim()) || (sel === "#queueChip" && el.textContent)) { src = el; break; }
+  }
+  $("#workBar").hidden = !src || Ride.on;
+  $("#status").classList.toggle("mirrored", src === $("#status"));
+  $("#queueChip").classList.add("mirrored");   // the queue's count shows in the bar instead
+  if (!src) return;
+  const t = src.textContent.trim(), m = t.match(/(\d+) of (\d+)/);
+  if ($("#workText").textContent !== t) $("#workText").textContent = t;
+  $("#workFill").style.width = m ? Math.round(100 * +m[1] / +m[2]) + "%" : "0";
+}
+setInterval(syncWork, 250);
 
 /* ---------- pop-overs, toggles, boot ---------- */
 function togglePop(id){
@@ -2173,7 +2220,7 @@ function showWelcome(){
   const box = $("#wlTrips"); box.innerHTML = "";
   trips.sort((a, b) => b.tour.days.length - a.tour.days.length).forEach(t => {
     const tk = t.tour.days.reduce((a, d) => a + (d.built?.total || 0), 0), b = document.createElement("button");
-    b.className = "tcard"; b.setAttribute("aria-label", `${t.name}, ${t.tour.days.length} days`);
+    b.className = "wl-trip"; b.setAttribute("aria-label", `${t.name}, ${t.tour.days.length} days`);
     b.innerHTML = `${routeSketch(t.tour.days.flatMap(d => d.built?.segs?.flatMap(sg => sg.coords) || []), t.tour.round)}<div class="cap"><b>${esc(t.name)}</b><span>${t.tour.days.length} day${t.tour.days.length > 1 ? "s" : ""} · ${km(tk)} km${t.kind === "road" ? " · roads" : " · lanes"}</span></div>`;
     b.onclick = () => { closeWelcome(); loadFeaturedTour(t); };
     box.append(b);

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta name="build" content="2b9484979a">
+<meta name="build" content="af84a1e847">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f4efe1">
@@ -99,7 +99,7 @@ input[type=range]{width:100%;height:32px;accent-color:var(--green);margin:0}
 .bigstats.rough b::before{content:"≈ ";font-weight:600}
 
 /* tab bar: a row at the top of the side panel on wide screens, fixed along the bottom on phones */
-#tabbar{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid var(--ink);background:var(--card);flex:0 0 auto}
+#tabbar{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:2px solid var(--ink);background:var(--card);flex:0 0 auto}
 #tabbar button{border:0;background:none;padding:8px 2px 7px;font:600 13px Barlow,sans-serif;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;min-height:52px}
 #tabbar .ti{font-size:19px;line-height:1.1}
 #tabbar button[aria-current="page"]{color:var(--green);box-shadow:inset 0 -3px 0 var(--green)}
@@ -117,58 +117,66 @@ html.noSignalMap .leaflet-container{background:#efeadf}
 /* riding view: map full screen, big glove-friendly controls, everything else hidden */
 body.riding #tabbar,body.riding #sheet,body.riding #searchWrap,body.riding #tools,body.riding #status,body.riding #queueChip,body.riding #zoomHint,body.riding .leaflet-control-zoom,body.riding #offlineBadge{display:none!important}
 body.riding #app{grid-template-columns:1fr}
-#ride{position:fixed;inset:0;z-index:1300;pointer-events:none;display:grid;grid-template-columns:1fr;grid-template-rows:auto 1fr auto auto;gap:8px;
-  padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+#ride{position:fixed;inset:0;z-index:1300;pointer-events:none;display:grid;grid-template-columns:1fr;grid-template-rows:auto 1fr auto auto;gap:6px;
+  padding:max(6px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))}
 #ride[hidden]{display:none}
 #ride>*{pointer-events:auto}
-#rideTop{grid-row:1}#rideBottom{grid-row:3}#rideActions{grid-row:4}
-.ride-panel{background:var(--card);border:2px solid var(--ink);border-radius:14px;box-shadow:var(--shadow);padding:10px 14px}
-.rt-row{display:flex;align-items:center;gap:8px}
-.rt-label{flex:1;font:700 15px Barlow,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.rt-icons{display:flex;gap:6px}
-.ride-ico{width:40px;height:40px;border-radius:50%;border:2px solid var(--ink);background:var(--paper);display:grid;place-items:center;padding:0;color:var(--ink);cursor:pointer}
-.ride-ico svg{width:22px;height:22px}
+#rideTop{grid-row:1}#rideFloat{grid-row:2;align-self:start;pointer-events:none;display:flex;flex-direction:column;gap:6px}#rideFloat>*{pointer-events:auto}
+#rideBottom{grid-row:3}#rideActions{grid-row:4}
+.ride-panel{background:var(--card);border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:6px 12px}
+/* top bar: what's next on the left, the GPS and signal icons on the right */
+#rideTop{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:8px;align-items:center}
+.rt-row{grid-column:1;grid-row:1}
+.rt-icons{grid-column:2;grid-row:1/3;display:flex;gap:6px}
+.rt-main{grid-column:1;grid-row:2;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px;min-width:0}
+.rt-label{font:700 13px Barlow,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.ride-ico{width:36px;height:36px;border-radius:50%;border:2px solid var(--ink);background:var(--paper);display:grid;place-items:center;padding:0;color:var(--ink);cursor:pointer}
+.ride-ico svg{width:20px;height:20px}
 .ride-ico.good{color:#1e7b34}.ride-ico.weak{color:#b7791f}.ride-ico.bad{color:#c0392b}
 #rideSignal{color:#c0392b}
-.rt-main{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-#rideNextName{font:700 30px/1.1 "Zilla Slab",Georgia,serif;min-width:0;overflow:hidden;max-width:100%;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-#rideNextDist{font:800 34px/1.1 Barlow,sans-serif;color:var(--green);white-space:nowrap;font-variant-numeric:tabular-nums}
-.rt-msg{margin-top:8px;font-size:18px;line-height:1.3;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#rideNextName{font:700 26px/1.1 "Zilla Slab",Georgia,serif;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+#rideNextDist{font:800 28px/1.1 Barlow,sans-serif;color:var(--green);white-space:nowrap;font-variant-numeric:tabular-nums;flex:0 0 auto;margin-left:auto}
+/* messages and the off-route warning float over the map, so the top bar stays one size */
+.rt-msg{background:var(--card);border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:8px 12px;font-size:16px;line-height:1.3;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .rt-msg[hidden]{display:none}
-.rt-msg .btn{min-height:48px;font-size:17px}
-.ride-off{background:#c0392b;color:#fff;border-radius:12px;padding:10px 14px;font-size:20px;margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rt-msg .btn{min-height:44px;font-size:16px}
+.ride-off{background:#c0392b;color:#fff;border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:8px 12px;font-size:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .ride-off[hidden]{display:none}
-.ride-off .btn{margin-left:auto;min-height:48px;font-size:17px}
+.ride-off .btn{margin-left:auto;min-height:44px;font-size:16px}
 .ride-stats{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}
-.ride-stats b{display:block;font:800 32px/1.1 Barlow,sans-serif;font-variant-numeric:tabular-nums}
+.ride-stats b{display:block;font:800 26px/1.05 Barlow,sans-serif;font-variant-numeric:tabular-nums}
 .ride-stats span{font:700 13px Barlow,sans-serif;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-.ride-next2{display:flex;flex-direction:column;gap:2px;margin-top:6px;font-size:18px;line-height:1.3}
+/* the next stop and fuel side by side on one line */
+.ride-next2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;font-size:15px;line-height:1.3}
+.ride-next2 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ride-next2 span:empty{display:none}
-.ride-next2:has(span:not(:empty)){border-top:1px solid var(--line,#d8d2c2);padding-top:6px}
-#rideActions{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.ride-btn{min-height:64px;border:2px solid var(--ink);border-radius:14px;background:var(--card);box-shadow:var(--shadow);color:var(--ink);cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:4px 2px;font:800 26px/1 Barlow,sans-serif}
-.ride-btn small{font:700 13px/1.2 Barlow,sans-serif;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
+.ride-next2:has(span:not(:empty)){border-top:1px solid var(--line,#d8d2c2);padding-top:4px}
+.ride-next2:has(span:empty){grid-template-columns:1fr}
+#rideActions{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.ride-btn{min-height:56px;border:2px solid var(--ink);border-radius:12px;background:var(--card);box-shadow:var(--shadow);color:var(--ink);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:3px 2px;font:800 22px/1 Barlow,sans-serif}
+.ride-btn small{font:700 13px/1.2 Barlow,sans-serif;text-transform:uppercase;letter-spacing:.03em;margin-top:2px}
 .ride-btn.danger{background:#c0392b;color:#fff}
 .ride-btn.on{background:var(--ink);color:var(--card)}
 .ride-btn:disabled{opacity:.45}
-body.riding .leaflet-control-attribution{font-size:10px}
-/* landscape phone: panels down the left, buttons down the right, the map in the middle */
+.leaflet-container .leaflet-control-attribution{font-size:9px;line-height:1.3;padding:0 4px;background:rgba(255,253,246,.75);color:#5d5848}
+.leaflet-container .leaflet-control-attribution a{color:#5d5848}
+.leaflet-left .leaflet-control-attribution{margin:0!important;border-top-right-radius:4px}
+/* landscape phone: the two panels down the left, the buttons down the right, the map in the middle */
 @media (orientation:landscape) and (max-height:560px){
-  #ride{grid-template-columns:minmax(270px,40%) 1fr 76px;grid-template-rows:auto 1fr auto;gap:6px}
-  .ride-panel{padding:7px 12px}
-  .rt-msg{font-size:15px;margin-top:4px}.rt-msg .btn{min-height:40px;font-size:15px}
-  .ride-ico{width:34px;height:34px}.rt-label{font-size:13px}
-  .ride-stats span{font-size:13px}
+  #ride{grid-template-columns:minmax(250px,36%) 1fr 70px;grid-template-rows:auto 1fr auto;gap:6px}
   #rideTop{grid-column:1;grid-row:1}
+  #rideFloat{grid-column:2;grid-row:1/3}
   #rideBottom{grid-column:1;grid-row:3}
   #rideActions{grid-column:3;grid-row:1/4;grid-template-columns:1fr;grid-auto-rows:1fr;align-self:stretch}
   .ride-btn{min-height:0}
-  #rideNextName{font-size:22px;-webkit-line-clamp:1}#rideNextDist{font-size:26px}
-  .ride-stats b{font-size:22px}.ride-next2{font-size:15px;margin-top:4px}.ride-next2:has(span:not(:empty)){padding-top:4px}
+  #rideNextName{font-size:22px}#rideNextDist{font-size:24px}
+  .rt-main{flex-wrap:wrap;row-gap:0}
+  .ride-stats b{font-size:22px}
+  .ride-next2{grid-template-columns:1fr;gap:0}
 }
 /* the no-signal badge: a small icon in the map's bottom-left corner; tap it to say what the plain map is */
-#offlineBadge{position:fixed;left:12px;bottom:calc(var(--sheet-ctl,16px) + 8px);z-index:1100;width:44px;height:44px;border-radius:50%;border:2px solid var(--ink);
+#offlineBadge{position:fixed;right:12px;bottom:calc(var(--sheet-ctl,16px) + 38px);z-index:1100;width:44px;height:44px;border-radius:50%;border:2px solid var(--ink);
   background:var(--card);color:#c0392b;box-shadow:var(--shadow);display:grid;place-items:center;padding:0;cursor:pointer}
 #offlineBadge[hidden]{display:none}
 @media (min-width:821px){#offlineBadge{left:auto;right:60px;bottom:16px}}
@@ -214,6 +222,17 @@ ul.list li .s{font-size:13px;color:var(--muted)}
 /* map furniture */
 .mapui{position:absolute;z-index:1000;display:flex;gap:8px}
 #searchWrap{top:12px;left:12px;width:min(620px,calc(100% - 400px - 100px));min-width:220px;flex-direction:column}
+#btnSearch,#searchClose{display:none}
+/* something is being worked out: a bar across the top of the map says what, so it never happens silently */
+#workBar{position:absolute;z-index:1160;top:12px;left:calc((100% - 400px)/2);transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--paper);
+  border-radius:999px;padding:9px 16px 11px;font:600 15px Barlow,sans-serif;box-shadow:var(--shadow);overflow:hidden;max-width:calc(100% - 440px);white-space:nowrap}
+#workBar[hidden]{display:none}
+#status.mirrored,#queueChip.mirrored{display:none!important}
+#workText{overflow:hidden;text-overflow:ellipsis}
+#workFill{position:absolute;left:0;bottom:0;height:3px;width:0;background:#7fd18b;transition:width .3s}
+.spin{flex:0 0 auto;width:16px;height:16px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
 #searchForm{max-width:400px}
 #searchForm{display:flex;background:var(--card);border:2px solid var(--ink);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
 #q{flex:1;min-width:0;border:0;padding:10px 12px;font:16px Barlow,sans-serif;background:transparent;color:var(--ink)}
@@ -289,7 +308,12 @@ html.topo{--l-boat:#0b57d0;--l-ucr:#e8590c;--l-closed:#b3001b;--l-rb:#555a61;--l
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .row2 .btn{white-space:normal;text-align:center}
 .bigstats.three{grid-template-columns:repeat(3,1fr)}
-.card.tcard{flex-direction:row;justify-content:space-between;align-items:center;gap:10px}
+.card.tcard{display:grid;grid-template-columns:76px minmax(0,1fr) auto;column-gap:12px;row-gap:6px;align-items:center}
+.card.tcard .th{grid-column:2}.card.tcard .th h3{font-size:17px;line-height:1.2}
+.card.tcard>.btn{grid-column:3;grid-row:1}
+.card.tcard .td{grid-column:1/-1;margin:0}
+.card.tcard .sk{flex:0 0 76px;width:76px;height:52px;border:2px solid var(--ink);border-radius:8px;overflow:hidden;background:#efe6cc}
+.card.tcard .sk svg{width:100%;height:100%;display:block}
 .card.tcard h3{margin-bottom:2px}
 .confirm{background:var(--card);border:2px solid var(--ink);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px}
 details.settingsBox{border:2px solid var(--ink);border-radius:8px;background:var(--card)}
@@ -362,17 +386,44 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
   #sheetHandle::before{content:"";width:44px;height:5px;border-radius:3px;background:var(--rule)}
   .sheet-body{padding:4px 14px 24px}
   .view{gap:12px}
-  #searchWrap{right:72px;width:auto;min-width:0;left:10px;top:10px}
-  #tools{right:10px;top:10px}
-  .tool{width:50px;height:50px}
+  /* the map's own buttons in the two top corners, one row high: Search and Show on the left, Map and Me on the right */
+  #searchWrap{left:10px;top:10px;right:auto;width:auto;min-width:0;flex-direction:row;align-items:flex-start;gap:8px}
+  #tools{right:10px;top:10px;flex-direction:row}
+  .tool{width:48px;height:48px;font-size:11px}
+  #btnSearch{display:flex}
+  #searchWrap:not(.open) #searchForm,#searchWrap:not(.open) #results{display:none}
+  #searchWrap.open{right:10px;flex-direction:column;z-index:1300}
+  #searchWrap.open #btnSearch,#searchWrap.open #poiWrap{display:none}
+  #searchWrap.open #searchForm{max-width:none;width:100%}
+  #searchClose{display:block;border:0;border-left:2px solid var(--ink);background:var(--card);padding:0 14px;font:700 16px Barlow,sans-serif;cursor:pointer;color:var(--ink)}
+  #poiWrap{margin-top:0}
+  #poiBtn{flex-direction:column;justify-content:center;gap:2px;height:48px;min-height:48px;border-radius:8px;padding:2px 8px;font-size:11px;font-weight:700}
+  #poiBtn b{font-weight:700;order:2}#poiBtn>span[aria-hidden]{display:none}
+  #poiIcons .poi{width:18px;height:18px}
+  #workBar{top:66px;left:10px;right:10px;transform:none;max-width:none;justify-content:center;font-size:15px}
+  body:has(#workBar:not([hidden])) #zoomHint{display:none}
+  /* the panel's tab: a solid tab standing up from the panel's top edge, to grab and drag */
+  #sheet{overflow:visible}
+  #sheetHandle{position:relative;flex-direction:row;justify-content:center;gap:8px;min-height:40px;padding:6px 0 4px;color:var(--ink);font:700 15px Barlow,sans-serif;z-index:3;background:var(--paper);border-radius:14px 14px 0 0}
+  #sheetHandle::before{display:none}
+  #sheetHandle .tab{position:absolute;left:50%;top:-24px;transform:translateX(-50%);width:92px;height:24px;background:var(--paper);border:2px solid var(--ink);border-bottom:0;border-radius:12px 12px 0 0;display:grid;place-items:center}
+  #sheetHandle .tab i{width:36px;height:9px;border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);opacity:.55}
+  #sheetHandle .tab::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:5px;background:var(--paper)}
+  #sheetHandle::after{content:"";position:absolute;left:0;right:0;top:100%;height:16px;background:linear-gradient(rgba(31,29,24,.30),rgba(31,29,24,0));pointer-events:none;opacity:0;transition:opacity .15s}
+  #sheet.scrolled #sheetHandle::after{opacity:1}
+  #sheet.dragging{transition:none}
+  #sheet[data-state="min"] #sheetHandle{padding-top:12px}
+  #sheet:not([data-state="min"]) #handleText{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  #sheet:not([data-state="min"]) #sheetHandle{min-height:16px;padding:0}
+  #sheetHandle .tab{width:108px;height:28px;top:-28px}
   #banner{left:10px;right:10px;transform:none;max-width:none;top:66px;padding:6px 8px;gap:6px;font-size:14px;line-height:1.25}
   #bannerText{flex:1 1 100%;text-align:center}
   #status{left:10px;bottom:min(calc(var(--sheet-h) + 10px), calc(100% - 170px));max-width:calc(100% - 20px)}
-  #zoomHint{left:10px;right:72px;top:118px;bottom:auto;transform:none;font-size:13px;white-space:normal;text-align:left}   /* under the Show button, clear of the area pins */
+  #zoomHint{left:10px;right:10px;top:66px;bottom:auto;transform:none;font-size:13px;white-space:normal;text-align:left}   /* under the corner buttons */
   #queueChip{left:50%;bottom:min(calc(var(--sheet-h) + 58px), calc(100% - 124px))}   /* above the status line, never over the top buttons */
   .leaflet-control-zoom{display:none}
   .pop{top:auto;bottom:calc(var(--sheet-h) + 8px);right:8px;left:8px;width:auto;max-height:calc(100% - var(--sheet-h) - 84px);z-index:1200}
-  .leaflet-bottom{bottom:var(--sheet-ctl)}
+  .leaflet-bottom{bottom:calc(var(--sheet-ctl) + 30px)}   /* clear of the panel's tab */
 }
 /* small phones (iPhone SE and narrower): keep every row inside the screen */
 @media (max-width:370px){
@@ -414,11 +465,11 @@ ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
 .wl-strip .rcard{flex:0 0 min(270px,74vw)}
 .rcard .cap .dist{font-style:normal;font-weight:700;color:var(--green);font-size:13px}
 .rcard .cap .dist:empty{display:none}
-.tcard{flex:0 0 min(290px,78vw);scroll-snap-align:start;border:2px solid var(--ink);border-radius:10px;background:var(--card);box-shadow:var(--shadow);overflow:hidden;text-align:left;padding:0;cursor:pointer;color:var(--ink);font:inherit;display:flex;flex-direction:column}
-.tcard svg{display:block;width:100%;aspect-ratio:3/2;background:#efe6cc;border-bottom:2px solid var(--ink)}
-.tcard .cap{padding:8px 12px 10px;display:flex;flex-direction:column;gap:2px}
-.tcard .cap b{font:700 18px/1.15 "Zilla Slab",Georgia,serif}
-.tcard .cap span{font-size:14px;color:var(--muted)}
+.wl-trip{flex:0 0 min(290px,78vw);scroll-snap-align:start;border:2px solid var(--ink);border-radius:10px;background:var(--card);box-shadow:var(--shadow);overflow:hidden;text-align:left;padding:0;cursor:pointer;color:var(--ink);font:inherit;display:flex;flex-direction:column}
+.wl-trip svg{display:block;width:100%;aspect-ratio:3/2;background:#efe6cc;border-bottom:2px solid var(--ink)}
+.wl-trip .cap{padding:8px 12px 10px;display:flex;flex-direction:column;gap:2px}
+.wl-trip .cap b{font:700 18px/1.15 "Zilla Slab",Georgia,serif}
+.wl-trip .cap span{font-size:14px;color:var(--muted)}
 .wl-own{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .wl-tile{border:2px solid var(--ink);border-radius:12px;background:var(--card);box-shadow:var(--shadow);padding:12px;text-align:left;display:flex;flex-direction:column;gap:3px;color:var(--ink);font:inherit;cursor:pointer;min-height:112px}
 .wl-tile .ic{font-size:26px;line-height:1}
@@ -496,9 +547,11 @@ html.booting #welcome .btn,html.booting #welcome .wl-tile,html.booting #welcome 
   <div id="map" aria-label="Map"></div>
 
   <div class="mapui" id="searchWrap">
+    <button class="tool" id="btnSearch" aria-label="Search for a place" aria-expanded="false"><span class="ic">⌕</span>Search</button>
     <form id="searchForm" role="search">
       <input id="q" type="search" placeholder="Town, village or postcode" aria-label="Search for a place" autocomplete="off">
       <button type="submit">Go</button>
+      <button type="button" id="searchClose" aria-label="Close search">✕</button>
     </form>
     <div id="results" hidden></div>
     <div id="poiWrap">
@@ -512,9 +565,10 @@ html.booting #welcome .btn,html.booting #welcome .wl-tile,html.booting #welcome 
     <button class="tool" id="btnLocate" aria-label="Show where I am"><span class="ic">◎</span>Me</button>
   </div>
 
-  <div class="mapui" id="banner" hidden><span id="bannerText"></span><button class="btn" id="bannerMe" hidden>Use my location</button><button class="btn" id="bannerMove" hidden>✋ Move map</button><button class="btn" id="bannerUndo" hidden>↶ Undo</button><button class="btn" id="bannerDone" hidden>✓ Done</button><button class="btn" id="bannerCancel">Cancel</button></div>
+  <div class="mapui" id="banner" hidden><span id="bannerText"></span><button class="btn" id="bannerMe" hidden>Use my location</button><button class="btn" id="bannerSearch" hidden>⌕ Search</button><button class="btn" id="bannerMove" hidden>✋ Move map</button><button class="btn" id="bannerUndo" hidden>↶ Undo</button><button class="btn" id="bannerDone" hidden>✓ Done</button><button class="btn" id="bannerCancel">Cancel</button></div>
   <div class="mapui" id="zoomHint" hidden>Green shading shows where the lanes are. Tap it to zoom in.</div>
   <div id="status" hidden role="status" aria-live="polite"></div>
+  <div id="workBar" hidden role="status" aria-live="polite"><span class="spin" aria-hidden="true"></span><span id="workText"></span><i id="workFill"></i></div>
   <div id="updateBar" hidden role="status"><span>A new version of the planner is ready.</span><button class="btn primary" id="updateGo">Update</button><button class="btn quiet" id="updateLater">Later</button></div>
   <div class="mapui" id="queueChip" hidden></div>
 
@@ -558,12 +612,13 @@ html.booting #welcome .btn,html.booting #welcome .wl-tile,html.booting #welcome 
   <!-- the sheet: one view at a time -->
   <section id="sheet" data-state="peek" aria-label="Planner">
     <nav id="tabbar" aria-label="Sections">
+      <button data-tab="home"><span class="ti" aria-hidden="true">⌂</span>Home</button>
       <button data-tab="explore" aria-current="page"><span class="ti" aria-hidden="true">◈</span>Explore</button>
       <button data-tab="plan"><span class="ti" aria-hidden="true">✎</span>Plan</button>
       <button data-tab="saved"><span class="ti" aria-hidden="true">★</span>Saved</button>
       <button data-tab="help"><span class="ti" aria-hidden="true">?</span>Help</button>
     </nav>
-    <button id="sheetHandle" aria-label="Show more"><span id="handleText">Pull up for settings</span></button>
+    <button id="sheetHandle" aria-label="Show more"><span class="tab" aria-hidden="true"><i></i></span><span id="handleText">Pull up for settings</span></button>
     <div class="sheet-body" id="sheetBody">
 
       <div id="vStart" class="view" hidden>
@@ -814,12 +869,12 @@ html.booting #welcome .btn,html.booting #welcome .wl-tile,html.booting #welcome 
      on the left, buttons down the right edge. -->
 <section id="ride" hidden aria-label="Riding">
   <header id="rideTop" class="ride-panel" aria-live="polite">
-    <div class="rt-row"><span id="rideNextLabel" class="rt-label">Next lane</span>
-      <span class="rt-icons"><button class="ride-ico" id="rideSignal" hidden aria-label="No signal: about the map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h2v-3H3zm5 0h2v-6H8zm5 0h2V10h-2zm5 0h2V5h-2z" fill="currentColor" opacity=".35"/><path d="M3 3l18 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button><button class="ride-ico" id="rideGpsIco" aria-label="GPS: how good the position is"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="currentColor" stroke-width="2"/></svg></button></span></div>
+    <div class="rt-row"><span id="rideNextLabel" class="rt-label">Next lane</span></div>
+    <span class="rt-icons"><button class="ride-ico" id="rideSignal" hidden aria-label="No signal: about the map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h2v-3H3zm5 0h2v-6H8zm5 0h2V10h-2zm5 0h2V5h-2z" fill="currentColor" opacity=".35"/><path d="M3 3l18 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button><button class="ride-ico" id="rideGpsIco" aria-label="GPS: how good the position is"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="currentColor" stroke-width="2"/></svg></button></span>
     <div class="rt-main"><b id="rideNextName">–</b><span id="rideNextDist"></span></div>
-    <div id="rideMsg" class="rt-msg" hidden><span id="rideMsgText"></span><button class="btn" id="rideMsgGo" hidden></button></div>
-    <div id="rideOff" class="ride-off" hidden role="alert"><b>Off the route</b> <span id="rideOffDist"></span><button class="btn" id="rideBackTo">Show the way back</button></div>
-  </header>
+    </header>
+  <div id="rideFloat"><div id="rideMsg" class="rt-msg" hidden><span id="rideMsgText"></span><button class="btn" id="rideMsgGo" hidden></button></div>
+    <div id="rideOff" class="ride-off" hidden role="alert"><b>Off the route</b> <span id="rideOffDist"></span><button class="btn" id="rideBackTo">Show the way back</button></div></div>
   <div id="rideBottom" class="ride-panel">
     <div class="ride-stats"><div><b id="rideDone">0.0</b><span>km ridden</span></div><div><b id="rideLeft">–</b><span>km left</span></div><div><b id="rideTime">–</b><span>to go</span></div></div>
     <div class="ride-next2"><span id="rideStop"></span><span id="rideFuel"></span></div>
@@ -842,8 +897,8 @@ html.booting #welcome .btn,html.booting #welcome .wl-tile,html.booting #welcome 
 <script src="data/featured.js?v=3747ca0e" onerror="window.FEATURED=null"></script>
 
 <script src="js/plan.js?v=89dd517b"></script>
-<script src="js/app.js?v=d3cb654d"></script>
+<script src="js/app.js?v=3ca02fb5"></script>
 <script src="js/offline.js?v=6fe83e21"></script>
-<script src="js/ride.js?v=cb997179"></script>
+<script src="js/ride.js?v=f7088694"></script>
 </body>
 </html>

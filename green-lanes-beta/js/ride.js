@@ -52,10 +52,10 @@ const Ride = (() => {
     if (text && ms) msgTimer = setTimeout(() => msg(""), ms);
     layoutChrome();
   }
-  // the map's credit line sits just above the bottom panel (portrait) or beside the buttons (landscape), never over the middle
+  // the map's credit line sits in the bottom-left of the map you can see: above the bottom panel in portrait, beside the panels in landscape
   function layoutChrome(){
-    requestAnimationFrame(() => { if (!on) return; const v = visibleBox(), m = map.getSize(), el = map.getContainer().querySelector(".leaflet-bottom.leaflet-right");
-      if (el) { el.style.bottom = Math.max(0, m.y - v.y1) + "px"; el.style.right = Math.max(0, m.x - v.x1) + "px"; } });
+    requestAnimationFrame(() => { if (!on) return; const v = visibleBox(), m = map.getSize(), el = map.getContainer().querySelector(".leaflet-bottom.leaflet-left");
+      if (el) { el.style.bottom = Math.max(0, m.y - v.y1) + "px"; el.style.left = Math.max(0, v.x0) + "px"; } });
   }
   function gpsIcon(acc){
     const el = $("#rideGpsIco"); el.classList.remove("good", "weak", "bad");
@@ -94,8 +94,8 @@ const Ride = (() => {
   // way there if it's within reach of the phone's router
   function toStart(p, off, q){
     $("#rideNextLabel").textContent = "Not on the route yet";
-    $("#rideNextName").textContent = off < 2000 ? "The route is close" : "Head for the route";
-    $("#rideNextDist").textContent = `${kmTxt(off)} away`;
+    $("#rideNextName").textContent = off < 2000 ? "Nearly there" : "To the route";
+    $("#rideNextDist").textContent = kmTxt(off);
     const near = off / 1000 <= WAY_KM;
     if (!backLine) msg(near ? "The map follows you once you reach the route." : "The map follows you once you reach the route. Tap Preview to see how the screen works.",
       near ? { label: "Show the way there", run: () => { $("#rideMsgGo").textContent = "Finding it…"; wayTo(p, q).then(r => msg(r ? `${kmTxt(r.len)} by road to the route.` : "No way found from here on the roads saved on this phone.")); } } : null);
@@ -193,7 +193,7 @@ const Ride = (() => {
     stopPractice(); lock?.release().catch(() => {}); lock = null; msg("");
     layer.clearLayers(); map.removeLayer(layer); clearBack();
     document.body.classList.remove("riding"); $("#ride").hidden = true; map.invalidateSize();
-    const cr = map.getContainer().querySelector(".leaflet-bottom.leaflet-right"); if (cr) cr.style.bottom = cr.style.right = "";
+    const cr = map.getContainer().querySelector(".leaflet-bottom.leaflet-left"); if (cr) cr.style.bottom = cr.style.left = "";
     if (zoomBefore) map.setView(zoomBefore.c, zoomBefore.z, { animate: false });
   }
   // Preview: the dot rides the route at 60 km/h, ten times faster than real, so you can see how the screen works
