@@ -1,5 +1,5 @@
 self.SWT = self.SWT || {};
-SWT.BUILD = "3077d69993";
+SWT.BUILD = "89d27e1c6e";
 SWT.MAPS = {"trail.pmtiles": 62556928, "overview.pmtiles": 10741583};
 SWT.MAP_BYTES = 73298511;
 SWT.ART = ["book", "foldmap", "gpx", "hero", "middle", "north", "p-albaricoques", "p-alquife", "p-arlanza", "p-atienza", "p-belmonte", "p-calar-alto", "p-caras", "p-cortijo-fraile", "p-entrepenas", "p-fin-del-mundo", "p-fort-bravo", "p-gorafe", "p-gormaz", "p-guadix-station", "p-la-calahorra", "p-las-menas", "p-minihollywood", "p-psa", "p-rio-dulce", "p-rio-lobos", "p-rio-mundo", "p-riopar-factories", "p-sad-hill", "p-segura", "p-silos", "p-utrero", "p-western-leone", "p-yecla", "p-zorita", "pg-about", "pg-app", "pg-faq", "pg-guide", "pg-places", "pg-shop", "picto-map", "s-0", "s-1", "s-2", "s-3", "s-4", "s-5", "s-6", "s-7", "s-8", "saloon", "south", "wallmap"];
@@ -9,6 +9,7 @@ SWT.SHELL = [
 "css/fonts.css",
 "css/site.css",
 "data/content.js",
+"data/photos.js",
 "data/places.js",
 "data/route.json",
 "fonts/CourierPrime-400-latin-ext.woff2",
@@ -99,6 +100,32 @@ SWT.SHELL = [
 "img/icons/icon-192.png",
 "img/icons/icon-512.png",
 "img/icons/icon-maskable-512.png",
+"img/photo/alquife.jpg",
+"img/photo/arlanza.jpg",
+"img/photo/atienza.jpg",
+"img/photo/belmonte.jpg",
+"img/photo/calar-alto.jpg",
+"img/photo/caras.jpg",
+"img/photo/cortijo-fraile.jpg",
+"img/photo/entrepenas.jpg",
+"img/photo/fin-del-mundo.jpg",
+"img/photo/fort-bravo.jpg",
+"img/photo/gorafe.jpg",
+"img/photo/gormaz.jpg",
+"img/photo/guadix-station.jpg",
+"img/photo/la-calahorra.jpg",
+"img/photo/las-menas.jpg",
+"img/photo/minihollywood.jpg",
+"img/photo/psa.jpg",
+"img/photo/rio-dulce.jpg",
+"img/photo/rio-lobos.jpg",
+"img/photo/rio-mundo.jpg",
+"img/photo/riopar-factories.jpg",
+"img/photo/sad-hill.jpg",
+"img/photo/segura.jpg",
+"img/photo/silos.jpg",
+"img/photo/yecla.jpg",
+"img/photo/zorita.jpg",
 "js/app.js",
 "js/art.js",
 "js/icons.js",

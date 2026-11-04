@@ -7,6 +7,10 @@ SWT.art = {};
   // which places get a pictogram on the poster map (the rest are on the zoomable map)
   var PICK = ["sad-hill", "arlanza", "rio-lobos", "gormaz", "atienza", "rio-dulce", "zorita", "caras", "belmonte", "rio-mundo", "segura", "utrero", "gorafe", "guadix-station", "la-calahorra", "calar-alto", "fort-bravo", "cortijo-fraile"];
   var LABEL = { "sad-hill": ["Sad Hill", 1], "caras": ["Faces in the rock", 1], "rio-mundo": ["Waterfall", 1], "gorafe": ["Dolmens", 1], "calar-alto": ["Observatory", 1], "fort-bravo": ["Film towns", 1], "la-calahorra": ["Flagstone", -1], "belmonte": ["Belmonte", 1], "gormaz": ["Gormaz", 1] };
+  // Where each landmark's picture came out on img/art/picto-map.jpg, in % across and % down (measured by eye on 4 Nov 2026).
+  // The painting puts pictures near, not on, the true spots, so the tap targets go on the pictures. Re-measure if the painting is redone.
+  var SPOT = { "sad-hill": [30, 6], "arlanza": [24, 12], "rio-lobos": [48, 15], "gormaz": [22, 19], "atienza": [36, 28], "rio-dulce": [60, 25], "zorita": [48, 37], "caras": [65, 36],
+    "belmonte": [40, 46], "rio-mundo": [58, 63], "segura": [38, 64], "gorafe": [17, 74], "guadix-station": [18, 81], "la-calahorra": [25, 87], "calar-alto": [49, 84], "fort-bravo": [49, 91], "cortijo-fraile": [50, 97] };
   // modes: "full" (drawn map, the fallback), "base" (land, sea and terrain only, the input for the painted map),
   // "overlay" (route, pins and labels on a transparent background, laid over the painted map)
   SWT.art.picto = function (route, opts) {
@@ -26,7 +30,11 @@ SWT.art = {};
       o += blob(-2.3, 37.03, 45, 18, -10, "#d9a560", .9);  // Tabernas desert
       o += blob(-3.0, 37.4, 40, 22, 0, "#cf8a5a", .7);    // Guadix and Gorafe badlands
       [[-4.0, 40.85, 90, 16, -18], [-2.2, 40.9, 30, 70, 20], [-1.95, 40.2, 34, 30, 0], [-2.65, 38.1, 26, 55, 12], [-3.2, 37.08, 62, 13, -4], [-2.45, 37.28, 40, 10, -6], [-4.5, 38.3, 90, 14, -8], [-3.25, 42.0, 40, 20, 0]].forEach(function (m) { o += blob(m[0], m[1], m[2], m[3], m[4], "#9c7a52", .85); });
-      [[-2.73, 40.5, 6, 18, 20], [-2.78, 38.17, 5, 16, -30], [-2.85, 40.3, 5, 14, 10]].forEach(function (r) { o += blob(r[0], r[1], r[2], r[3], r[4], "#6aa3b8", 1); });
+      // no lakes: the painting model grew them into rivers across the route
+      // with marks: a plain ink pictogram where each landmark is, so the painting puts its picture in the right spot
+      if (opts.marks) { var bi = {}; SWT.places.forEach(function (q) { bi[q.id] = q; });
+        PICK.forEach(function (id) { var q = bi[id]; if (!q) return; var p = P(q.lon, q.lat);
+          o += '<g transform="translate(' + f(p[0] - 12) + ' ' + f(p[1] - 12) + ')" fill="none" stroke="#2a221a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="' + SWT.icons[q.icon] + '"/></g>'; }); }
       return o + "</svg>";
     }
     if (mode === "full") {
@@ -38,8 +46,8 @@ SWT.art = {};
       o += '<path d="' + path(SPAIN) + 'Z" fill="url(#pm-dots)" opacity=".7"/>';
       [[-3.6,40.95,60,18,-12],[-2.75,38.1,30,48,8],[-3.2,37.08,58,12,-4],[-2.45,37.27,40,10,-6],[-1.95,40.25,36,30,0],[-2.45,38.55,26,16,0]].forEach(function (m) { o += blob(m[0], m[1], m[2], m[3], m[4], "url(#pm-hatch)"); });
     }
-    // towns for context
-    [["Burgos", -3.70, 42.34, 1], ["Madrid", -3.70, 40.42, -1], ["Cuenca", -2.13, 40.07, 1], ["Albacete", -1.86, 38.99, 1], ["Murcia", -1.13, 37.99, 1]].forEach(function (c) {
+    // towns for context (not on the painted map, which carries only the route)
+    if (mode !== "overlay") [["Burgos", -3.70, 42.34, 1], ["Madrid", -3.70, 40.42, -1], ["Cuenca", -2.13, 40.07, 1], ["Albacete", -1.86, 38.99, 1], ["Murcia", -1.13, 37.99, 1]].forEach(function (c) {
       var p = P(c[1], c[2]); o += '<rect x="' + f(p[0] - 3.5) + '" y="' + f(p[1] - 3.5) + '" width="7" height="7" fill="#3b3f43"/>' +
         '<text x="' + f(p[0] + (c[3] > 0 ? 8 : -8)) + '" y="' + f(p[1] + 4) + '" text-anchor="' + (c[3] > 0 ? "start" : "end") + '" font-family="Courier Prime, monospace" font-weight="700" font-size="12.5" fill="#3b3f43" paint-order="stroke" stroke="' + halo + '" stroke-width="3">' + c[0] + '</text>';
     });
@@ -54,11 +62,14 @@ SWT.art = {};
     });
     (route.stages || []).forEach(function (s) {
       if (!s.n) return; var w = s.waypoints[0], p = P(w[0], w[1]);
-      o += '<g transform="translate(' + f(p[0] - 34) + ' ' + f(p[1]) + ')"><rect x="-9" y="-9" width="18" height="18" fill="#26292c"/><text y="5" text-anchor="middle" font-family="Courier Prime, monospace" font-weight="700" font-size="13" fill="#fffaf0">' + s.n + '</text></g>';
+      if (mode === "overlay") o += '<g transform="translate(' + f(p[0]) + ' ' + f(p[1]) + ')"><circle r="6.5" fill="#26292c" stroke="#fffaf0" stroke-width="1.5"/><text y="3.2" text-anchor="middle" font-family="Courier Prime, monospace" font-weight="700" font-size="9" fill="#fffaf0">' + s.n + '</text></g>';
+      else o += '<g transform="translate(' + f(p[0] - 34) + ' ' + f(p[1]) + ')"><rect x="-9" y="-9" width="18" height="18" fill="#26292c"/><text y="5" text-anchor="middle" font-family="Courier Prime, monospace" font-weight="700" font-size="13" fill="#fffaf0">' + s.n + '</text></g>';
     });
     var byId = {}; SWT.places.forEach(function (p) { byId[p.id] = p; });
     PICK.forEach(function (id) {
       var pl = byId[id]; if (!pl) return; var p = P(pl.lon, pl.lat), col = SWT.cats[pl.cat].color;
+      // on the painted map the picture is the pin: an invisible tap target over it, named for screen readers and hover
+      if (mode === "overlay") { var sp = SPOT[id]; if (!sp) return; o += '<a class="hot" href="#place/' + id + '" aria-label="' + pl.name + '"><title>' + pl.name + '</title><circle cx="' + f(sp[0] / 100 * W) + '" cy="' + f(sp[1] / 100 * H) + '" r="26"/></a>'; return; }
       o += '<a href="#place/' + id + '" aria-label="' + pl.name + '"><g transform="translate(' + f(p[0] - 15) + ' ' + f(p[1] - 15) + ')">' +
         '<circle cx="15" cy="15" r="13.5" fill="#fff" stroke="' + col + '" stroke-width="2.4"/><g transform="translate(4.2 4.2) scale(.9)" fill="none" stroke="' + col + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' + SWT.icons[pl.icon] + '"/></g></g>';
       var lb = LABEL[id];
@@ -69,11 +80,12 @@ SWT.art = {};
       o += '<g transform="translate(442 70)"><circle r="26" fill="var(--sun)"/>' + [0,30,60,90,120,150,180,210,240,270,300,330].map(function (r) { return '<path d="M0 -33V-44" stroke="var(--sun)" stroke-width="3" transform="rotate(' + r + ')"/>'; }).join("") + '</g>';
       [[-1.6, 37.55], [-4.3, 37.6], [-1.3, 38.6]].forEach(function (c) { var p = P(c[0], c[1]); o += '<g transform="translate(' + f(p[0] - 14) + ' ' + f(p[1] - 14) + ') scale(1.2)" fill="none" stroke="var(--trail)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="' + SWT.icons.cactus + '"/></g>'; });
     }
-    o += '<g transform="translate(478 470)" font-family="Rye, serif" font-size="14" fill="#26292c" text-anchor="middle"><path d="M0 -30L7 0 0 30-7 0z" fill="#26292c"/><path d="M0 -30L7 0H-7z" fill="#e0892a"/><text y="-36" paint-order="stroke" stroke="' + halo + '" stroke-width="3">N</text></g>';
-    var sea = P(-0.45, 37.25); o += '<g font-family="Rye, serif" font-size="17" fill="#3b3f43" text-anchor="middle" paint-order="stroke" stroke="' + (mode === "overlay" ? "#cfe0e4" : "none") + '" stroke-width="3" opacity=".85"><text x="' + f(sea[0]) + '" y="' + f(sea[1]) + '">Mar</text><text x="' + f(sea[0]) + '" y="' + f(sea[1] + 20) + '">Mediterráneo</text></g>';
+    if (mode !== "overlay") o += '<g transform="translate(478 470)" font-family="Rye, serif" font-size="14" fill="#26292c" text-anchor="middle"><path d="M0 -30L7 0 0 30-7 0z" fill="#26292c"/><path d="M0 -30L7 0H-7z" fill="#e0892a"/><text y="-36" paint-order="stroke" stroke="' + halo + '" stroke-width="3">N</text></g>';
+    var sea = P(-0.45, 37.25); if (mode !== "overlay") o += '<g font-family="Rye, serif" font-size="17" fill="#3b3f43" text-anchor="middle" paint-order="stroke" stroke="' + (mode === "overlay" ? "#cfe0e4" : "none") + '" stroke-width="3" opacity=".85"><text x="' + f(sea[0]) + '" y="' + f(sea[1]) + '">Mar</text><text x="' + f(sea[0]) + '" y="' + f(sea[1] + 20) + '">Mediterráneo</text></g>';
     var a = P(-3.4084, 41.9908);
-    o += '<text x="' + f(a[0] - 2) + '" y="' + f(a[1] - 22) + '" font-family="Rye, serif" font-size="13" fill="#a3262a" text-anchor="middle" paint-order="stroke" stroke="' + halo + '" stroke-width="3">START</text>';
-    if (!opts.bare) o += '<text x="18" y="' + (H - 18) + '" font-family="Courier Prime, monospace" font-size="11" fill="#3b3f43" paint-order="stroke" stroke="' + halo + '" stroke-width="3">Not to scale for navigation. Use the Map for that.</text>';
+    if (mode === "overlay") o += '<text x="' + f(a[0] - 16) + '" y="' + f(a[1] + 4) + '" font-family="Rye, serif" font-size="11" fill="#a3262a" text-anchor="end" paint-order="stroke" stroke="#f7eedb" stroke-width="3">START</text>';
+    else o += '<text x="' + f(a[0] - 2) + '" y="' + f(a[1] - 22) + '" font-family="Rye, serif" font-size="13" fill="#a3262a" text-anchor="middle" paint-order="stroke" stroke="' + halo + '" stroke-width="3">START</text>';
+    if (!opts.bare && mode !== "overlay") o += '<text x="18" y="' + (H - 18) + '" font-family="Courier Prime, monospace" font-size="11" fill="#3b3f43" paint-order="stroke" stroke="' + halo + '" stroke-width="3">Not to scale for navigation. Use the Map for that.</text>';
     return o + "</svg>";
   };
 

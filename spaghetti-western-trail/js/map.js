@@ -85,6 +85,9 @@ window.SWT = window.SWT || {};
     map.addLayer({ id: "starts", type: "circle", source: "starts", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 7, 10, 11], "circle-color": ["case", ["has", "end"], "#a3262a", "#2b2e31"], "circle-stroke-color": "#fffdf6", "circle-stroke-width": 2 } });
     map.addLayer({ id: "starts-n", type: "symbol", source: "starts", layout: { "text-field": ["get", "n"], "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 5, 10, 10, 13], "text-allow-overlap": true }, paint: { "text-color": "#ffffff" } });
     addImages(map);
+    // a ring under the pin that is open in the pop-up, so you can see which one you picked
+    map.addSource("sel", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "sel", type: "circle", source: "sel", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 13, 12, 22], "circle-color": "rgba(224,137,42,.28)", "circle-stroke-color": "#e0892a", "circle-stroke-width": 3 } });
     map.addSource("places", { type: "geojson", data: M.placesGeo() });
     map.addLayer({ id: "places", type: "symbol", source: "places", layout: {
       "icon-image": ["get", "img"], "icon-size": ["interpolate", ["linear"], ["zoom"], 5, .5, 8, .7, 11, .9, 14, 1], "symbol-sort-key": ["get", "rank"],
@@ -92,10 +95,15 @@ window.SWT = window.SWT || {};
       "text-field": ["step", ["zoom"], "", 10, ["get", "name"]], "text-font": ["Noto Sans Medium"], "text-size": 12, "text-offset": [0, 1.5], "text-anchor": "top", "text-optional": true, "text-max-width": 9 },
       paint: { "text-color": "#2b2e31", "text-halo-color": "#fffdf6", "text-halo-width": 1.6 } });
     if (opts.interactive !== false) {
-      map.on("click", "places", function (e) { var f = e.features && e.features[0]; if (f && M.onPick) M.onPick(f.properties.id); });
+      // where pins overlap, open the real landmark rather than the sample listing on top of it
+      map.on("click", "places", function (e) { var fs = (e.features || []).slice().sort(function (a, b) { return a.properties.rank - b.properties.rank; }); if (fs[0] && M.onPick) M.onPick(fs[0].properties.id); });
       map.on("mouseenter", "places", function () { map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", "places", function () { map.getCanvas().style.cursor = ""; });
     }
+  };
+  M.select = function (map, p) {
+    var src = map && map.getSource("sel"); if (!src) return;
+    src.setData({ type: "FeatureCollection", features: p ? [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [p.lon, p.lat] } }] : [] });
   };
   M.applyFilter = function (map) {
     if (!map || !map.getLayer("places")) return;
@@ -110,7 +118,7 @@ window.SWT = window.SWT || {};
   M.refreshPlaces = function (map) { if (map && map.getSource("places")) { addImages(map); map.getSource("places").setData(M.placesGeo()); } };
   M.bounds = function (stageN) {
     var pts = [];
-    SWT.route.stages.forEach(function (s) { if (stageN == null ? s.n : s.n === stageN) pts = pts.concat(s.trail || s.tarmac); });
+    SWT.route.stages.forEach(function (s) { if (stageN == null || s.n === stageN) pts = pts.concat(s.trail || s.tarmac); });
     var b = new maplibregl.LngLatBounds(pts[0], pts[0]); pts.forEach(function (p) { b.extend(p); }); return b;
   };
   M.create = function (el, opts) {

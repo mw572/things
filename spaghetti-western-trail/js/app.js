@@ -39,7 +39,18 @@ window.SWT = window.SWT || {};
   function art(slug) { return (SWT.ART || []).indexOf(slug) >= 0 ? "img/art/" + slug + ".jpg" : null; }
   function areaOfStage(n) { return (SWT.stages[n] || SWT.stages[1]).area; }
   function stageImg(n) { return art("s-" + n) || art(SWT.areas[areaOfStage(n)].art); }
-  function placeImg(p) { return art("p-" + p.id) || (p.stage != null ? art(SWT.areas[areaOfStage(p.stage)].art) : null); }
+  // made-up places get no picture (a stage painting there looked like a picture of the place); real ones get their painting
+  function placeImg(p) { return p.sample || p.community ? null : art("p-" + p.id) || (p.stage != null ? art(SWT.areas[areaOfStage(p.stage)].art) : null); }
+  function wiki(p) { return (SWT.photos || {})[p.id] || {}; }
+  function credit(ph) { return 'Photo: <a href="' + ph.page + '" target="_blank" rel="noopener">' + esc(ph.by) + '</a>, ' + esc(ph.licence) + ', Wikimedia Commons'; }
+  function gmaps(p) { return "https://www.google.com/maps/search/?api=1&query=" + p.lat + "," + p.lon; }
+  // the picture at the top of the pop-up: the real photo, else the painting, else a plain panel with the pictogram
+  function pickPic(p) {
+    var ph = wiki(p).photo, img = placeImg(p);
+    if (ph) return '<div class="pic"><img src="' + ph.src + '" alt="Photo of ' + esc(p.name) + '"><span class="cr">' + credit(ph) + '</span></div>';
+    if (img) return '<div class="pic"><img src="' + img + '" alt=""></div>';
+    return '<div class="pic plain" style="background:' + SWT.cats[p.cat].color + '">' + SWT.svgIcon(p.icon, { size: 44, color: "#fffaf0" }) + '<span>' + (p.sample ? "Sample listing" : "Added by a rider") + '</span></div>';
+  }
   function banner(img, eyebrow, title, text, cls, pills) {
     return '<section class="banner ' + (cls || "") + '">' + (img ? '<img src="' + img + '" alt="">' : '') + '<div class="wrap">' + (pills ? '<div class="pills">' + pills + '</div>' : '') +
       (eyebrow ? '<div class="eyebrow">' + eyebrow + '</div>' : '') + '<h1>' + title + '</h1>' + (text ? '<p>' + text + '</p>' : '') + '</div></section>';
@@ -84,7 +95,7 @@ window.SWT = window.SWT || {};
         '<div class="actions"><a class="btn" href="#map">Open the map</a><a class="btn ghost" href="#app">Put it on your phone</a></div>' +
       '</div></div></section>' +
     '<section class="band"><div class="wrap picto-wrap"><figure style="margin:0">' + pictoMap() + '' +
-      '<div class="legend"><span><i class="ln" style="border-color:var(--trail);border-top-style:dashed"></i>Trail (off-road)</span><span><i class="ln" style="border-color:var(--tarmac)"></i>Tarmac route</span><span>' + SWT.badgeSvg("cross", SWT.cats.film.color, 18) + ' Film location</span><span>' + SWT.badgeSvg("block", SWT.cats.odd.color, 18) + ' Odd and abandoned</span><span>' + SWT.badgeSvg("fall", SWT.cats.beauty.color, 18) + ' Waterfalls and views</span></div></figure>' +
+      '<div class="legend"><span><i class="ln" style="border-color:var(--trail);border-top-style:dashed"></i>Trail (off-road)</span><span><i class="ln" style="border-color:var(--tarmac)"></i>Tarmac route</span><span class="muted">Tap a picture on the map to read about the place. Not to scale.</span></div></figure>' +
       '<div class="prose"><div class="eyebrow">The route</div><h2 style="margin:8px 0 16px">Sad Hill to the desert</h2>' +
         '<p class="lede">The trail starts at Sad Hill, the circular cemetery south of Burgos where The Good, the Bad and the Ugly ends, and runs south for eight stages to Tabernas in Almería, where the western towns built for the films are still standing.</p>' +
         '<p>In between it crosses limestone canyons, the empty uplands of Guadalajara, the Tagus reservoirs, the plain of La Mancha, the forests of Segura and Cazorla, and the red badlands round Guadix.</p>' +
@@ -170,14 +181,18 @@ window.SWT = window.SWT || {};
   }
   pages.place = function (id) {
     var p = place(id); if (!p) return notFound();
-    var n = locate(p), st = SWT.stages[p.stage], t = threadFor(p);
+    var n = locate(p), st = SWT.stages[p.stage], t = threadFor(p), w = wiki(p), ph = w.photo;
     var near = SWT.allPlaces().filter(function (q) { return q.id !== p.id && !q.sample && q.stage === p.stage; }).slice(0, 3);
-    return banner(placeImg(p), '<a href="#stage/' + p.stage + '">' + (p.stage ? "Stage " + p.stage : "Coda") + ': ' + esc(st.from) + ' to ' + esc(st.to) + '</a>', esc(p.name), "", "", catPill(p)) +
+    var wikiTitle = w.wiki ? decodeURIComponent(w.wiki.split("/wiki/")[1]).replace(/_/g, " ") : "";
+    return banner(placeImg(p), '<a href="#stage/' + p.stage + '">' + (p.stage ? "Stage " + p.stage : "Coda") + ': ' + esc(st.from) + ' to ' + esc(st.to) + '</a>', esc(p.name), "", placeImg(p) ? "" : "short", catPill(p)) +
       '<section class="band"><div class="wrap grid2"><div class="prose">' + (p.sample ? '<p class="note">This is a sample listing made up for the demo. In the real guide it would be a place checked by the authors or approved by the moderators.</p>' : '') +
       '<p class="lede">' + esc(p.blurb) + '</p>' +
       (p.tips && p.tips.length ? '<h3 style="margin:26px 0 10px">Good to know</h3><ul class="tips">' + p.tips.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '') +
-      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px"><a class="btn" href="#thread/' + t.id + '">Talk about this place (' + t.posts.length + ')</a><a class="btn ghost" href="https://www.google.com/maps/dir/?api=1&destination=' + p.lat + ',' + p.lon + '" target="_blank" rel="noopener">Directions</a></div></div>' +
-      '<div><div id="placemap" class="minimap"></div><ul class="facts-list" style="margin-top:16px"><li><span>Distance from the trail</span><span>' + (n.off < 1 ? "On the trail" : kmFmt(n.off)) + '</span></li>' + (p.stage ? '<li><span>Along the trail</span><span>km ' + Math.round(n.km) + ' of ' + Math.round(SWT.totalKm) + '</span></li>' : '') +
+      (w.about ? '<h3 style="margin:26px 0 10px">From Wikipedia</h3><p>' + esc(w.about) + '</p><p class="credit">From the Wikipedia article <a href="' + w.wiki + '" target="_blank" rel="noopener">' + esc(wikiTitle) + '</a>, CC BY-SA 4.0.</p>' : '') +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px"><a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=' + p.lat + ',' + p.lon + '" target="_blank" rel="noopener">Directions</a><a class="btn ghost" href="' + gmaps(p) + '" target="_blank" rel="noopener">Google Maps</a>' +
+      (w.wiki ? '<a class="btn ghost" href="' + w.wiki + '" target="_blank" rel="noopener">Wikipedia</a>' : '') + '<a class="btn ghost" href="#thread/' + t.id + '">Talk about it (' + t.posts.length + ')</a><a class="btn ghost" href="#map">On the big map</a></div></div>' +
+      '<div>' + (ph ? '<figure class="photo"><img src="' + ph.src + '" alt="Photo of ' + esc(p.name) + '"><figcaption>' + credit(ph) + '</figcaption></figure>' : '') +
+      '<div id="placemap" class="minimap"></div><ul class="facts-list" style="margin-top:16px"><li><span>Distance from the trail</span><span>' + (n.off < 1 ? "On the trail" : kmFmt(n.off)) + '</span></li>' + (p.stage ? '<li><span>Along the trail</span><span>km ' + Math.round(n.km) + ' of ' + Math.round(SWT.totalKm) + '</span></li>' : '') +
       '<li><span>Position</span><span>' + p.lat.toFixed(4) + ', ' + p.lon.toFixed(4) + '</span></li></ul></div></div></section>' +
       (near.length ? '<section class="band alt"><div class="wrap"><div class="sec-head"><div><div class="eyebrow">Same stage</div><h2>Nearby</h2></div></div><div class="grid3">' + near.map(placeCard).join("") + '</div></div></section>' : '');
   };
@@ -411,7 +426,7 @@ window.SWT = window.SWT || {};
     $("#open-stages").onclick = function () { var s = $("#map-side"); s.classList.add("open"); s.scrollTop = 0; };
     function after(m) { setTimeout(function () { m.resize(); zoomStage(stageN); }, 30); }
     if (SWT.mainMap) after(SWT.mainMap);
-    else SWT.map.create($("#map"), { onLoad: function (m) { after(m); } }).then(function (m) { SWT.mainMap = m; drawMapStatus(); });
+    else SWT.map.create($("#map"), { onLoad: function (m) { after(m); } }).then(function (m) { SWT.mainMap = m; drawMapStatus(); m.once("idle", function () { $("#map-loading").hidden = true; }); m.on("click", function (e) { if (!m.queryRenderedFeatures(e.point, { layers: ["places"] }).length) closePick(); }); });
     drawMapStatus();
   }
   function zoomStage(n) {
@@ -430,19 +445,38 @@ window.SWT = window.SWT || {};
       el.innerHTML = saved ? "✓ Map saved on this device" : (navigator.onLine ? 'Streaming map · <a href="#app">Save for no signal</a>' : 'No signal and the map isn\'t saved · <a href="#app">How to save it</a>');
     });
   }
+  var popup = null;
+  function closePick() { if (popup) { popup.remove(); popup = null; } $("#sheet").hidden = true; SWT.map.select(SWT.mainMap, null); }
   SWT.map.onPick = function (id) {
-    var p = place(id); if (!p) return; var n = locate(p), sh = $("#sheet"), img = placeImg(p);
-    sh.hidden = false;
-    sh.innerHTML = '<button class="x" aria-label="Close">×</button>' + (img ? '<div class="pic"><img src="' + img + '" alt=""></div>' : '') + '<div class="in"><div style="display:flex;gap:6px;flex-wrap:wrap">' + catPill(p) + '</div><h3>' + esc(p.name) + '</h3><p>' + esc(p.blurb.length > 170 ? p.blurb.slice(0, 167).replace(/\s\S*$/, "") + "…" : p.blurb) + '</p><div class="mono muted" style="font-size:12.5px;margin-bottom:12px">' + (p.stage ? "Stage " + p.stage + " · km " + Math.round(n.km) + " · " : "Coda · ") + (n.off < 1 ? "on the trail" : kmFmt(n.off) + " off the trail") + '</div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn small" href="#place/' + p.id + '">Read more</a><a class="btn ghost small" href="#thread/' + threadFor(p).id + '">Talk about it</a></div></div>';
-    $(".x", sh).onclick = function () { sh.hidden = true; };
+    var p = place(id), m = SWT.mainMap; if (!p || !m) return; var n = locate(p), w = wiki(p);
+    var text = p.blurb;
+    var body = '<button class="x" aria-label="Close">×</button>' + pickPic(p) + '<div class="in"><div style="display:flex;gap:6px;flex-wrap:wrap">' + catPill(p) + '</div><h3>' + esc(p.name) + '</h3><p>' + esc(text.length > 190 ? text.slice(0, 187).replace(/\s\S*$/, "") + "…" : text) + '</p>' +
+      '<div class="mono muted" style="font-size:12.5px;margin-bottom:12px">' + (p.stage ? "Stage " + p.stage + " · km " + Math.round(n.km) + " · " : "Coda · ") + (n.off < 1 ? "on the trail" : kmFmt(n.off) + " off the trail") + '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn small" href="#place/' + p.id + '">Read more</a><a class="btn ghost small" href="' + gmaps(p) + '" target="_blank" rel="noopener">Google Maps</a></div></div>';
+    closePick(); SWT.map.select(m, p);
+    if (window.innerWidth > 900) {
+      // on a computer the card opens on the pin itself
+      var el = document.createElement("div"); el.className = "pick-card"; el.innerHTML = body;
+      popup = new maplibregl.Popup({ closeButton: false, closeOnClick: true, maxWidth: "340px", offset: 22, focusAfterOpen: false }).setLngLat([p.lon, p.lat]).setDOMContent(el).addTo(m);
+      popup.on("close", function () { SWT.map.select(m, null); popup = null; });
+      $(".x", el).onclick = closePick;
+      // make sure the whole card is on screen
+      var pt = m.project([p.lon, p.lat]), H = m.getContainer().clientHeight, W = m.getContainer().clientWidth;
+      if (pt.y < 420 || pt.x < 200 || pt.x > W - 200 || pt.y > H - 30) m.easeTo({ center: m.unproject([pt.x, pt.y - 170]), duration: 400 });
+    } else {
+      // on a phone the card comes up from the bottom and the map moves so the pin sits above it
+      var sh = $("#sheet"); sh.hidden = false; sh.innerHTML = body; $(".x", sh).onclick = closePick;
+      requestAnimationFrame(function () { m.easeTo({ center: [p.lon, p.lat], padding: { top: 40, bottom: sh.offsetHeight + 24, left: 0, right: 0 }, duration: 450 }); });
+    }
   };
+  SWT.map.onBlank = closePick;
 
   // ---------- router ----------
   var current = "", subMap = null;
   function render() {
     var h = (location.hash || "#home").slice(1) || "home"; current = h;
     var parts = h.split("/"), key = parts[0], arg = parts.slice(1).join("/");
-    setNav(h); $("#sheet").hidden = true;
+    setNav(h); closePick();
     if (subMap) { subMap.remove(); subMap = null; }
     if (pickMap) { pickMap.remove(); pickMap = null; }
     if (key === "map") { showMap(arg === "" ? null : +arg); document.title = "Map · The Spaghetti Western Trail"; return; }
