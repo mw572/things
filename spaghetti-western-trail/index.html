@@ -18,8 +18,38 @@
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
 <link rel="stylesheet" href="css/site.css">
+<script>
+/* Password wall for the demo. It only keeps casual visitors out: the site is static on GitHub Pages and its files can be
+   fetched directly by anyone who knows the paths. The password is checked against its SHA-256 so it isn't in the page as text. */
+try { if (localStorage.getItem("swt-gate") !== "1") document.documentElement.classList.add("locked"); } catch (e) { document.documentElement.classList.add("locked"); }
+</script>
 </head>
 <body>
+<div id="gate" class="gate">
+  <form class="gate-card" id="gate-form" autocomplete="off">
+    <img src="img/icons/icon-192.png" width="72" height="72" alt="" style="border-radius:14px">
+    <h1>The Spaghetti Western Trail</h1>
+    <p>This is a private concept demo. Type the password to see it.</p>
+    <label for="gate-pw" class="eyebrow">Password</label>
+    <input id="gate-pw" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" autofocus>
+    <button class="btn" type="submit">Let me in</button>
+    <p class="gate-err" id="gate-err" hidden>That's not it. Try again.</p>
+  </form>
+</div>
+<script>
+(function () {
+  var HASH = "c7c1319276e936c8d64f1d5ed80cd8a0cf54e6dea7b0125533eb4163e03a2c11";
+  function hex(buf) { return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ("0" + b.toString(16)).slice(-2); }).join(""); }
+  document.getElementById("gate-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var v = document.getElementById("gate-pw").value.trim().toLowerCase();
+    crypto.subtle.digest("SHA-256", new TextEncoder().encode(v)).then(function (h) {
+      if (hex(h) === HASH) { try { localStorage.setItem("swt-gate", "1"); } catch (x) {} document.documentElement.classList.remove("locked"); window.dispatchEvent(new Event("resize")); }
+      else { document.getElementById("gate-err").hidden = false; document.getElementById("gate-pw").select(); }
+    });
+  });
+})();
+</script>
 <div class="demo-strip">Concept demo, not the official Spaghetti Western Trail site. <a href="#about">What's real here</a></div>
 <header class="site">
   <div class="wrap">

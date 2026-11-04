@@ -1,5 +1,5 @@
 self.SWT = self.SWT || {};
-SWT.BUILD = "89d27e1c6e";
+SWT.BUILD = "f6de48e91a";
 SWT.MAPS = {"trail.pmtiles": 62556928, "overview.pmtiles": 10741583};
 SWT.MAP_BYTES = 73298511;
 SWT.ART = ["book", "foldmap", "gpx", "hero", "middle", "north", "p-albaricoques", "p-alquife", "p-arlanza", "p-atienza", "p-belmonte", "p-calar-alto", "p-caras", "p-cortijo-fraile", "p-entrepenas", "p-fin-del-mundo", "p-fort-bravo", "p-gorafe", "p-gormaz", "p-guadix-station", "p-la-calahorra", "p-las-menas", "p-minihollywood", "p-psa", "p-rio-dulce", "p-rio-lobos", "p-rio-mundo", "p-riopar-factories", "p-sad-hill", "p-segura", "p-silos", "p-utrero", "p-western-leone", "p-yecla", "p-zorita", "pg-about", "pg-app", "pg-faq", "pg-guide", "pg-places", "pg-shop", "picto-map", "s-0", "s-1", "s-2", "s-3", "s-4", "s-5", "s-6", "s-7", "s-8", "saloon", "south", "wallmap"];

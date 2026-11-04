@@ -322,3 +322,17 @@ figure.photo figcaption a, p.credit a { color: inherit; }
 .picto.painted .ov a.hot circle { fill: transparent; stroke: none; cursor: pointer; }
 .picto.painted .ov a.hot:hover circle, .picto.painted .ov a.hot:focus circle { fill: rgba(255, 250, 240, .25); stroke: #26292c; stroke-width: 1.5; }
 @media (max-width: 900px) { .sheet { max-height: 62vh; overflow: auto; } .sheet .pic { aspect-ratio: 2 / 1; } }
+
+/* password wall */
+.gate { display: none; }
+html.locked .gate { display: flex; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center; padding: 16px; background: var(--paper) url("../img/art/hero.jpg") center / cover; }
+html.locked .gate::before { content: ""; position: absolute; inset: 0; background: rgba(20, 16, 12, .55); }
+html.locked body { overflow: hidden; }
+html.locked body > *:not(.gate):not(script) { visibility: hidden; }
+.gate-card { position: relative; width: min(380px, 100%); background: var(--card); border-radius: 8px; padding: 28px 24px; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); display: flex; flex-direction: column; gap: 10px; text-align: center; align-items: center; }
+.gate-card h1 { font-size: 28px; margin: 6px 0 0; }
+.gate-card p { margin: 0 0 6px; font-size: 16px; }
+.gate-card label { align-self: stretch; text-align: left; }
+.gate-card input { align-self: stretch; font: inherit; font-size: 18px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; }
+.gate-card .btn { align-self: stretch; justify-content: center; }
+.gate-err { color: var(--blood); font-size: 15px !important; }
