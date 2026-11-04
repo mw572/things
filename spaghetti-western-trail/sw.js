@@ -1,4 +1,4 @@
-// release f6de48e91a
+// release d2f62ec9c4
 /* Service worker: keeps the whole app (pages, scripts, pictures, fonts) for use with no signal.
    The big map file is saved separately by the page ("Save the trail") into its own cache. */
 importScripts("js/build.js");

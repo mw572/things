@@ -197,16 +197,27 @@ a.pcard:hover { transform: translateY(-3px); box-shadow: 0 2px 4px rgba(38,41,44
 .maplibregl-ctrl-attrib { font-family: var(--mono); font-size: 10px; }
 .maplibregl-ctrl-group { border-radius: 6px !important; box-shadow: var(--shadow) !important; }
 .maplibregl-ctrl-scale { font-family: var(--mono); font-size: 10px; border-color: var(--soft) !important; background: rgba(255,253,248,.85) !important; }
-.map-side .grab { display: none; }
+.map-side .grab, .sheet .grab { display: none; }
+.peek-hint { display: none; }
+@media (max-width: 900px) { .peek-hint { display: block; } }
 @media (max-width: 900px) {
   .mapview { display: block; height: calc(100dvh - 58px - 26px - var(--tabs-h) - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px)); }
   .map-main { position: absolute; inset: 0; }
-  .map-side { position: absolute; left: 0; right: 0; bottom: 0; max-height: 72%; border-right: 0; border-radius: 14px 14px 0 0; box-shadow: 0 -10px 40px rgba(20,16,12,.25); transform: translateY(105%); transition: transform .22s; padding-top: 10px; }
-  .map-side.open { transform: none; }
-  .map-side .grab { display: block; width: 44px; height: 5px; border-radius: 3px; background: var(--rule2); margin: 0 auto 10px; border: 0; padding: 0; cursor: pointer; }
+  /* the panel peeks above the tabs and is dragged up (js: sideSnap, wireSideDrag) */
+  .map-side { position: absolute; left: 0; right: 0; bottom: 0; height: 92%; display: flex; flex-direction: column; overflow: hidden; padding: 0; border-right: 0; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(20,16,12,.22); transform: translateY(calc(100% - 92px)); transition: transform .28s cubic-bezier(.2,.8,.2,1); will-change: transform; }
+  .side-head { flex: none; padding: 8px 18px 4px; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+  .side-head .eyebrow { display: none; }
+  .side-head h2 { font-size: 22px; margin: 0 0 2px !important; }
+  .peek-hint { font-size: 12px; color: var(--soft); }
+  .map-side.up .peek-hint { visibility: hidden; }
+  .side-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 6px 18px calc(30px + env(safe-area-inset-bottom, 0px)); }
+  .map-side .grab, .sheet .grab { display: block; width: 46px; height: 5px; border-radius: 3px; background: #c9bfae; margin: 0 auto 12px; }
+  .sheet .grab { position: absolute; top: 7px; left: 50%; margin: 0 0 0 -23px; z-index: 3; background: rgba(255,253,248,.85); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .sheet { transition: transform .22s; }
+  .mapview .maplibregl-ctrl-bottom-right, .mapview .maplibregl-ctrl-bottom-left { bottom: 92px; }
   .map-top { display: flex; position: absolute; left: 12px; right: 12px; top: 12px; z-index: 5; gap: 8px; }
   .map-top button { border: 0; background: rgba(255,253,248,.97); border-radius: 999px; padding: 8px 14px; font-family: var(--mono); font-size: 13px; box-shadow: var(--shadow); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
-  .map-status { top: auto; bottom: 12px; left: 12px; transform: none; font-size: 11px; white-space: normal; max-width: calc(100% - 70px); border-radius: 6px; }
+  .map-status { top: 58px; bottom: auto; left: 12px; transform: none; font-size: 11px; white-space: normal; max-width: calc(100% - 70px); border-radius: 6px; }
   .sheet { left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; }
   .sheet .pic { aspect-ratio: 21 / 9; }
 }
@@ -336,3 +347,12 @@ html.locked body > *:not(.gate):not(script) { visibility: hidden; }
 .gate-card input { align-self: stretch; font: inherit; font-size: 18px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; }
 .gate-card .btn { align-self: stretch; justify-content: center; }
 .gate-err { color: var(--blood); font-size: 15px !important; }
+
+@media (max-width: 900px) {
+  html.mapmode, html.mapmode body { overflow: hidden; overscroll-behavior: none; height: 100%; }
+  html.mapmode main { padding-bottom: 0; }
+  .side-intro { display: none; }
+  .side-body .map-legend { margin-top: 0 !important; }
+  .side-body h4:first-of-type { margin-top: 12px; }
+  html.mapmode .mapview { position: fixed; left: 0; right: 0; top: var(--map-top, 107px); bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom, 0px)); height: auto; overflow: hidden; }
+}

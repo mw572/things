@@ -410,20 +410,73 @@ window.SWT = window.SWT || {};
   function drawSide() {
     var side = $("#map-side"), counts = {};
     SWT.allPlaces().forEach(function (p) { counts[p.cat] = (counts[p.cat] || 0) + 1; });
-    side.innerHTML = '<button class="grab" aria-label="Close"></button><div class="eyebrow">The map</div><h2 style="margin:4px 0 6px">Sad Hill to Tabernas</h2><p class="muted" style="font-size:15px;margin:0">' + Math.round(SWT.totalKm) + ' km of trail in eight stages. Tap a stage to zoom to it, or a picture on the map to read about a place.</p>' +
+    side.innerHTML = '<div class="side-head"><span class="grab" aria-hidden="true"></span><div class="eyebrow">The map</div><h2 style="margin:4px 0 6px">Sad Hill to Tabernas</h2><div class="peek-hint mono">' + Math.round(SWT.totalKm) + ' km · 8 stages · swipe up for more</div></div>' +
+      '<div class="side-body"><p class="muted side-intro" style="font-size:15px;margin:0">' + Math.round(SWT.totalKm) + ' km of trail in eight stages. Tap a stage to zoom to it, or a picture on the map to read about a place.</p>' +
       '<div class="map-legend" style="margin-top:14px"><span><i style="width:26px;border-top:4px dashed var(--trail)"></i>Trail (off-road)</span><span><i style="width:26px;border-top:3px solid var(--tarmac)"></i>Tarmac route</span></div>' +
       '<h4>Stages</h4><div id="side-stages"><button class="stage-row' + (SWT.map.stage == null ? " on" : "") + '" data-st="all"><span class="th"><img src="img/art/hero.jpg" alt=""></span><span class="t"><b>Whole trail</b></span><span class="km">' + Math.round(SWT.totalKm) + ' km</span></button>' +
       SWT.route.stages.map(function (s) { var st = SWT.stages[s.n]; return '<button class="stage-row' + (SWT.map.stage === s.n ? " on" : "") + '" data-st="' + s.n + '"><span class="th"><img src="' + stageImg(s.n) + '" alt="" loading="lazy"><b>' + (s.n || "+") + '</b></span><span class="t">' + esc(st.from) + ' to ' + esc(st.to) + '</span><span class="km">' + Math.round(s.trail_km || s.tarmac_km) + ' km</span></button>'; }).join("") + '</div>' +
-      '<h4>Show on the map</h4><div id="side-cats">' + Object.keys(SWT.cats).map(function (c) { var p = SWT.places.filter(function (x) { return x.cat === c; })[0]; return '<button class="cat-row" data-cat="' + c + '" aria-pressed="' + !!SWT.map.visibleCats[c] + '">' + SWT.badgeSvg(p ? p.icon : "star", SWT.cats[c].color, 28) + '<span>' + SWT.cats[c].label + '</span><span class="count">' + (counts[c] || 0) + '</span><span class="switch"></span></button>'; }).join("") + '</div>';
+      '<h4>Show on the map</h4><div id="side-cats">' + Object.keys(SWT.cats).map(function (c) { var p = SWT.places.filter(function (x) { return x.cat === c; })[0]; return '<button class="cat-row" data-cat="' + c + '" aria-pressed="' + !!SWT.map.visibleCats[c] + '">' + SWT.badgeSvg(p ? p.icon : "star", SWT.cats[c].color, 28) + '<span>' + SWT.cats[c].label + '</span><span class="count">' + (counts[c] || 0) + '</span><span class="switch"></span></button>'; }).join("") + '</div></div>';
     $$("#side-cats .cat-row").forEach(function (b) { b.onclick = function () { var c = b.getAttribute("data-cat"); SWT.map.visibleCats[c] = !SWT.map.visibleCats[c]; b.setAttribute("aria-pressed", !!SWT.map.visibleCats[c]); SWT.map.applyFilter(SWT.mainMap); }; });
-    $$("#side-stages .stage-row").forEach(function (b) { b.onclick = function () { var v = b.getAttribute("data-st"); history.replaceState(null, "", v === "all" ? "#map" : "#map/" + v); zoomStage(v === "all" ? null : +v); side.classList.remove("open"); }; });
-    $(".grab", side).onclick = function () { side.classList.remove("open"); };
+    $$("#side-stages .stage-row").forEach(function (b) { b.onclick = function () { var v = b.getAttribute("data-st"); history.replaceState(null, "", v === "all" ? "#map" : "#map/" + v); zoomStage(v === "all" ? null : +v); sideSnap("peek"); }; });
+    wireSideDrag(side); sideSnap("peek", false);
   }
+  // ---- phone: the panel is a sheet that peeks above the tabs and is dragged up to half or full height ----
+  var SNAP = "peek";
+  function phone() { return window.innerWidth <= 900; }
+  function snapPoints(side) {
+    var hint = $(".peek-hint", side), peek = hint ? hint.offsetTop + hint.offsetHeight + 12 : 92, sh = side.offsetHeight;
+    return { full: 0, half: Math.max(0, sh - mapview.clientHeight * 0.55), peek: Math.max(0, sh - peek) };
+  }
+  function sideY(side) { var m = /translateY\(([-\d.]+)px\)/.exec(side.style.transform); return m ? +m[1] : snapPoints(side).peek; }
+  function sideSnap(name, animate) {
+    var side = $("#map-side"); if (!side) return;
+    if (!phone()) { side.style.transform = ""; return; }
+    SNAP = name; side.style.transition = animate === false ? "none" : "";
+    side.style.transform = "translateY(" + snapPoints(side)[name] + "px)";
+    side.classList.toggle("up", name !== "peek");
+    if (name === "peek") { var b = $(".side-body", side); if (b) b.scrollTop = 0; }
+  }
+  function wireSideDrag(side) {
+    var head = $(".side-head", side), body = $(".side-body", side), y0 = 0, t0 = 0, dragging = false, moved = false, lastY = 0, lastT = 0, vel = 0;
+    function begin(y) { y0 = lastY = y; t0 = sideY(side); dragging = true; moved = false; vel = 0; lastT = Date.now(); side.style.transition = "none"; }
+    function move(y) {
+      if (Math.abs(y - y0) > 5) moved = true;
+      var t = Math.min(snapPoints(side).peek, Math.max(0, t0 + y - y0)); side.style.transform = "translateY(" + t + "px)";
+      var now = Date.now(); vel = (y - lastY) / Math.max(1, now - lastT); lastY = y; lastT = now;
+    }
+    function end() {
+      dragging = false; var t = sideY(side), pts = snapPoints(side), pick;
+      if (vel > .45) pick = t < pts.half - 10 ? "half" : "peek";            // flicked down
+      else if (vel < -.45) pick = t > pts.half + 10 ? "half" : "full";      // flicked up
+      else pick = ["full", "half", "peek"].sort(function (a, b) { return Math.abs(pts[a] - t) - Math.abs(pts[b] - t); })[0];
+      sideSnap(pick);
+    }
+    // the head drags, and a tap on it opens or closes the panel
+    head.addEventListener("pointerdown", function (e) { if (!phone()) return; head.setPointerCapture(e.pointerId); begin(e.clientY); });
+    head.addEventListener("pointermove", function (e) { if (dragging) move(e.clientY); });
+    head.addEventListener("pointerup", function () { if (!dragging) return; if (moved) end(); else { dragging = false; sideSnap(SNAP === "peek" ? "half" : "peek"); } });
+    head.addEventListener("pointercancel", function () { if (dragging) end(); });
+    // in the list: dragging up grows the panel until it's full; dragging down at the top of the list shrinks it
+    var by = 0, bdrag = false;
+    body.addEventListener("touchstart", function (e) { by = e.touches[0].clientY; bdrag = false; }, { passive: true });
+    body.addEventListener("touchmove", function (e) {
+      if (!phone()) return; var y = e.touches[0].clientY;
+      if (!bdrag) { var dy = y - by; if ((dy > 6 && body.scrollTop <= 0) || (dy < -6 && SNAP !== "full")) { bdrag = true; begin(y); } else return; }
+      e.preventDefault(); move(y);
+    }, { passive: false });
+    body.addEventListener("touchend", function () { if (bdrag) end(); bdrag = false; });
+  }
+  window.addEventListener("resize", function () { if (!mapview.hidden) sideSnap(SNAP, false); });
+  // On a phone the map screen is pinned between the header and the tabs, and the page itself can't scroll.
+  // Before this the panel hanging below the screen made the page scrollable, so drags moved the page instead of the panel.
+  function pinMap() { window.scrollTo(0, 0); document.documentElement.style.setProperty("--map-top", Math.round($("header.site").getBoundingClientRect().bottom) + "px"); }
+  window.addEventListener("resize", function () { if (document.documentElement.classList.contains("mapmode")) pinMap(); });
   function showMap(stageN) {
     mapview.hidden = false; view.hidden = true; $("footer.site").hidden = true;
+    document.documentElement.classList.add("mapmode"); pinMap();
     drawSide();
-    $("#open-filters").onclick = function () { var s = $("#map-side"); s.classList.add("open"); $("#side-cats").scrollIntoView({ block: "start" }); };
-    $("#open-stages").onclick = function () { var s = $("#map-side"); s.classList.add("open"); s.scrollTop = 0; };
+    $("#open-filters").onclick = function () { sideSnap("full"); var b = $("#map-side .side-body"); setTimeout(function () { b.scrollTop = $("#side-cats").offsetTop - b.offsetTop - 50; }, 250); };
+    $("#open-stages").onclick = function () { sideSnap("full"); $("#map-side .side-body").scrollTop = 0; };
     function after(m) { setTimeout(function () { m.resize(); zoomStage(stageN); }, 30); }
     if (SWT.mainMap) after(SWT.mainMap);
     else SWT.map.create($("#map"), { onLoad: function (m) { after(m); } }).then(function (m) { SWT.mainMap = m; drawMapStatus(); m.once("idle", function () { $("#map-loading").hidden = true; }); m.on("click", function (e) { if (!m.queryRenderedFeatures(e.point, { layers: ["places"] }).length) closePick(); }); });
@@ -465,11 +518,22 @@ window.SWT = window.SWT || {};
       if (pt.y < 420 || pt.x < 200 || pt.x > W - 200 || pt.y > H - 30) m.easeTo({ center: m.unproject([pt.x, pt.y - 170]), duration: 400 });
     } else {
       // on a phone the card comes up from the bottom and the map moves so the pin sits above it
-      var sh = $("#sheet"); sh.hidden = false; sh.innerHTML = body; $(".x", sh).onclick = closePick;
+      sideSnap("peek");
+      var sh = $("#sheet"); sh.hidden = false; sh.style.transform = ""; sh.innerHTML = '<span class="grab" aria-hidden="true"></span>' + body; $(".x", sh).onclick = closePick; wireCardDrag(sh);
       requestAnimationFrame(function () { m.easeTo({ center: [p.lon, p.lat], padding: { top: 40, bottom: sh.offsetHeight + 24, left: 0, right: 0 }, duration: 450 }); });
     }
   };
   SWT.map.onBlank = closePick;
+  function wireCardDrag(sh) {
+    if (sh._wired) return; sh._wired = true; var y0 = 0, on = false, dy = 0;
+    sh.addEventListener("touchstart", function (e) { y0 = e.touches[0].clientY; on = false; dy = 0; }, { passive: true });
+    sh.addEventListener("touchmove", function (e) {
+      var d = e.touches[0].clientY - y0;
+      if (!on) { if (d > 6 && sh.scrollTop <= 0) { on = true; sh.style.transition = "none"; } else return; }
+      e.preventDefault(); dy = Math.max(0, d); sh.style.transform = "translateY(" + dy + "px)";
+    }, { passive: false });
+    sh.addEventListener("touchend", function () { if (!on) return; on = false; sh.style.transition = ""; if (dy > 80) closePick(); else sh.style.transform = ""; });
+  }
 
   // ---------- router ----------
   var current = "", subMap = null;
@@ -480,7 +544,7 @@ window.SWT = window.SWT || {};
     if (subMap) { subMap.remove(); subMap = null; }
     if (pickMap) { pickMap.remove(); pickMap = null; }
     if (key === "map") { showMap(arg === "" ? null : +arg); document.title = "Map · The Spaghetti Western Trail"; return; }
-    mapview.hidden = true; view.hidden = false; $("footer.site").hidden = false;
+    mapview.hidden = true; view.hidden = false; $("footer.site").hidden = false; document.documentElement.classList.remove("mapmode");
     var fn = pages[key] || notFound;
     view.innerHTML = fn(arg);
     var titles = { home: "", guide: "Guide", area: SWT.areas[arg] ? SWT.areas[arg].name : "", stage: "Stage " + arg, places: "Places", place: place(arg) ? place(arg).name : "", shop: "Trading Post", checkout: "Checkout", saloon: "The Saloon", thread: "The Saloon", board: "The Saloon", suggest: "Suggest a place", moderate: "Moderator queue", app: "Get the app", faq: "FAQ", about: "About this demo" };
