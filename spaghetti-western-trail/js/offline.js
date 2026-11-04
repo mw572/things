@@ -1,7 +1,6 @@
 /* Installing the app, saving the trail for no signal, and checking it is still there. */
 window.SWT = window.SWT || {};
 (function () {
-  var MAP_URL = "data/trail.pmtiles";
   var MAP_CACHE = "swt-map-v1";
   var O = SWT.offline = { deferredPrompt: null, listeners: [] };
   function emit() { O.listeners.forEach(function (fn) { try { fn(); } catch (e) {} }); }
@@ -32,49 +31,51 @@ window.SWT = window.SWT || {};
     navigator.serviceWorker.addEventListener && navigator.serviceWorker.addEventListener("controllerchange", emit);
   }
 
-  // ---- the map file ----
-  O.mapFile = null; // a File once read from the cache
+  // ---- the map files: the detailed trail corridor and a light overview of Spain ----
+  function mapNames() { return Object.keys(SWT.MAPS || { "trail.pmtiles": 0, "overview.pmtiles": 0 }); }
+  O.mapFiles = null; // { "trail.pmtiles": File, ... } once read from the cache
   O.mapSaved = function () {
     if (!("caches" in window)) return Promise.resolve(false);
-    return caches.open(MAP_CACHE).then(function (c) { return c.match(MAP_URL); }).then(function (r) { return !!r; }).catch(function () { return false; });
+    return caches.open(MAP_CACHE).then(function (c) {
+      return Promise.all(mapNames().map(function (n) { return c.match("data/" + n); }));
+    }).then(function (rs) { return rs.every(Boolean); }).catch(function () { return false; });
   };
-  O.loadMapFile = function () {
-    if (O.mapFile) return Promise.resolve(O.mapFile);
+  O.loadMapFiles = function () {
+    if (O.mapFiles) return Promise.resolve(O.mapFiles);
     if (!("caches" in window)) return Promise.resolve(null);
-    return caches.open(MAP_CACHE).then(function (c) { return c.match(MAP_URL); }).then(function (r) {
-      if (!r) return null;
-      return r.blob().then(function (b) { O.mapFile = new File([b], "trail.pmtiles"); return O.mapFile; });
+    return caches.open(MAP_CACHE).then(function (c) {
+      return Promise.all(mapNames().map(function (n) { return c.match("data/" + n).then(function (r) { return r ? r.blob().then(function (b) { return new File([b], n); }) : null; }); }));
+    }).then(function (files) {
+      if (!files.every(Boolean)) return null;
+      O.mapFiles = {}; files.forEach(function (f) { O.mapFiles[f.name] = f; }); return O.mapFiles;
     }).catch(function () { return null; });
   };
   O.saving = false;
+  function download(name, done, total, onProgress) {
+    return fetch("data/" + name, { cache: "no-store" }).then(function (res) {
+      if (!res.ok) throw new Error("The map did not download (" + res.status + ")");
+      var chunks = [], got = 0;
+      if (!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader();
+      function pump() { return reader.read().then(function (r) { if (r.done) return new Blob(chunks); chunks.push(r.value); got += r.value.length; onProgress && onProgress(done + got, total); return pump(); }); }
+      return pump();
+    }).then(function (blob) {
+      if (SWT.MAPS && SWT.MAPS[name] && blob.size !== SWT.MAPS[name]) throw new Error("The map arrived incomplete. Try again on a better connection.");
+      return caches.open(MAP_CACHE).then(function (c) { return c.put("data/" + name, new Response(blob, { headers: { "Content-Type": "application/octet-stream", "Content-Length": String(blob.size) } })); }).then(function () { return blob.size; });
+    });
+  }
   O.saveMap = function (onProgress) {
     if (O.saving) return Promise.reject(new Error("Already saving"));
     O.saving = true; emit();
+    var total = SWT.MAP_BYTES || 0, done = 0, names = mapNames();
     var persist = navigator.storage && navigator.storage.persist ? navigator.storage.persist().catch(function () { return false; }) : Promise.resolve(false);
-    return persist.then(function () { return fetch(MAP_URL, { cache: "no-store" }); }).then(function (res) {
-      if (!res.ok) throw new Error("The map file did not download (" + res.status + ")");
-      var total = +res.headers.get("Content-Length") || SWT.MAP_BYTES || 0, got = 0, chunks = [];
-      if (!res.body || !res.body.getReader) return res.blob();
-      var reader = res.body.getReader();
-      function pump() {
-        return reader.read().then(function (r) {
-          if (r.done) return new Blob(chunks);
-          chunks.push(r.value); got += r.value.length; onProgress && onProgress(got, total);
-          return pump();
-        });
-      }
-      return pump();
-    }).then(function (blob) {
-      if (SWT.MAP_BYTES && blob.size !== SWT.MAP_BYTES) throw new Error("The map file arrived incomplete. Try again on a better connection.");
-      return caches.open(MAP_CACHE).then(function (c) { return c.put(MAP_URL, new Response(blob, { headers: { "Content-Type": "application/octet-stream", "Content-Length": String(blob.size) } })); })
-        .then(function () { O.mapFile = new File([blob], "trail.pmtiles"); });
-    }).then(function () {
-      // make sure every page, picture and font is cached too
-      return O.ensureShell();
-    }).then(function () { O.saving = false; emit(); }, function (e) { O.saving = false; emit(); throw e; });
+    var chain = persist;
+    names.forEach(function (n) { chain = chain.then(function () { return download(n, done, total, onProgress).then(function (sz) { done += sz; }); }); });
+    return chain.then(function () { O.mapFiles = null; return O.ensureShell(); })
+      .then(function () { O.saving = false; emit(); }, function (e) { O.saving = false; emit(); throw e; });
   };
   O.removeMap = function () {
-    O.mapFile = null;
+    O.mapFiles = null;
     return caches.delete(MAP_CACHE).then(emit);
   };
   O.ensureShell = function () {
@@ -93,8 +94,8 @@ window.SWT = window.SWT || {};
       jobs.push(caches.open("swt-shell-" + SWT.BUILD).then(function (c) {
         return Promise.all((SWT.SHELL || []).map(function (u) { return c.match(u).then(function (r) { if (r) out.shell++; }); }));
       }).catch(function () {}));
-      jobs.push(caches.open(MAP_CACHE).then(function (c) { return c.match(MAP_URL); }).then(function (r) {
-        if (r) { out.map = true; out.mapBytes = +r.headers.get("Content-Length") || 0; }
+      jobs.push(caches.open(MAP_CACHE).then(function (c) { return Promise.all(mapNames().map(function (n) { return c.match("data/" + n); })); }).then(function (rs) {
+        out.map = rs.every(Boolean); out.mapBytes = rs.reduce(function (s, r) { return s + (r ? (+r.headers.get("Content-Length") || 0) : 0); }, 0);
       }).catch(function () {}));
     }
     if (navigator.storage && navigator.storage.persisted) jobs.push(navigator.storage.persisted().then(function (p) { out.persisted = p; }).catch(function () {}));

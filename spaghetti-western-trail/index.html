@@ -6,7 +6,8 @@
 <title>The Spaghetti Western Trail</title>
 <meta name="description" content="Concept demo of an offline trail guide for the Spaghetti Western Trail, Sad Hill to Tabernas.">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#2b2e31">
+<meta name="theme-color" content="#26292c">
+<meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -29,23 +30,26 @@
     <nav class="top" aria-label="Main">
       <a href="#map" data-k="map">Map</a><a href="#guide" data-k="guide">Guide</a><a href="#places" data-k="places">Places</a><a href="#shop" data-k="shop">Trading Post<span class="basket-count"></span></a><a href="#saloon" data-k="saloon">Saloon</a><a href="#faq" data-k="faq">FAQ</a><a href="#app" data-k="app" class="cta">Get the app</a>
     </nav>
-    <span style="display:flex;gap:8px;align-items:center"><span id="net" class="net on">Online</span><a href="#app" class="btn small mob-app">Get app</a></span>
+    <span class="head-right"><span id="net" class="net on">Online</span><a href="#app" class="btn small mob-app">Get app</a></span>
   </div>
 </header>
 <main>
   <div id="view"></div>
   <div id="mapview" class="mapview" hidden>
-    <div id="map"></div>
-    <div class="map-ui" id="map-ui"></div>
-    <div class="map-status" id="map-status"></div>
-    <div class="sheet" id="sheet" hidden></div>
+    <aside class="map-side" id="map-side" aria-label="Map options"></aside>
+    <div class="map-main">
+      <div id="map"></div>
+      <div class="map-top"><button id="open-filters" type="button">Show on map</button><button id="open-stages" type="button">Stages</button></div>
+      <div class="map-status" id="map-status"></div>
+      <div class="sheet" id="sheet" hidden></div>
+    </div>
   </div>
 </main>
 <footer class="site">
   <div class="wrap cols">
     <div style="max-width:420px">
       <div style="font-family:var(--display);font-size:20px">The Spaghetti Western Trail</div>
-      <p class="muted" style="font-size:14.5px;margin-top:6px">800 km through backcountry Spain from Burgos to Tabernas. This page is a concept demo made for the trail's authors and isn't the official site.</p>
+      <p style="font-size:14.5px;margin-top:6px;color:#b8ae9b">800 km through backcountry Spain from Burgos to Tabernas. This page is a concept demo made for the trail's authors and isn't the official site.</p>
     </div>
     <div class="mono" style="display:flex;gap:28px;flex-wrap:wrap;font-size:14px">
       <div style="display:flex;flex-direction:column;gap:6px"><a href="#guide">Guide</a><a href="#area/north">The North</a><a href="#area/middle">The Middle</a><a href="#area/south">The South</a></div>

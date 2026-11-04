@@ -1,7 +1,7 @@
 /* Guide text, FAQs, shop items and sample forum threads for the demo. */
 window.SWT = window.SWT || {};
 SWT.areas = {
-  north: { name: "The North", sub: "Burgos, Soria and Guadalajara", stages: [1, 2], art: "north",
+  north: { name: "The North", sub: "Burgos, Soria and Guadalajara", short: "Pine hills, limestone canyons, a Caliphate fortress and the empty uplands of Guadalajara.", stages: [1, 2], art: "north",
     intro: "The trail starts in the pine and juniper hills south of Burgos, at the cemetery built for the last scene of The Good, the Bad and the Ugly. From there it drops through limestone canyons to the Duero and climbs onto the bare uplands of northern Guadalajara, where villages are small and far apart.",
     ride: "Mostly firm gravel farm tracks and quiet tarmac. Expect frost and fog on spring and autumn mornings above 1,000 m, and snow on the high ground between December and March.",
     faq: [
@@ -9,7 +9,7 @@ SWT.areas = {
       ["Is there anywhere to leave a van?", "Santo Domingo de Silos has a free car park by the monastery. Ask at the bar on the square if you're leaving it for more than a few days."],
       ["How far apart is fuel?", "El Burgo de Osma and Sigüenza both have 24-hour pumps. Between them it is about 110 km, so fill up in both."]
     ] },
-  middle: { name: "The Middle", sub: "Guadalajara, Cuenca and Albacete", stages: [3, 4, 5], art: "middle",
+  middle: { name: "The Middle", sub: "Guadalajara, Cuenca and Albacete", short: "The Tagus reservoirs, carved faces in the rock, the plain of La Mancha and the first sierras.", stages: [3, 4, 5], art: "middle",
     intro: "The middle third follows the Tagus reservoirs south, past a nuclear power station being taken apart and a wood full of carved stone faces, then crosses the open plain of La Mancha by castles and windmills to the first sierras of the south.",
     ride: "The longest stages and the emptiest country. Tracks across La Mancha are fast and straight, then the trail climbs into pine forest above Riópar. Summer afternoons on the plain are very hot and there is little shade.",
     faq: [
@@ -17,7 +17,7 @@ SWT.areas = {
       ["Where is the biggest fuel gap?", "Alcaraz to Siles, about 70 km of mountain road and track. Fill up in Alcaraz."],
       ["Is it worth a day off here?", "Belmonte castle and the Río Mundo waterfall both deserve half a day, and Riópar is a good place to rest before the south."]
     ] },
-  south: { name: "The South", sub: "Jaén, Granada and Almería", stages: [6, 7, 8], art: "south",
+  south: { name: "The South", sub: "Jaén, Granada and Almería", short: "Forests, red badlands, cave houses and the Tabernas desert, where the films were made.", stages: [6, 7, 8], art: "south",
     intro: "The south is where the films were made. The trail runs through the forests of Cazorla and Segura, across the red badlands of Gorafe and Guadix, past La Calahorra and its castle, and down into the Tabernas desert, where the western towns are still standing.",
     ride: "Rocky tracks in the sierras, then dusty and rutted ground in the badlands. Dry riverbeds (ramblas) flood fast in autumn storms, so never camp in one. Summer heat in the desert regularly passes 40°C.",
     faq: [

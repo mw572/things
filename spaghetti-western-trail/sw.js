@@ -14,7 +14,7 @@ self.addEventListener("fetch", function (e) {
   var req = e.request, url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== location.origin) return;
   // the map file streams from the network with range requests until it is saved; the page reads the saved copy itself
-  if (url.pathname.endsWith("/data/trail.pmtiles")) return;
+  if (url.pathname.endsWith(".pmtiles")) return;
   if (req.mode === "navigate") {
     e.respondWith(fetch(req).then(function (r) { return r; }).catch(function () { return caches.match("index.html", { cacheName: SHELL_CACHE }); }));
     return;
