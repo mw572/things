@@ -1,10 +1,12 @@
-// release d1e295dc4b
+// release 3077d69993
 /* Service worker: keeps the whole app (pages, scripts, pictures, fonts) for use with no signal.
    The big map file is saved separately by the page ("Save the trail") into its own cache. */
 importScripts("js/build.js");
 var SHELL_CACHE = "swt-shell-" + self.SWT.BUILD;
 self.addEventListener("install", function (e) {
-  e.waitUntil(caches.open(SHELL_CACHE).then(function (c) { return c.addAll(self.SWT.SHELL); }).then(function () { return self.skipWaiting(); }));
+  e.waitUntil(caches.open(SHELL_CACHE).then(function (c) { // cache: "reload" skips the browser's own HTTP cache, which GitHub Pages lets keep a file for 10 minutes;
+    // without it a new release can be stored with stale copies of some files.
+    return c.addAll(self.SWT.SHELL.map(function (u) { return new Request(u, { cache: "reload" }); })); }).then(function () { return self.skipWaiting(); }));
 });
 self.addEventListener("activate", function (e) {
   e.waitUntil(caches.keys().then(function (keys) {

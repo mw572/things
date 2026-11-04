@@ -84,7 +84,7 @@ window.SWT = window.SWT || {};
     if (!("caches" in window) || !SWT.SHELL) return Promise.resolve();
     return caches.open("swt-shell-" + SWT.BUILD).then(function (c) {
       return Promise.all(SWT.SHELL.map(function (u) {
-        return c.match(u).then(function (hit) { return hit || fetch(u).then(function (r) { if (r.ok) return c.put(u, r); }); }).catch(function () {});
+        return c.match(u).then(function (hit) { return hit || fetch(u, { cache: "reload" }).then(function (r) { if (r.ok) return c.put(u, r); }); }).catch(function () {});
       }));
     });
   };
