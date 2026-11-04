@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Spaghetti Western Trail</title>
+<meta name="description" content="Concept demo of an offline trail guide for the Spaghetti Western Trail, Sad Hill to Tabernas.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#2b2e31">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SW Trail">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="img/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="img/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<div class="demo-strip">Concept demo, not the official Spaghetti Western Trail site. <a href="#about">What's real here</a></div>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="#home" aria-label="The Spaghetti Western Trail, home">
+      <img src="img/icons/icon-192.png" width="40" height="40" alt="" style="border-radius:8px">
+      <span class="mark"><span>The</span><span>Spaghetti</span><span>Western</span><span>Trail</span></span>
+    </a>
+    <nav class="top" aria-label="Main">
+      <a href="#map" data-k="map">Map</a><a href="#guide" data-k="guide">Guide</a><a href="#places" data-k="places">Places</a><a href="#shop" data-k="shop">Trading Post<span class="basket-count"></span></a><a href="#saloon" data-k="saloon">Saloon</a><a href="#faq" data-k="faq">FAQ</a><a href="#app" data-k="app" class="cta">Get the app</a>
+    </nav>
+    <span style="display:flex;gap:8px;align-items:center"><span id="net" class="net on">Online</span><a href="#app" class="btn small mob-app">Get app</a></span>
+  </div>
+</header>
+<main>
+  <div id="view"></div>
+  <div id="mapview" class="mapview" hidden>
+    <div id="map"></div>
+    <div class="map-ui" id="map-ui"></div>
+    <div class="map-status" id="map-status"></div>
+    <div class="sheet" id="sheet" hidden></div>
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap cols">
+    <div style="max-width:420px">
+      <div style="font-family:var(--display);font-size:20px">The Spaghetti Western Trail</div>
+      <p class="muted" style="font-size:14.5px;margin-top:6px">800 km through backcountry Spain from Burgos to Tabernas. This page is a concept demo made for the trail's authors and isn't the official site.</p>
+    </div>
+    <div class="mono" style="display:flex;gap:28px;flex-wrap:wrap;font-size:14px">
+      <div style="display:flex;flex-direction:column;gap:6px"><a href="#guide">Guide</a><a href="#area/north">The North</a><a href="#area/middle">The Middle</a><a href="#area/south">The South</a></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><a href="#places">Places</a><a href="#shop">Trading Post</a><a href="#saloon">Saloon</a><a href="#suggest">Suggest a place</a></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><a href="#app">Get the app</a><a href="#faq">FAQ</a><a href="#about">About this demo</a></div>
+    </div>
+  </div>
+</footer>
+<nav class="tabs" aria-label="Main">
+  <a href="#home" data-k="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8M5 9v12h14V9M10 21v-6h4v6"/></svg>Home</a>
+  <a href="#map" data-k="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg>Map</a>
+  <a href="#guide" data-k="guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-5a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h5z"/></svg>Guide</a>
+  <a href="#shop" data-k="shop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 21V4a2 2 0 0 1 4 0v17M10 13H7a2 2 0 0 1-2-2V8M14 11h3a2 2 0 0 0 2-2V6M7 21h10"/></svg>Shop</a>
+  <a href="#saloon" data-k="saloon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4zM8 9h8M8 12h5"/></svg>Saloon</a>
+</nav>
+<script src="js/build.js"></script>
+<script src="vendor/maplibre-gl.js"></script>
+<script src="vendor/pmtiles.js"></script>
+<script src="vendor/basemaps.js"></script>
+<script src="data/places.js"></script>
+<script src="data/content.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/art.js"></script>
+<script src="js/offline.js"></script>
+<script src="js/map.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
