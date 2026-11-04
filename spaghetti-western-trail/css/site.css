@@ -46,8 +46,8 @@ nav.top a.cta { background: var(--sun); color: var(--sun-ink); font-weight: 700;
 .net.on { color: var(--trail); }
 
 /* bottom tabs on phones */
-.mob-app { display: none; }
-@media (max-width: 820px) { .mob-app { display: inline-flex; font-size: 13px; padding: 5px 10px; } }
+.btn.mob-app { display: none; }
+@media (max-width: 820px) { .btn.mob-app { display: inline-flex; font-size: 13px; padding: 5px 10px; } }
 nav.tabs { display: none; }
 @media (max-width: 820px) {
   nav.top { display: none; }

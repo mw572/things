@@ -1,5 +1,5 @@
 self.SWT = self.SWT || {};
-SWT.BUILD = "719a0cc2a0";
+SWT.BUILD = "89dcc28d88";
 SWT.MAP_BYTES = 62556928;
 SWT.SHELL = [
 "./",

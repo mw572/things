@@ -5,8 +5,8 @@ SWT.art = {};
   var SPAIN = [[-7.7,43.79],[-6,43.57],[-5,43.47],[-3.8,43.46],[-3,43.38],[-1.8,43.39],[-1.4,43.05],[-0.7,42.85],[0.7,42.85],[1.5,42.45],[2.4,42.42],[3.3,42.32],[3.2,41.9],[2.2,41.35],[1,41.05],[0.9,40.7],[0.2,40],[-0.3,39.5],[-0.2,39],[0.2,38.75],[-0.5,38.3],[-0.75,37.9],[-0.8,37.6],[-1,37.55],[-1.6,37.35],[-1.85,37.14],[-1.95,36.95],[-2.19,36.72],[-2.45,36.83],[-3,36.75],[-3.6,36.72],[-4.4,36.72],[-5,36.45],[-5.35,36.15],[-5.6,36],[-6,36.3],[-6.3,36.55],[-6.4,36.8],[-7,37.2],[-7.4,37.2],[-7.5,37.5],[-7.25,38.2],[-7,38.8],[-7,39],[-7.5,39.7],[-6.9,40.25],[-6.8,41],[-6.2,41.6],[-6.6,41.95],[-7.2,41.9],[-8.1,41.85],[-8.85,41.9],[-8.9,42.2],[-9,42.6],[-9.3,42.9],[-9.2,43.2],[-8.5,43.35],[-8,43.65]];
   var PORTUGAL = [[-8.85,41.9],[-8.65,41.0],[-8.9,40.1],[-9.4,39.4],[-9.5,38.75],[-8.9,38.5],[-8.8,37.95],[-8.95,37.0],[-8.0,37.0],[-7.4,37.2],[-7.5,37.5],[-7.25,38.2],[-7,38.8],[-7,39],[-7.5,39.7],[-6.9,40.25],[-6.8,41],[-6.2,41.6],[-6.6,41.95],[-7.2,41.9],[-8.1,41.85]];
   // which places get a pictogram on the poster map (the rest are on the zoomable map)
-  var PICK = ["sad-hill", "arlanza", "rio-lobos", "gormaz", "atienza", "rio-dulce", "zorita", "caras", "belmonte", "rio-mundo", "segura", "utrero", "gorafe", "guadix-station", "la-calahorra", "alquife", "calar-alto", "psa", "fort-bravo", "cortijo-fraile"];
-  var LABEL = { "sad-hill": ["Sad Hill", 1], "caras": ["Faces in the rock", 1], "zorita": ["Nuclear relic", -1], "rio-mundo": ["Waterfall", 1], "gorafe": ["Dolmens", 1], "calar-alto": ["Observatory", 1], "fort-bravo": ["Film towns", -1], "la-calahorra": ["Flagstone", -1], "belmonte": ["Belmonte", -1], "gormaz": ["Gormaz", 1], "cortijo-fraile": ["Blood Wedding", 1] };
+  var PICK = ["sad-hill", "arlanza", "rio-lobos", "gormaz", "atienza", "rio-dulce", "zorita", "caras", "belmonte", "rio-mundo", "segura", "utrero", "gorafe", "guadix-station", "la-calahorra", "calar-alto", "fort-bravo", "cortijo-fraile"];
+  var LABEL = { "sad-hill": ["Sad Hill", 1], "caras": ["Faces in the rock", 1], "rio-mundo": ["Waterfall", 1], "gorafe": ["Dolmens", 1], "calar-alto": ["Observatory", 1], "fort-bravo": ["Film towns", 1], "la-calahorra": ["Flagstone", -1], "belmonte": ["Belmonte", 1], "gormaz": ["Gormaz", 1] };
   SWT.art.picto = function (route, opts) {
     opts = opts || {};
     var W = 520, H = 760, LON0 = -5.2, LON1 = 0.35, LAT0 = 42.45, LAT1 = 36.45;
@@ -29,7 +29,7 @@ SWT.art = {};
       var p = P(m[0], m[1]); o += '<path d="M' + f(p[0] - 11) + ' ' + f(p[1] + 7) + 'l11-15 11 15" fill="none" stroke="var(--soft)" stroke-width="1.6" stroke-linejoin="round"/>';
     });
     // towns for context
-    [["Burgos", -3.70, 42.34, 1], ["Madrid", -3.70, 40.42, 1], ["Cuenca", -2.13, 40.07, 1], ["Albacete", -1.86, 38.99, 1], ["Granada", -3.60, 37.18, -1], ["Almería", -2.46, 36.84, 1], ["Murcia", -1.13, 37.99, 1]].forEach(function (c) {
+    [["Burgos", -3.70, 42.34, 1], ["Madrid", -3.70, 40.42, -1], ["Cuenca", -2.13, 40.07, 1], ["Albacete", -1.86, 38.99, 1], ["Murcia", -1.13, 37.99, 1]].forEach(function (c) {
       var p = P(c[1], c[2]); o += '<rect x="' + f(p[0] - 3.5) + '" y="' + f(p[1] - 3.5) + '" width="7" height="7" fill="var(--soft)"/>' +
         '<text x="' + f(p[0] + (c[3] > 0 ? 8 : -8)) + '" y="' + f(p[1] + 4) + '" text-anchor="' + (c[3] > 0 ? "start" : "end") + '" font-family="Courier Prime, monospace" font-size="12.5" fill="var(--soft)">' + c[0] + '</text>';
     });
@@ -57,13 +57,12 @@ SWT.art = {};
     });
     // sun, compass, sea name, cactus and rider doodles
     o += '<g transform="translate(442 70)"><circle r="26" fill="var(--sun)"/>' + [0,30,60,90,120,150,180,210,240,270,300,330].map(function (r) { return '<path d="M0 -33V-44" stroke="var(--sun)" stroke-width="3" transform="rotate(' + r + ')"/>'; }).join("") + '</g>';
-    o += '<g transform="translate(470 610)" font-family="Rye, serif" font-size="14" fill="var(--ink)" text-anchor="middle"><path d="M0 -30L7 0 0 30-7 0z" fill="var(--ink)"/><path d="M0 -30L7 0H-7z" fill="var(--sun)"/><text y="-36">N</text></g>';
-    var sea = P(-0.9, 37.0); o += '<text x="' + f(sea[0]) + '" y="' + f(sea[1]) + '" font-family="Rye, serif" font-size="17" fill="var(--soft)" text-anchor="middle">Mar</text><text x="' + f(sea[0]) + '" y="' + f(sea[1] + 20) + '" font-family="Rye, serif" font-size="17" fill="var(--soft)" text-anchor="middle">Mediterráneo</text>';
+    o += '<g transform="translate(478 470)" font-family="Rye, serif" font-size="14" fill="var(--ink)" text-anchor="middle"><path d="M0 -30L7 0 0 30-7 0z" fill="var(--ink)"/><path d="M0 -30L7 0H-7z" fill="var(--sun)"/><text y="-36">N</text></g>';
+    var sea = P(-0.45, 37.25); o += '<text x="' + f(sea[0]) + '" y="' + f(sea[1]) + '" font-family="Rye, serif" font-size="17" fill="var(--soft)" text-anchor="middle">Mar</text><text x="' + f(sea[0]) + '" y="' + f(sea[1] + 20) + '" font-family="Rye, serif" font-size="17" fill="var(--soft)" text-anchor="middle">Mediterráneo</text>';
     var cact = [[-1.6, 37.55], [-4.3, 37.6], [-1.3, 38.6]];
     cact.forEach(function (c) { var p = P(c[0], c[1]); o += '<g transform="translate(' + f(p[0] - 14) + ' ' + f(p[1] - 14) + ') scale(1.2)" fill="none" stroke="var(--trail)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="' + SWT.icons.cactus + '"/></g>'; });
     var a = P(-3.4084, 41.9908), b = P(-2.3905, 37.0496);
     o += '<text x="' + f(a[0] - 2) + '" y="' + f(a[1] - 22) + '" font-family="Rye, serif" font-size="13" fill="var(--blood)" text-anchor="middle">START</text>';
-    o += '<text x="' + f(b[0] + 18) + '" y="' + f(b[1] + 26) + '" font-family="Rye, serif" font-size="13" fill="var(--blood)">THE END</text>';
     if (!opts.bare) o += '<text x="18" y="' + (H - 18) + '" font-family="Courier Prime, monospace" font-size="11" fill="var(--soft)">Not to scale for navigation. Use the Map for that.</text>';
     return o + "</svg>";
   };
