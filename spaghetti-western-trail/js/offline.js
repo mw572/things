@@ -23,7 +23,7 @@ window.SWT = window.SWT || {};
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js").then(function (reg) {
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(function (reg) {
         O.reg = reg; emit();
         reg.addEventListener("updatefound", function () { var w = reg.installing; if (w) w.addEventListener("statechange", emit); });
       }).catch(function () {});
