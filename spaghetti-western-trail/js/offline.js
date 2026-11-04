@@ -28,7 +28,9 @@ window.SWT = window.SWT || {};
         reg.addEventListener("updatefound", function () { var w = reg.installing; if (w) w.addEventListener("statechange", emit); });
       }).catch(function () {});
     });
-    navigator.serviceWorker.addEventListener && navigator.serviceWorker.addEventListener("controllerchange", emit);
+    // When a new release takes over from an old one, reload once so the page never runs a mix of old and new files.
+    var hadController = !!navigator.serviceWorker.controller, reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () { if (hadController && !reloaded) { reloaded = true; location.reload(); } else emit(); });
   }
 
   // ---- the map files: the detailed trail corridor and a light overview of Spain ----

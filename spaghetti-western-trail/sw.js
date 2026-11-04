@@ -19,7 +19,7 @@ self.addEventListener("fetch", function (e) {
     e.respondWith(fetch(req).then(function (r) { return r; }).catch(function () { return caches.match("index.html", { cacheName: SHELL_CACHE }); }));
     return;
   }
-  e.respondWith(caches.match(req, { ignoreSearch: true }).then(function (hit) {
+  e.respondWith(caches.match(req, { ignoreSearch: true, cacheName: SHELL_CACHE }).then(function (hit) {
     return hit || fetch(req).then(function (r) {
       if (r.ok && url.pathname.indexOf("/fonts/glyphs/") >= 0) { var copy = r.clone(); caches.open(SHELL_CACHE).then(function (c) { c.put(req, copy); }); }
       return r;

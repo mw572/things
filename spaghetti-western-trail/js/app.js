@@ -83,7 +83,7 @@ window.SWT = window.SWT || {};
         '<div class="facts"><div><b>' + Math.round(SWT.totalKm) + '</b>km of trail</div><div><b>' + stages.length + '</b>stages</div><div><b>3</b>areas</div><div><b>' + nReal + '</b>landmarks</div></div>' +
         '<div class="actions"><a class="btn" href="#map">Open the map</a><a class="btn ghost" href="#app">Put it on your phone</a></div>' +
       '</div></div></section>' +
-    '<section class="band"><div class="wrap picto-wrap"><figure style="margin:0"><div class="picto">' + SWT.art.picto(SWT.route) + '</div>' +
+    '<section class="band"><div class="wrap picto-wrap"><figure style="margin:0">' + pictoMap() + '' +
       '<div class="legend"><span><i class="ln" style="border-color:var(--trail);border-top-style:dashed"></i>Trail (off-road)</span><span><i class="ln" style="border-color:var(--tarmac)"></i>Tarmac route</span><span>' + SWT.badgeSvg("cross", SWT.cats.film.color, 18) + ' Film location</span><span>' + SWT.badgeSvg("block", SWT.cats.odd.color, 18) + ' Odd and abandoned</span><span>' + SWT.badgeSvg("fall", SWT.cats.beauty.color, 18) + ' Waterfalls and views</span></div></figure>' +
       '<div class="prose"><div class="eyebrow">The route</div><h2 style="margin:8px 0 16px">Sad Hill to the desert</h2>' +
         '<p class="lede">The trail starts at Sad Hill, the circular cemetery south of Burgos where The Good, the Bad and the Ugly ends, and runs south for eight stages to Tabernas in Almería, where the western towns built for the films are still standing.</p>' +
@@ -103,6 +103,11 @@ window.SWT = window.SWT || {};
       SWT.threads.slice(0, 4).map(function (t) { return '<a class="thread-row" href="#thread/' + t.id + '"><span style="display:flex;gap:10px;align-items:flex-start">' + avatar(t.author) + '<span><b>' + esc(t.title) + '</b><br><span class="muted" style="font-size:14px">' + esc(t.author) + '</span></span></span><span class="mono muted" style="font-size:12px">' + esc(t.when) + '</span></a>'; }).join("") +
       '<p style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap"><a href="#saloon" class="btn dark small">Go to the Saloon</a><a href="#suggest" class="btn ghost small">Suggest a place</a></p></div></div></section>';
   };
+  function pictoMap() {
+    var img = art("picto-map");
+    if (!img) return '<div class="picto">' + SWT.art.picto(SWT.route) + '</div>';
+    return '<div class="picto painted"><img src="' + img + '" alt="Illustrated map of central and southern Spain"><div class="ov">' + SWT.art.picto(SWT.route, { mode: "overlay" }) + '</div></div>';
+  }
   function installBanner() {
     if (SWT.offline.standalone() && SWT._mapSaved) return "";
     var msg = SWT.offline.standalone() ? "The app is installed. Save the trail now so the map works with no signal." : "Riding it? Put the whole guide on your phone. Once saved it works in flight mode, map included.";

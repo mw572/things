@@ -116,7 +116,10 @@ window.SWT = window.SWT || {};
   M.create = function (el, opts) {
     opts = opts || {};
     return M.prepare().then(function (k) {
-      var map = new maplibregl.Map({ container: el, style: style(k), bounds: opts.center ? undefined : M.bounds(null), center: opts.center, zoom: opts.zoom,
+      // Keep the drawing surface under 4,000 px on its longest side. Above about 4,096 px MapLibre draws nothing at all,
+      // which a Retina screen reaches on a wide window (Marcus's desktop, 4 Nov 2026).
+      function capPR() { var w = el.clientWidth || 1, h = el.clientHeight || 1; return Math.min(window.devicePixelRatio || 1, 4000 / Math.max(w, h)); }
+      var map = new maplibregl.Map({ container: el, pixelRatio: capPR(), style: style(k), bounds: opts.center ? undefined : M.bounds(null), center: opts.center, zoom: opts.zoom,
         fitBoundsOptions: { padding: 30 }, maxBounds: [[-11, 34.5], [5, 45]], minZoom: 4.5, maxZoom: 16.5, attributionControl: { compact: true }, cooperativeGestures: !!opts.cooperative, dragRotate: false, pitchWithRotate: false });
       map.touchZoomRotate.disableRotation();
       if (opts.controls !== false) {
@@ -124,7 +127,7 @@ window.SWT = window.SWT || {};
         map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), "bottom-right");
         map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
       }
-      if (window.ResizeObserver) new ResizeObserver(function () { map.resize(); }).observe(el);
+      if (window.ResizeObserver) new ResizeObserver(function () { var pr = capPR(); if (Math.abs(pr - map.getPixelRatio()) > .01) map.setPixelRatio(pr); map.resize(); }).observe(el);
       requestAnimationFrame(function () { map.resize(); });
       map.on("load", function () { map.resize(); M.addOverlays(map, opts); if (opts.controls !== false) M.applyFilter(map); if (opts.onLoad) opts.onLoad(map); });
       return map;

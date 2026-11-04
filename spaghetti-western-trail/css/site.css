@@ -135,6 +135,10 @@ section.band.alt { background: var(--paper2); }
 /* pictographic map */
 .picto { background: var(--sea); border-radius: 4px; overflow: hidden; box-shadow: var(--shadow); }
 .picto svg { width: 100%; height: auto; display: block; }
+.picto.painted { position: relative; }
+.picto.painted > img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; }
+.picto.painted .ov { position: absolute; inset: 0; }
+.picto.painted .ov svg { width: 100%; height: 100%; }
 .picto a:hover circle, .picto a:focus circle { stroke-width: 3.5; }
 .picto-wrap { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 48px; align-items: center; }
 @media (max-width: 860px) { .picto-wrap { grid-template-columns: 1fr; gap: 28px; } }
